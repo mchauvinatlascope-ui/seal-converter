@@ -169,5 +169,109 @@
     if (file) openDocx(file);
   });
 
+  // ---- Editing the preview by hand (step 5) ----
+
+  // Character offsets of the selection inside one line of the preview.
+  function offsetsIn(el, range) {
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    let pos = 0;
+    let start = null;
+    let end = null;
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      if (node === range.startContainer) start = pos + range.startOffset;
+      if (node === range.endContainer) end = pos + range.endOffset;
+      pos += node.nodeValue.length;
+    }
+    if (start === null) start = range.intersectsNode(el) ? 0 : null;
+    if (end === null) end = range.intersectsNode(el) ? pos : null;
+    return start === null || end === null ? null : { start: Math.min(start, end), end: Math.max(start, end) };
+  }
+
+  // The lines the user can format: steps, paragraphs, titles and table cells.
+  const LINES = 'li, p, h2, h3, td, th';
+
+  function selectedLines() {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || !sel.rangeCount) return [];
+    const range = sel.getRangeAt(0);
+    if (!preview.contains(range.commonAncestorContainer)) return [];
+    const out = [];
+    for (const el of preview.querySelectorAll(LINES)) {
+      if (el.querySelector(LINES) || !range.intersectsNode(el)) continue;
+      const offsets = offsetsIn(el, range);
+      if (offsets && offsets.end > offsets.start) out.push({ el, ...offsets });
+    }
+    return out;
+  }
+
+  function applyFormat(kind) {
+    const lines = selectedLines();
+    if (!lines.length) return;
+    // One click formats everything selected, unless it is all formatted already.
+    const on = kind !== 'none' && !lines.every(({ el, start, end }) =>
+      Edit.hasFormat(Parse.runsFromElement(el), start, end, kind));
+    for (const { el, start, end } of lines) {
+      const runs = Parse.runsFromElement(el);
+      const next = kind === 'none' ? Edit.clearFormat(runs, start, end) : Edit.setFormat(runs, start, end, kind, on);
+      el.innerHTML = Edit.renderRuns(next);
+    }
+    // Keep the same characters selected, so the user can try another button.
+    const first = lines[0];
+    const last = lines[lines.length - 1];
+    const sel = window.getSelection();
+    const range = document.createRange();
+    const point = (el, offset) => {
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      let pos = 0;
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        if (pos + node.nodeValue.length >= offset) return [node, offset - pos];
+        pos += node.nodeValue.length;
+      }
+      return [el, el.childNodes.length];
+    };
+    range.setStart(...point(first.el, first.start));
+    range.setEnd(...point(last.el, last.end));
+    sel.removeAllRanges();
+    sel.addRange(range);
+    updateTools();
+  }
+
+  const tools = Array.from(document.querySelectorAll('.tool'));
+  const hint = document.getElementById('protocol-hint');
+
+  function updateTools() {
+    const lines = selectedLines();
+    for (const tool of tools) {
+      const kind = tool.dataset.format;
+      tool.disabled = !lines.length;
+      if (kind === 'none') continue;
+      const active = lines.length > 0 && lines.every(({ el, start, end }) =>
+        Edit.hasFormat(Parse.runsFromElement(el), start, end, kind));
+      tool.setAttribute('aria-pressed', String(active));
+    }
+    hint.textContent = lines.length ? 'Formatting applies to the selected text' : 'Select text in the preview to format it';
+  }
+
+  for (const tool of tools) {
+    // mousedown would drop the selection before the click arrives.
+    tool.addEventListener('mousedown', (e) => e.preventDefault());
+    tool.addEventListener('click', () => applyFormat(tool.dataset.format));
+  }
+
+  document.addEventListener('selectionchange', () => { if (!preview.hidden) updateTools(); });
+
+  preview.addEventListener('keydown', (e) => {
+    if (!(e.ctrlKey || e.metaKey)) return;
+    const key = e.key.toLowerCase();
+    const kind = key === 'b' ? 'b' : key === 'i' ? 'i' : (key === 'v' && e.shiftKey) ? 'v' : null;
+    if (!kind) return;
+    e.preventDefault();
+    applyFormat(kind);
+  });
+
+  preview.contentEditable = 'true';
+  preview.spellcheck = false;
+
   render();
+  updateTools();
 })();

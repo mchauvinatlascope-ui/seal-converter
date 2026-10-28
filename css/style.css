@@ -61,16 +61,7 @@ h1, h2, h3, h4, h5 { margin: 0; letter-spacing: -0.01em; }
   padding: 20px var(--gutter) 12px;
 }
 .brand { display: flex; align-items: center; gap: 12px; }
-.brand-mark {
-  display: grid;
-  place-items: center;
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
-  background: var(--accent);
-  color: #fff;
-}
-.brand-mark svg { width: 24px; height: 24px; }
+.brand-mark { width: 40px; height: 40px; border-radius: 10px; }
 .brand h1 { font-size: 18px; font-weight: 650; }
 .brand-sub { margin: 0; font-size: 13px; color: var(--muted); }
 
@@ -221,6 +212,35 @@ label.btn { display: inline-flex; align-items: center; }
 .card.dragging .drop-veil { display: grid; }
 
 .error { margin: 0 16px 16px; padding: 10px 12px; border-radius: 8px; background: #fdecea; color: #a12a1f; font-size: 13.5px; }
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+}
+.tool {
+  min-width: 34px;
+  padding: 5px 10px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: none;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+.tool:hover:not(:disabled) { background: var(--surface); border-color: var(--line-strong); color: var(--ink); }
+.tool[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.tool:disabled { opacity: 0.4; cursor: default; }
+.tool-blue { color: var(--seal-blue); font-weight: 700; }
+.toolbar-hint { margin-left: auto; font-size: 12.5px; color: var(--muted); }
+
+#protocol-sample[contenteditable="true"]:focus { outline: none; }
+#protocol-sample [contenteditable="true"]:focus-visible { outline: 2px solid var(--accent-soft); outline-offset: 2px; border-radius: 4px; }
 
 /* Empty states */
 .empty {

@@ -85,18 +85,22 @@
 
     // Formatting of every character, then values on top.
     const fmt = [];
-    for (const r of clean) for (let k = 0; k < r.text.length; k++) fmt.push({ b: !!r.b, i: !!r.i, v: -1 });
-    Detect.findValues(text).forEach((v, n) => { for (let k = v.start; k < v.end; k++) fmt[k].v = n; });
+    clean.forEach((r, n) => {
+      for (let k = 0; k < r.text.length; k++) fmt.push({ b: !!r.b, i: !!r.i, v: r.v ? `kept${n}` : -1 });
+    });
+    Detect.findValues(text).forEach((v, n) => {
+      for (let k = v.start; k < v.end; k++) if (fmt[k].v === -1) fmt[k].v = n;
+    });
 
     const pieces = [];
     let k = 0;
     while (k < end) {
       const f = fmt[k];
       let j = k + 1;
-      while (j < end && fmt[j].v === f.v && fmt[j].i === f.i && (f.v >= 0 || fmt[j].b === f.b)) j++;
+      while (j < end && fmt[j].v === f.v && fmt[j].i === f.i && (f.v !== -1 || fmt[j].b === f.b)) j++;
       const piece = text.slice(k, j);
-      let h = f.v >= 0 ? Seal.value(piece) : Seal.esc(piece);
-      if (f.v < 0 && f.b && piece.trim()) h = `<strong>${h}</strong>`;
+      let h = f.v !== -1 ? Seal.value(piece) : Seal.esc(piece);
+      if (f.v === -1 && f.b && piece.trim()) h = `<strong>${h}</strong>`;
       pieces.push({ html: h, i: f.i && !!piece.trim() });
       k = j;
     }
@@ -272,19 +276,29 @@
     return /^(I|EM)$/.test(el.tagName) || (el.style && el.style.fontStyle === 'italic');
   }
 
-  function inlineRuns(node, b = false, i = false, out = []) {
+  // Text already in Seal blue stays a value, whoever wrote it.
+  function isValueEl(el) {
+    return el.getAttribute && el.getAttribute('data-native-color') === 'blue';
+  }
+
+  function inlineRuns(node, b = false, i = false, out = [], v = false) {
     for (const child of node.childNodes) {
-      if (child.nodeType === 3) out.push({ text: child.nodeValue, b, i });
+      if (child.nodeType === 3) out.push({ text: child.nodeValue, b, i, v });
       else if (child.nodeType === 1) {
         const tag = child.tagName;
         if (/^(UL|OL|TABLE|STYLE|SCRIPT)$/.test(tag)) continue;
-        if (tag === 'BR') out.push({ text: ' ', b, i });
-        else if (tag === 'SUP') out.push({ text: scriptText(child.textContent, SUP, '^'), b, i });
-        else if (tag === 'SUB') out.push({ text: scriptText(child.textContent, SUB, '_'), b, i });
-        else inlineRuns(child, b || isBoldEl(child), i || isItalicEl(child), out);
+        if (tag === 'BR') out.push({ text: ' ', b, i, v });
+        else if (tag === 'SUP') out.push({ text: scriptText(child.textContent, SUP, '^'), b, i, v });
+        else if (tag === 'SUB') out.push({ text: scriptText(child.textContent, SUB, '_'), b, i, v });
+        else inlineRuns(child, b || isBoldEl(child), i || isItalicEl(child), out, v || isValueEl(child));
       }
     }
     return out;
+  }
+
+  // Reads one line of the preview back into runs, so a button can change it.
+  function runsFromElement(el) {
+    return inlineRuns(el).filter((r) => r.text);
   }
 
   function domToBlocks(rootEl) {
@@ -344,7 +358,7 @@
     return /^\s*</.test(text) && /<\/(p|div|h[1-6]|li|td|table|span)>/i.test(text);
   }
 
-  const Parse = { textToBlocks, htmlToBlocks, blocksToDoc, runsToHtml, readMarker, looksLikeHtml };
+  const Parse = { textToBlocks, htmlToBlocks, blocksToDoc, runsToHtml, runsFromElement, readMarker, looksLikeHtml };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Parse;
   else root.Parse = Parse;

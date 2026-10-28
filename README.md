@@ -42,6 +42,17 @@ Seal renumbers everything, so the original numbers (`1.`, `a)`, bullets) are dro
 
 [`examples/example-protocol.docx`](examples/example-protocol.docx) is a made-up protocol to try the import.
 
+## Editing the result by hand
+
+The preview is editable. Select text in it and use the toolbar:
+
+- **Value** puts the selection in blue bold, Seal's own markup for a value to respect (Ctrl+Shift+V).
+- **B** for reagents, equipment and warnings (Ctrl+B).
+- **I** for remarks and tips (Ctrl+I).
+- **Clear** removes formatting from the selection.
+
+A button that is already on removes the format instead of adding it. You can also correct the wording in the preview.
+
 ## Tests
 
 The HTML builder has unit tests that run with Node.js 18 or later, without installing anything:

@@ -5,15 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>seal-converter</title>
   <meta name="description" content="Format protocols, experiments and antibody mixes as HTML ready to paste into the Seal ELN. Runs entirely in your browser.">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232d72d2'/%3E%3Ccircle cx='16' cy='16' r='8' fill='none' stroke='white' stroke-width='2.5'/%3E%3Ccircle cx='16' cy='16' r='3' fill='white'/%3E%3C/svg%3E">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%2064%2064%22%20width=%2264%22%20height=%2264%22%3E%3Crect%20width=%2264%22%20height=%2264%22%20rx=%2215%22%20fill=%22%232d72d2%22/%3E%3Cpath%20d=%22M17%2044c-4%202-7%206-6.5%208.5.6%202.4%205%202%209.5-1.5z%22%20fill=%22%23cfe0f6%22/%3E%3Cpath%20d=%22M47%2044c4%202%207%206%206.5%208.5-.6%202.4-5%202-9.5-1.5z%22%20fill=%22%23cfe0f6%22/%3E%3Cpath%20d=%22M32%2010c10.5%200%2018.5%207.5%2018.5%2018.5%200%206.5-1.3%2012-4.3%2016C43%2048.8%2038%2051.5%2032%2051.5s-11-2.7-14.2-7C14.8%2040.5%2013.5%2035%2013.5%2028.5%2013.5%2017.5%2021.5%2010%2032%2010z%22%20fill=%22%23f4f8fd%22/%3E%3Cellipse%20cx=%2232%22%20cy=%2242%22%20rx=%2211.5%22%20ry=%228%22%20fill=%22%23dce9f8%22/%3E%3Cpath%20d=%22M32%2035.6c3.1%200%205.3%201.7%205.3%203.5s-2.4%203.4-5.3%203.4-5.3-1.6-5.3-3.4%202.2-3.5%205.3-3.5z%22%20fill=%22%231c2230%22/%3E%3Cpath%20d=%22M32%2042.5v3.2m0%200c0%202.1-1.7%203.4-3.8%203.4M32%2045.7c0%202.1%201.7%203.4%203.8%203.4%22%20fill=%22none%22%20stroke=%22%231c2230%22%20stroke-width=%221.8%22%20stroke-linecap=%22round%22/%3E%3Cg%20stroke=%22%231c2230%22%20stroke-width=%221.4%22%20stroke-linecap=%22round%22%20opacity=%22.7%22%3E%3Cpath%20d=%22M21.5%2039.5h-6M22%2043.5l-5.5%202%22/%3E%3Cpath%20d=%22M42.5%2039.5h6M42%2043.5l5.5%202%22/%3E%3C/g%3E%3Cg%20fill=%22none%22%20stroke=%22%231c2230%22%20stroke-width=%223%22%3E%3Ccircle%20cx=%2223%22%20cy=%2227.5%22%20r=%228%22%20fill=%22%23ffffff%22/%3E%3Ccircle%20cx=%2241%22%20cy=%2227.5%22%20r=%228%22%20fill=%22%23ffffff%22/%3E%3Cpath%20d=%22M31%2027.5h2%22%20stroke-linecap=%22round%22/%3E%3Cpath%20d=%22M15.2%2025.2l-3.4-2.4M48.8%2025.2l3.4-2.4%22%20stroke-linecap=%22round%22/%3E%3C/g%3E%3Ccircle%20cx=%2223%22%20cy=%2227.5%22%20r=%222.7%22%20fill=%22%231c2230%22/%3E%3Ccircle%20cx=%2241%22%20cy=%2227.5%22%20r=%222.7%22%20fill=%22%231c2230%22/%3E%3Crect%20x=%2230%22%20y=%2224%22%20width=%224%22%20height=%227%22%20rx=%221.2%22%20fill=%22%23f6c84c%22%20stroke=%22%231c2230%22%20stroke-width=%221.2%22/%3E%3C/svg%3E">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
   <header class="topbar">
     <div class="brand">
-      <span class="brand-mark" aria-hidden="true">
-        <svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="8" fill="none" stroke="currentColor" stroke-width="2.5"/><circle cx="16" cy="16" r="3" fill="currentColor"/></svg>
-      </span>
+      <img class="brand-mark" src="assets/logo.svg" width="40" height="40" alt="">
       <div>
         <h1>seal-converter</h1>
         <p class="brand-sub">Clean HTML for the Seal ELN</p>
@@ -70,6 +68,13 @@
             <h3>Seal preview</h3>
             <button class="btn btn-primary" disabled>Copy for Seal</button>
           </header>
+          <div class="toolbar" role="toolbar" aria-label="Formatting">
+            <button class="tool" data-format="v" title="Value in blue bold (Ctrl+Shift+V)"><span class="tool-blue">Aa</span> Value</button>
+            <button class="tool" data-format="b" title="Bold, for reagents and warnings (Ctrl+B)"><strong>B</strong></button>
+            <button class="tool" data-format="i" title="Italic, for remarks (Ctrl+I)"><em>I</em></button>
+            <button class="tool" data-format="none" title="Remove formatting">Clear</button>
+            <span class="toolbar-hint" id="protocol-hint">Select text in the preview to format it</span>
+          </div>
           <div class="seal-sample" aria-live="polite">
             <p class="sample-label" id="protocol-label">Example output</p>
             <div id="protocol-sample"></div>
@@ -127,12 +132,13 @@
   <footer class="foot">
     <span>Open source, MIT licence</span>
     <span class="dot" aria-hidden="true"></span>
-    <span>v0.4.1</span>
+    <span>v0.5.0</span>
   </footer>
 
   <script src="js/seal.js"></script>
   <script src="js/detect.js"></script>
   <script src="js/parse.js"></script>
+  <script src="js/edit.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
