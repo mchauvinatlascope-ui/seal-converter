@@ -40,7 +40,9 @@
   const fileInput = document.getElementById('protocol-file');
   const imported = document.getElementById('protocol-imported');
   const importedName = document.getElementById('protocol-imported-name');
+  const importedNote = document.getElementById('protocol-imported-note');
   const clearBtn = document.getElementById('protocol-clear');
+  const READY_NOTE = importedNote.textContent;
   const preview = document.getElementById('protocol-sample');
   const label = document.getElementById('protocol-label');
 
@@ -90,10 +92,21 @@
   function setImported(html, name) {
     importedHtml = html;
     importedName.textContent = name;
+    importedNote.textContent = READY_NOTE;
     imported.hidden = false;
     input.hidden = true;
     setError(null);
     render();
+  }
+
+  // The Word reader is 620 kB and loads on the first file, which takes a moment.
+  function setReading(name) {
+    importedName.textContent = name;
+    importedNote.textContent = 'Reading the file…';
+    imported.hidden = false;
+    input.hidden = true;
+    clearBtn.disabled = true;
+    setError(null);
   }
 
   function clearImport() {
@@ -132,6 +145,7 @@
       setError('Only .docx files can be imported. Save older .doc files as .docx in Word first.');
       return;
     }
+    setReading(file.name);
     try {
       const mammoth = await loadMammoth();
       const result = await mammoth.convertToHtml(
@@ -140,8 +154,10 @@
       );
       setImported(result.value, file.name);
     } catch (err) {
+      clearImport();
       setError(`This file could not be read (${err.message}).`);
     }
+    clearBtn.disabled = false;
   }
 
   input.addEventListener('input', render);
