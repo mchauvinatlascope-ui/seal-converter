@@ -1,6 +1,6 @@
 {
   "name": "seal-converter",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "description": "Format protocols, experiments and antibody mixes as HTML for the Seal ELN",
   "license": "MIT",

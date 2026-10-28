@@ -75,10 +75,16 @@
 
   // Headers in bold; cells that are numbers (with or without a unit) in blue bold.
   function table(headers, rows) {
-    const head = `<tr>${headers.map((h) => `<th>${bold(h)}</th>`).join('')}</tr>`;
-    const body = rows.map((row) =>
-      `<tr>${row.map((cell) => `<td>${isNumeric(cell) ? value(cell) : esc(cell ?? '')}</td>`).join('')}</tr>`
-    ).join('');
+    return rawTable(
+      headers.map(bold),
+      rows.map((row) => row.map((cell) => (isNumeric(cell) ? value(cell) : esc(cell ?? ''))))
+    );
+  }
+
+  // Same table from cells that are already HTML. A table may have no header row.
+  function rawTable(headHtml, rowsHtml) {
+    const head = headHtml ? `<tr>${headHtml.map((h) => `<th>${h}</th>`).join('')}</tr>` : '';
+    const body = rowsHtml.map((row) => `<tr>${row.map((c) => `<td>${c}</td>`).join('')}</tr>`).join('');
     return `<table>${head}${body}</table>`;
   }
 
@@ -87,21 +93,35 @@
     return typeof cell === 'string' && /^\s*[<>~≈]?\s*\d+([.,]\d+)?/.test(cell);
   }
 
-  // A whole document: [{ title, intro?, sections: [{ title, steps: [html] }] }]
+  function blocks(list) {
+    return (list || []).map((b) => {
+      if (b.type === 'steps') return b.items.length ? steps(b.items) : '';
+      if (b.type === 'para') return paragraph(b.html);
+      if (b.type === 'table') return rawTable(b.head, b.rows);
+      return '';
+    }).join('');
+  }
+
+  // A whole document: [{ title, blocks?, intro?, steps?, sections: [{ title, blocks?, steps? }] }]
+  // A chapter without a title (text before the first chapter) gets no heading and no separator.
   function document(chapters) {
-    return chapters.map((ch, i) => {
-      const parts = [chapter(i + 1, ch.title)];
+    let n = 0;
+    return chapters.map((ch) => {
+      const parts = [];
+      if (ch.title) parts.push(chapter(++n, ch.title));
       if (ch.intro) parts.push(paragraph(ch.intro));
-      if (ch.steps) parts.push(steps(ch.steps));
+      if (ch.steps && ch.steps.length) parts.push(steps(ch.steps));
+      parts.push(blocks(ch.blocks));
       (ch.sections || []).forEach((sec, j) => {
         parts.push(section(j + 1, sec.title));
         if (sec.steps && sec.steps.length) parts.push(steps(sec.steps));
+        parts.push(blocks(sec.blocks));
       });
       return parts.join('');
     }).join('');
   }
 
-  const Seal = { esc, value, bold, note, roman, letter, separator, chapter, section, steps, paragraph, table, document };
+  const Seal = { esc, value, bold, note, roman, letter, separator, chapter, section, steps, paragraph, table, rawTable, document };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Seal;
   else root.Seal = Seal;

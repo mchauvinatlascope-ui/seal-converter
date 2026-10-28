@@ -4,8 +4,10 @@
   const SP = '[ \\u00a0\\u202f]?'; // at most one space, including the non-breaking kinds Word uses
   const MINUS = '[-\\u2212]';
 
+  // x 10^6 | × 10⁶ | e6
+  const SCI = `(?:${SP}[x×]${SP}10(?:${SP}\\^?${SP}${MINUS}?\\d+|[⁻]?[⁰¹²³⁴⁵⁶⁷⁸⁹]+)|e[-+]?\\d+)`;
   // 5 | 0.5 | 1,000 | 1 x 10^6 | 2e6 | -80
-  const NUM = `(?:${MINUS})?\\d+(?:[.,]\\d+)?(?:${SP}[x×]${SP}10${SP}\\^?${SP}${MINUS}?\\d+|e[-+]?\\d+)?`;
+  const NUM = `(?:${MINUS})?\\d+(?:[.,]\\d+)?${SCI}?`;
   // 5-10 | 5–10 | 5 to 10 | 37 ± 1
   const RANGE = `${NUM}(?:\\s*(?:-|–|to|±|\\+\\/-)\\s*${NUM})?`;
 
@@ -27,16 +29,17 @@
     '[µμu]m', 'nm', 'mm', 'cm',
     'Gy', 'mA', 'V', 'G',
     'cells', 'cell',
-    'times', '-?fold', '[xX×]',
+    'times', '-?fold', `[xX×](?!${SP}\\d)`,
   ];
   const UNIT = `(?:${UNITS.join('|')})`;
   // mg/mL, U/mL, cells/well, µg/mouse...
-  const PER = `(?:${SP}\\/${SP}(?:[µμun]?[Lgl]|mL|ml|kg|g|well|mouse|animal|cm2|cm²))?`;
+  const PER = `(?:${SP}\\/${SP}(?:[µμun]?[Lgl]|mL|ml|kg|g|well|mouse|animal|cm2|cm²|min|h|s))?`;
 
   const WORD_NUMBERS = '[Oo]ne|[Tt]wo|[Tt]hree|[Ff]our|[Ff]ive|[Ss]ix|[Ss]even|[Ee]ight|[Nn]ine|[Tt]en';
 
   const PATTERNS = [
     `${RANGE}${SP}${UNIT}${PER}`, // 50 µL, 1 mM, 300 x g, 10 µg/mL
+    `\\d+(?:[.,]\\d+)?(?:\\s*(?:-|–|to)\\s*\\d+(?:[.,]\\d+)?)?${SCI}`, // counts: 7.5 to 22.5 × 10⁵
     `\\d+${SP}(?::|\\/|in)${SP}\\d+(?![\\/\\d])`, // dilutions 1:200, 1/50, 1 in 100
     `[xX×]${SP}\\d+`, // x3
     `pH${SP}\\d+(?:\\.\\d+)?`,
@@ -59,11 +62,14 @@
 
   // Em dashes, and spaced en dashes used the same way, become commas.
   // En dashes inside ranges ("5–10 min") are left alone.
+  // Only the dash and the spaces around it change, so formatting around it is kept.
   function cleanDashes(text) {
-    return String(text)
-      .replace(/\s*—\s*|\s+–\s+/g, ', ')
-      .replace(/^, /gm, '')
-      .replace(/, (?=[,.;:!?)]|$)/gm, '');
+    return String(text).replace(/\s*(?:—|(?<=\s)–(?=\s))\s*/g, (dash, offset, all) => {
+      const before = all.slice(0, offset);
+      const after = all.slice(offset + dash.length);
+      if (!before.trim() || !after.trim() || /^[,.;:!?)]/.test(after)) return '';
+      return ', ';
+    });
   }
 
   // Plain text in, Seal HTML out: escaped text with every value in blue bold.

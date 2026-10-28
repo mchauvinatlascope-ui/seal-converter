@@ -44,14 +44,26 @@
         <p>Import a .docx or paste your text. Values with units turn blue, and the result pastes into Seal with its formatting intact.</p>
       </div>
       <div class="workspace">
-        <article class="card">
+        <article class="card" id="protocol-source">
           <header class="card-head">
             <h3>Source</h3>
-            <span class="hint">Word import arrives at step 4</span>
+            <label class="btn">
+              Import .docx
+              <input type="file" id="protocol-file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden>
+            </label>
           </header>
+          <div class="imported" id="protocol-imported" hidden>
+            <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M14 6h14l10 10v24a2 2 0 0 1-2 2H14a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M28 6v10h10" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+            <div>
+              <p class="imported-name" id="protocol-imported-name"></p>
+              <p class="imported-note">Formatting, headings, lists and tables are read from the source. Edit the result in the preview (step 5).</p>
+            </div>
+            <button class="btn" id="protocol-clear">Clear</button>
+          </div>
           <label class="sr-only" for="protocol-input">Protocol text</label>
           <textarea id="protocol-input" class="source-input" spellcheck="false"
-            placeholder="Type or paste protocol steps, one per line.&#10;&#10;Example:&#10;Spin at 300 x g for 5 min at 4 °C.&#10;Stain with anti-CD45 at 1:200 for 20 min on ice."></textarea>
+            placeholder="Paste a protocol from Word or a web page, type it, or drop a .docx file here.&#10;&#10;I. Before experiments&#10;a. Buffer preparation&#10;Spin at 300 x g for 5 min at 4 °C.&#10;Stain with anti-CD45 at 1:200 for 20 min on ice."></textarea>
+          <div class="drop-veil" aria-hidden="true">Drop the .docx file</div>
         </article>
         <article class="card">
           <header class="card-head">
@@ -115,11 +127,12 @@
   <footer class="foot">
     <span>Open source, MIT licence</span>
     <span class="dot" aria-hidden="true"></span>
-    <span>v0.3.0</span>
+    <span>v0.4.0</span>
   </footer>
 
   <script src="js/seal.js"></script>
   <script src="js/detect.js"></script>
+  <script src="js/parse.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

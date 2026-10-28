@@ -8,7 +8,7 @@ Everything runs in your browser. Files you open and text you paste stay on your 
 
 ## Status
 
-Early work in progress. In the Protocol tab you can already type or paste steps, one per line, and see values with units turn blue. Word import and copying to Seal come next.
+Work in progress. The Protocol tab already reads a protocol and shows the Seal version; copying to Seal comes next.
 
 | Module | What it will do |
 | --- | --- |
@@ -28,6 +28,18 @@ cd seal-converter
 open index.html   # or double-click the file
 ```
 
+## Protocol import
+
+You can bring a protocol in three ways:
+
+- **Word file**: click *Import .docx* or drop the file on the Source panel. Heading styles become chapters and sections, Word lists become steps, tables stay tables, and bold and italic are kept.
+- **Paste from Word or a web page**: paste into the empty Source box. The formatting that came with the paste is used the same way.
+- **Plain text**: type or paste lines. A line starting with `I.`, `II.` is a chapter, `a.`, `b.` a section, and other lines are steps. Lines separated by tabs become a table.
+
+Seal renumbers everything, so the original numbers (`1.`, `a)`, bullets) are dropped. Values with units turn blue, em dashes become commas, and superscripts such as 10⁶ are kept.
+
+[`examples/example-protocol.docx`](examples/example-protocol.docx) is a made-up protocol to try the import.
+
 ## Tests
 
 The HTML builder has unit tests that run with Node.js 18 or later, without installing anything:
@@ -43,3 +55,5 @@ No server is involved. The app never sends protocols, experiment data or panels 
 ## Licence
 
 MIT, see [LICENSE](LICENSE).
+
+Third-party code: [mammoth.js](https://github.com/mwilliamson/mammoth.js) 1.12.0 (BSD 2-Clause), in `vendor/` with its licence.
