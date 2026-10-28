@@ -116,9 +116,10 @@
     return html;
   }
 
+  // A bare number in a cell is as often a catalogue number as a value,
+  // so only numbers with a unit turn blue, like everywhere else.
   function cellToHtml(runs) {
-    const text = oneLine(runsText(runs));
-    return /^[<>~≈]?\s*\d+([.,]\d+)?$/.test(text) ? Seal.value(text) : runsToHtml(runs);
+    return runsToHtml(runs);
   }
 
   // Heading levels actually used, from the top: a single top heading is the document title,
@@ -145,8 +146,11 @@
     const numbered = lines.map((b) => readMarker(b.runs)).filter((m) => m.type === 'number');
     const numberedTitles = numbered.length > 0 && numbered.every((m) => m.title) && numbered.length < lines.length / 2;
     const textHasHeadings = numberedTitles || lines.some((b) => /^(roman|letter)$/.test(readMarker(b.runs).type));
-    // When a list or indentation has sub levels, the top level holds the section titles.
-    const deepest = blocks.reduce((max, b) => Math.max(max, b.depth || 0), 0);
+    // A line is a title when the line just after it sits one level deeper.
+    const opensSubLevel = blocks.map((b, n) => {
+      const next = blocks.slice(n + 1).find((other) => other.kind !== 'table');
+      return next ? (next.depth || 0) > (b.depth || 0) : false;
+    });
 
     const chapters = [];
     let chapter = null;
@@ -181,18 +185,25 @@
     };
     const started = () => chapters.some((c) => c.title || c.sections.length);
 
-    for (const block of blocks) {
+    blocks.forEach((block, index) => {
       if (block.kind === 'table') {
-        if (!block.rows.length && !block.head) continue;
+        if (!block.rows.length && !block.head) return;
+        // A bench sheet table (# | STEP | DONE) is a list of steps, not a table.
+        const stepColumn = stepColumnOf(block);
+        if (stepColumn >= 0) {
+          block.rows.forEach((row) => addStep(row[stepColumn] || []));
+          afterTable = true;
+          return;
+        }
         target().push({
           type: 'table',
           head: block.head ? block.head.map((c) => Seal.bold(titleText(c))) : null,
           rows: block.rows.map((row) => row.map(cellToHtml)),
         });
         afterTable = true;
-        continue;
+        return;
       }
-      if (!runsText(block.runs).trim()) continue;
+      if (!runsText(block.runs).trim()) return;
       const wasAfterTable = afterTable;
       afterTable = false;
 
@@ -202,7 +213,7 @@
         if (block === plan.title) addPara(runs, true);
         else if (block.level === plan.chapter) newChapter(runs);
         else newSection(runs);
-        continue;
+        return;
       }
 
       const m = readMarker(block.runs);
@@ -210,15 +221,40 @@
       if (m.type === 'roman') newChapter(m.runs);
       else if (m.type === 'letter') newSection(m.runs);
       else if (m.type === 'number' && block.kind === 'line' && numberedTitles) newChapter(m.runs);
-      else if (deepest > 0 && depth === 0 && block.kind !== 'line' && looksLikeTitle(runsText(m.runs))) newSection(m.runs);
+      // A list item that opens a sub level is the title of what follows.
+      else if (opensSubLevel[index] && block.kind === 'item' && looksLikeTitle(runsText(m.runs))) newSection(m.runs);
+      // A short paragraph entirely in bold is a title, numbered or not.
+      else if (block.kind === 'para' && isBoldTitle(m.runs)) newSection(m.runs);
       else if (depth > 0 || block.kind === 'item' || m.type === 'number' || m.type === 'bullet') addStep(m.runs);
-      else if (block.kind === 'para' && !hasHeadings && isBoldTitle(block.runs)) newSection(block.runs);
-      // Plain lines are steps, except an introduction before the first heading
-      // and a note right after a table.
+      // Plain text carries no formatting, so a title is read from the wording.
+      else if (block.kind === 'line' && (started() || !textHasHeadings) && looksLikePlainTitle(m.runs)) newSection(m.runs);
       else if (block.kind === 'line' && (started() || !textHasHeadings) && !wasAfterTable) addStep(block.runs);
       else addPara(block.runs);
-    }
+    });
     return chapters;
+  }
+
+  // The index of a STEP column in a bench sheet, or -1 when the table is a real table.
+  const TICK_COLUMN = /^(?:#|n°|no\.?|step ?#|done|ok|check(?:ed)?|✓|☐)$/i;
+  function stepColumnOf(table) {
+    if (!table.head) return -1;
+    const names = table.head.map((cell) => oneLine(runsText(cell)));
+    const step = names.findIndex((name) => /^steps?$/i.test(name));
+    if (step < 0) return -1;
+    return names.every((name, k) => k === step || TICK_COLUMN.test(name)) ? step : -1;
+  }
+
+  // Words a step starts with. A line that opens with one of them is an instruction,
+  // however short it is ("Place mouse down").
+  const ACTIONS = new RegExp('^(?:do not|if |when |once |avoid |add|allow|anaesthetize|anesthetize|aspirate|book|bring|centrifuge|change|check|collect|count|cover|discard|dilute|dispose|dissolve|draw|ensure|fill|filter|fix|harvest|heat|hold|immunis|immuniz|incubate|inject|insert|keep|label|leave|let|make|measure|mix|monitor|move|open|place|plate|pool|prepare|press|put|record|remove|repeat|replace|resuspend|return|rinse|run|seed|set|shake|spin|spray|stain|start|stop|store|take|tap|test|thaw|transfer|turn|update|use|validate|vortex|wait|warm|wash|weigh|weight|wrap|write)\\b', 'i');
+
+  // In plain text a title is short, has no final punctuation, no value, and is not an order.
+  function looksLikePlainTitle(runs) {
+    const text = oneLine(runsText(runs));
+    if (!looksLikeTitle(text) || text.length > 60) return false;
+    if (ACTIONS.test(text)) return false;
+    if (Detect.findValues(text).length) return false;
+    return text === text.toUpperCase() || text.split(/\s+/).length <= 5;
   }
 
   // Plain text: one block per line, and runs of tab separated lines become a table.
@@ -253,6 +289,8 @@
   const SUB = { 0: '₀', 1: '₁', 2: '₂', 3: '₃', 4: '₄', 5: '₅', 6: '₆', 7: '₇', 8: '₈', 9: '₉', '+': '₊', '-': '₋', '−': '₋' };
   // 10<sup>4</sup> -> 10⁴ and CO<sub>2</sub> -> CO₂, so the text survives any paste.
   function scriptText(text, map, fallback) {
+    // Word and SharePoint write 4<sup>o</sup>C for 4 °C.
+    if (map === SUP && /^[oO0]$/.test(text.trim())) return '°';
     const chars = [...text.trim()];
     return chars.every((c) => map[c]) ? chars.map((c) => map[c]).join('') : fallback + text;
   }
@@ -333,11 +371,14 @@
           // A header row is made of <th>, or is bold all the way across.
           const headRow = rows.length > 1 && rows[0].every((c) => c.tagName === 'TH' || inlineRuns(c).every((r) => r.b || !r.text.trim()));
           const toRuns = (row) => row.map((c) => inlineRuns(c, c.tagName === 'TH' || isBoldEl(c)));
-          blocks.push({
+          const table = {
             kind: 'table',
             head: headRow ? toRuns(rows[0]) : null,
             rows: (headRow ? rows.slice(1) : rows).map(toRuns),
-          });
+          };
+          // A table of empty cells is page furniture, not content.
+          table.rows = table.rows.filter((row) => row.some((cell) => runsText(cell).trim()));
+          if (table.rows.length) blocks.push(table);
         } else if (/^(DIV|SECTION|ARTICLE|MAIN|BODY|BLOCKQUOTE|LI|CENTER|FONT|SPAN)$/.test(tag) && el.children.length) walk(el, depth + indentOf(el));
         else if (!/^(STYLE|SCRIPT|META|LINK|TITLE|HEAD)$/.test(tag) && el.textContent.trim()) {
           blocks.push({ kind: 'para', runs: inlineRuns(el) });

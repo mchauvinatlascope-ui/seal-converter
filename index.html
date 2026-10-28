@@ -46,8 +46,8 @@
           <header class="card-head">
             <h3>Source</h3>
             <label class="btn">
-              Import .docx
-              <input type="file" id="protocol-file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden>
+              Open a file
+              <input type="file" id="protocol-file" accept=".docx,.html,.htm,.txt,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/html,text/plain" hidden>
             </label>
           </header>
           <div class="imported" id="protocol-imported" hidden>
@@ -60,8 +60,8 @@
           </div>
           <label class="sr-only" for="protocol-input">Protocol text</label>
           <textarea id="protocol-input" class="source-input" spellcheck="false"
-            placeholder="Paste a protocol from Word or a web page, type it, or drop a .docx file here.&#10;&#10;I. Before experiments&#10;a. Buffer preparation&#10;Spin at 300 x g for 5 min at 4 °C.&#10;Stain with anti-CD45 at 1:200 for 20 min on ice."></textarea>
-          <div class="drop-veil" aria-hidden="true">Drop the .docx file</div>
+            placeholder="Paste a protocol from Word, SharePoint or a web page, type it, or drop a .docx or .html file here.&#10;&#10;I. Before experiments&#10;a. Buffer preparation&#10;Spin at 300 x g for 5 min at 4 °C.&#10;Stain with anti-CD45 at 1:200 for 20 min on ice."></textarea>
+          <div class="drop-veil" aria-hidden="true">Drop the file</div>
         </article>
         <article class="card">
           <header class="card-head">
@@ -73,6 +73,10 @@
             <button class="tool" data-format="b" title="Bold, for reagents and warnings (Ctrl+B)"><strong>B</strong></button>
             <button class="tool" data-format="i" title="Italic, for remarks (Ctrl+I)"><em>I</em></button>
             <button class="tool" data-format="none" title="Remove formatting">Clear</button>
+            <span class="tool-sep" aria-hidden="true"></span>
+            <button class="tool" data-level="up" title="Make this line a chapter, a section, or a step">Up</button>
+            <button class="tool" data-level="down" title="Make this line a section, or a step">Down</button>
+            <span class="tool-role" id="protocol-role"></span>
             <span class="toolbar-hint" id="protocol-hint">Select text in the preview to format it</span>
           </div>
           <div class="seal-sample" aria-live="polite">
@@ -130,7 +134,7 @@
   </main>
 
   <footer class="foot">
-    <span>v0.6.1</span>
+    <span>v0.7.0</span>
   </footer>
 
   <script src="js/seal.js"></script>

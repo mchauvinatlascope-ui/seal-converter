@@ -87,6 +87,27 @@ test('a step starting with a quantity keeps it', () => {
   assert.equal(fromText('1. Weigh the mice.'), '<ol><li>Weigh the mice.</li></ol>');
 });
 
+test('a bench sheet table (# | STEP | DONE) becomes numbered steps', () => {
+  const html = fromText([
+    'Complete medium',
+    '#\tSTEP\tDONE',
+    '1\tHeat the serum for 30 min at 56 degrees C.\tX',
+    '2\tMix 450 mL medium and 50 mL serum.\tX',
+  ].join('\n'));
+  assert.equal(html,
+    '<h3>a. Complete medium</h3>' +
+    `<ol><li>Heat the serum for ${B('30 min')} at ${B('56 degrees C')}.</li>` +
+    `<li>Mix ${B('450 mL')} medium and ${B('50 mL')} serum.</li></ol>`);
+});
+
+test('a real table keeps its columns, and a catalogue number stays plain', () => {
+  const html = fromText(['I. Inventory', 'Item\tCatalogue no', 'Cell strainer\t353077'].join('\n'));
+  assert.equal(html,
+    `<p>${'-'.repeat(184)}</p><h2>I. Inventory</h2>` +
+    '<table><tr><th><strong>Item</strong></th><th><strong>Catalogue no</strong></th></tr>' +
+    '<tr><td>Cell strainer</td><td>353077</td></tr></table>');
+});
+
 test('headings: a single top heading is the title, the next level gives chapters', () => {
   const doc = Parse.blocksToDoc([
     { kind: 'heading', level: 1, runs: [run('Example protocol')] },

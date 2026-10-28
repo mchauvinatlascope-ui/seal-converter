@@ -40,7 +40,9 @@
   const PATTERNS = [
     `${RANGE}${SP}${UNIT}${PER}`, // 50 µL, 1 mM, 300 x g, 10 µg/mL
     `\\d+(?:[.,]\\d+)?(?:\\s*(?:-|–|to)\\s*\\d+(?:[.,]\\d+)?)?${SCI}`, // counts: 7.5 to 22.5 × 10⁵
-    `\\d+${SP}(?::|\\/|in)${SP}\\d+(?![\\/\\d])`, // dilutions 1:200, 1/50, 1 in 100
+    `\\d+${SP}(?:\\/|in)${SP}\\d+(?![\\/\\d])`, // dilutions 1/50, 1 in 100
+    // 1:200 is a dilution, 22:26 is a clock, so the left side stays small
+    `(?:\\d|1\\d|20)${SP}:${SP}\\d+(?![\\/\\d:])`,
     `[xX×]${SP}\\d(?!\\d)`, // x3 (a longer number is usually a name, such as influenza x31)
     `pH${SP}\\d+(?:\\.\\d+)?`,
     `(?:${WORD_NUMBERS})\\s+times`,

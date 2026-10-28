@@ -32,9 +32,11 @@ open index.html   # or double-click the file
 
 You can bring a protocol in three ways:
 
-- **Word file**: click *Import .docx* or drop the file on the Source panel. Heading styles become chapters and sections, Word lists become steps, tables stay tables, and bold and italic are kept.
-- **Paste from Word or a web page**: paste into the empty Source box. The formatting that came with the paste is used the same way.
-Sub levels are kept: when a list or an indented paragraph has levels, the top level becomes a section title and the levels below become its steps.
+- **A file**: click *Open a file* or drop it on the Source panel. Word (.docx), a saved or exported web page (.html) and plain text (.txt) all work. Heading styles become chapters and sections, Word lists become steps, tables stay tables, and bold and italic are kept.
+- **Paste from Word, SharePoint or a web page**: paste into the empty Source box. The formatting that came with the paste is used the same way.
+Sub levels are kept: a list item or an indented paragraph with deeper lines below it becomes a section title, and those lines become its steps. A short paragraph entirely in bold is read as a title too, numbered or not.
+
+A bench sheet table whose columns are `#`, `STEP` and `DONE` becomes a numbered list of steps rather than a three column table.
 
 - **Plain text**: type or paste lines. A line starting with `I.`, `II.` is a chapter, `a.`, `b.` a section, and other lines are steps. Lines separated by tabs become a table.
 
@@ -52,6 +54,8 @@ The preview is editable. Select text in it and use the toolbar:
 - **Clear** removes formatting from the selection.
 
 A button that is already on removes the format instead of adding it. You can also correct the wording in the preview.
+
+**Up** and **Down** move the line the caret sits in between chapter, section and step. Everything is renumbered, so a step promoted to a section takes the next free letter.
 
 ## Copy into Seal
 

@@ -48,6 +48,11 @@ test('a strain name keeps its number, a repeat count is one digit', () => {
   assert.deepEqual(values('Thaw Influenza A x31 and wash x3.'), ['x3']);
 });
 
+test('a clock is not a dilution', () => {
+  assert.deepEqual(values('Last modified on 2026-07-27 22:26.'), []);
+  assert.deepEqual(values('Stain at 1:200 and 20:1.'), ['1:200', '20:1']);
+});
+
 test('numbers glued to names are not values', () => {
   assert.deepEqual(values('Stain CD45 with BV421 and PE-Cy7.'), []);
   assert.deepEqual(values('Take 5 mice and 3 samples from group 2.'), []);

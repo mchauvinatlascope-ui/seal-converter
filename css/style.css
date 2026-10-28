@@ -239,6 +239,8 @@ label.btn { display: inline-flex; align-items: center; }
 .tool:disabled { opacity: 0.4; cursor: default; }
 .tool-blue { color: var(--seal-blue); font-weight: 700; }
 .toolbar-hint { margin-left: auto; font-size: 12.5px; color: var(--muted); }
+.tool-sep { width: 1px; height: 20px; margin: 0 4px; background: var(--line-strong); }
+.tool-role { font-size: 12.5px; color: var(--accent); font-weight: 550; }
 
 #protocol-sample[contenteditable="true"]:focus { outline: none; }
 #protocol-sample [contenteditable="true"]:focus-visible { outline: 2px solid var(--accent-soft); outline-offset: 2px; border-radius: 4px; }

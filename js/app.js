@@ -140,9 +140,20 @@
     return mammothReady;
   }
 
-  async function openDocx(file) {
+  async function openFile(file) {
+    // An exported web page, a protocol list page, or anything already in HTML.
+    if (/\.html?$/i.test(file.name)) {
+      setImported(await file.text(), file.name);
+      return;
+    }
+    if (/\.(txt|md|csv|tsv)$/i.test(file.name)) {
+      clearImport();
+      input.value = await file.text();
+      render();
+      return;
+    }
     if (!/\.docx$/i.test(file.name)) {
-      setError('Only .docx files can be imported. Save older .doc files as .docx in Word first.');
+      setError('Open a .docx, .html or .txt file. Save an older .doc file as .docx in Word first.');
       return;
     }
     setReading(file.name);
@@ -170,7 +181,7 @@
     setImported(html, 'Pasted content');
   });
 
-  fileInput.addEventListener('change', () => { if (fileInput.files[0]) openDocx(fileInput.files[0]); });
+  fileInput.addEventListener('change', () => { if (fileInput.files[0]) openFile(fileInput.files[0]); });
   clearBtn.addEventListener('click', clearImport);
 
   let depth = 0;
@@ -182,7 +193,7 @@
     depth = 0;
     card.classList.remove('dragging');
     const file = e.dataTransfer.files[0];
-    if (file) openDocx(file);
+    if (file) openFile(file);
   });
 
   // ---- Editing the preview by hand (step 5) ----
@@ -252,26 +263,148 @@
     updateTools();
   }
 
+  // ---- Chapter, section or step: moving a line between the three ----
+
+  // What the caret sits in, and where that line can go.
+  const ROLES = ['chapter', 'section', 'step'];
+
+  function lineAt() {
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return null;
+    let node = sel.getRangeAt(0).startContainer;
+    if (!preview.contains(node)) return null;
+    if (node.nodeType === 3) node = node.parentNode;
+    const el = node.closest('h2, h3, li, p');
+    if (!el || el.classList.contains('sep')) return null;
+    const role = el.tagName === 'H2' ? 'chapter' : el.tagName === 'H3' ? 'section' : el.tagName === 'LI' ? 'step' : 'text';
+    return { el, role };
+  }
+
+  // Rebuilds the whole preview from its own content, so numbering follows.
+  function rebuild(changer) {
+    const blocks = [];
+    for (const el of preview.children) {
+      if (el.tagName === 'P' && el.classList.contains('sep')) continue;
+      if (el.tagName === 'TABLE') {
+        const rows = Array.from(el.querySelectorAll('tr'));
+        const head = rows[0] && Array.from(rows[0].children).every((c) => c.tagName === 'TH') ? rows.shift() : null;
+        blocks.push({
+          kind: 'table',
+          head: head && Array.from(head.children).map((c) => c.innerHTML),
+          rows: rows.map((tr) => Array.from(tr.children).map((c) => c.innerHTML)),
+        });
+        continue;
+      }
+      if (el.tagName === 'OL') {
+        for (const li of el.children) blocks.push({ kind: 'step', el: li, html: li.innerHTML });
+        continue;
+      }
+      const kind = el.tagName === 'H2' ? 'chapter' : el.tagName === 'H3' ? 'section' : 'text';
+      // A title shown as "I. Day 0" is stored as "Day 0": Seal numbers it again.
+      const html = kind === 'text' ? el.innerHTML : stripMarker(el.innerHTML);
+      blocks.push({ kind, el, html });
+    }
+    const changed = changer(blocks);
+    if (!changed) return;
+
+    // Back to the shape Seal.document() renders.
+    const chapters = [];
+    let chapter = null;
+    let section = null;
+    const ensure = () => {
+      if (!chapter) { chapter = { title: null, blocks: [], sections: [] }; chapters.push(chapter); }
+      return chapter;
+    };
+    const target = () => (section || ensure()).blocks;
+    for (const block of blocks) {
+      if (block.kind === 'chapter') {
+        chapter = { title: block.html, blocks: [], sections: [] };
+        chapters.push(chapter);
+        section = null;
+      } else if (block.kind === 'section') {
+        section = { title: block.html, blocks: [] };
+        ensure().sections.push(section);
+      } else if (block.kind === 'step') {
+        const list = target();
+        const last = list[list.length - 1];
+        if (last && last.type === 'steps') last.items.push(block.html);
+        else list.push({ type: 'steps', items: [block.html] });
+      } else if (block.kind === 'table') {
+        target().push({ type: 'table', head: block.head, rows: block.rows });
+      } else {
+        target().push({ type: 'para', html: block.html });
+      }
+    }
+    // Titles are plain text in Seal, so a title keeps its words, not its tags.
+    for (const ch of chapters) {
+      if (ch.title) ch.title = textOf(ch.title);
+      for (const sec of ch.sections) sec.title = textOf(sec.title);
+    }
+    paint(Seal.document(chapters));
+    updateTools();
+  }
+
+  // The I. and a. the preview shows come from the renderer, not from the title.
+  function stripMarker(html) {
+    return textOf(html).replace(/^(?:[IVXLC]+|[a-z]{1,2})[.)]\s+/, '');
+  }
+
+  function textOf(html) {
+    const holder = document.createElement('div');
+    holder.innerHTML = html;
+    return holder.textContent.replace(/\s+/g, ' ').trim();
+  }
+
+  function moveLine(direction) {
+    const line = lineAt();
+    if (!line) return;
+    const wanted = {
+      up: { step: 'section', text: 'section', section: 'chapter', chapter: 'chapter' },
+      down: { chapter: 'section', section: 'step', step: 'step', text: 'text' },
+    }[direction][line.role];
+    if (wanted === line.role) return;
+    rebuild((blocks) => {
+      const block = blocks.find((b) => b.el === line.el);
+      if (!block) return false;
+      block.kind = wanted;
+      return true;
+    });
+  }
+
   const tools = Array.from(document.querySelectorAll('.tool'));
   const hint = document.getElementById('protocol-hint');
+  const roleLabel = document.getElementById('protocol-role');
 
   function updateTools() {
     const lines = selectedLines();
+    const line = lineAt();
+    const ROLE_NAMES = { chapter: 'Chapter', section: 'Section', step: 'Step', text: 'Paragraph' };
+    roleLabel.textContent = line ? ROLE_NAMES[line.role] : '';
     for (const tool of tools) {
       const kind = tool.dataset.format;
+      if (tool.dataset.level) {
+        tool.disabled = !line || (tool.dataset.level === 'up' && line.role === 'chapter')
+          || (tool.dataset.level === 'down' && (line.role === 'step' || line.role === 'text'));
+        continue;
+      }
       tool.disabled = !lines.length;
       if (kind === 'none') continue;
       const active = lines.length > 0 && lines.every(({ el, start, end }) =>
         Edit.hasFormat(Parse.runsFromElement(el), start, end, kind));
       tool.setAttribute('aria-pressed', String(active));
     }
-    hint.textContent = lines.length ? 'Formatting applies to the selected text' : 'Select text in the preview to format it';
+    hint.textContent = lines.length
+      ? 'Formatting applies to the selected text'
+      : 'Select text to format it, or click a line and use Up and Down';
   }
 
   for (const tool of tools) {
     // mousedown would drop the selection before the click arrives.
     tool.addEventListener('mousedown', (e) => e.preventDefault());
-    tool.addEventListener('click', () => applyFormat(tool.dataset.format));
+    tool.addEventListener('click', () => {
+      if (tool.dataset.level) moveLine(tool.dataset.level);
+      else applyFormat(tool.dataset.format);
+    });
   }
 
   document.addEventListener('selectionchange', () => { if (!preview.hidden) updateTools(); });
