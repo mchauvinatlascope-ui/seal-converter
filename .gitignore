@@ -1,0 +1,9 @@
+node_modules/
+.DS_Store
+*.log
+# Never commit real lab material
+private/
+*.docx
+*.xlsx
+!examples/*.docx
+!examples/*.xlsx
