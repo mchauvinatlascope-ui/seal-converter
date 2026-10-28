@@ -139,6 +139,10 @@
           });
           continue;
         }
+        if (el.tagName === 'P' && el.children.length === 1 && el.firstElementChild.tagName === 'IMG') {
+          blocks.push({ kind: 'image', el, html: el.innerHTML });
+          continue;
+        }
         if (el.tagName === 'OL') {
           for (const li of el.children) blocks.push({ kind: 'step', el: li, html: li.innerHTML });
           continue;
@@ -172,6 +176,8 @@
           else list.push({ type: 'steps', items: [block.html] });
         } else if (block.kind === 'table') {
           target().push({ type: 'table', head: block.head, rows: block.rows });
+        } else if (block.kind === 'image') {
+          target().push({ type: 'para', html: block.html });
         } else {
           target().push({ type: 'para', html: block.html });
         }

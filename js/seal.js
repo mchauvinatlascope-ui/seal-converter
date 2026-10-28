@@ -93,11 +93,17 @@
     return typeof cell === 'string' && /^\s*[<>~≈]?\s*\d+([.,]\d+)?/.test(cell);
   }
 
+  // An image travels inside the HTML, so Seal receives it with the text.
+  function image(src, alt = '') {
+    return `<p><img src="${esc(src)}" alt="${esc(alt)}"></p>`;
+  }
+
   function blocks(list) {
     return (list || []).map((b) => {
       if (b.type === 'steps') return b.items.length ? steps(b.items) : '';
       if (b.type === 'para') return paragraph(b.html);
       if (b.type === 'table') return rawTable(b.head, b.rows);
+      if (b.type === 'image') return image(b.src, b.alt);
       return '';
     }).join('');
   }
@@ -121,7 +127,7 @@
     }).join('');
   }
 
-  const Seal = { esc, value, bold, note, roman, letter, separator, chapter, section, steps, paragraph, table, rawTable, document };
+  const Seal = { esc, value, bold, note, roman, letter, separator, chapter, section, steps, paragraph, table, rawTable, image, document };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Seal;
   else root.Seal = Seal;

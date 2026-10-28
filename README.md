@@ -44,6 +44,12 @@ Seal renumbers everything, so the original numbers (`1.`, `a)`, bullets) are dro
 
 [`examples/example-protocol.docx`](examples/example-protocol.docx) is a made-up protocol to try the import.
 
+## Pictures
+
+Pictures are kept. An image in a Word file travels inside the copied HTML, so it reaches Seal with the text; an image in a web page is kept when it is embedded in the page or available at a public address.
+
+Seal decides what it does with a pasted picture, so try one before converting a whole protocol: if Seal drops it, add the file in Seal as an attachment and keep the text from here.
+
 ## Editing the result by hand
 
 The preview is editable. Select text in it and use the toolbar:

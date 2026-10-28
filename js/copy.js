@@ -38,7 +38,7 @@
       if (slash && /^(h[1-6]|p|li|tr)$/.test(name)) { out += '\n'; continue; }
       if (name === 'br') out += '\n';
     }
-    return decode(out.replace(/<[^>]+>/g, ''))
+    return decode(out.replace(/<img[^>]*>/gi, '[image]').replace(/<[^>]+>/g, ''))
       .replace(/[ \t]+\n/g, '\n')
       .replace(/\n{3,}/g, '\n\n')
       .trim();

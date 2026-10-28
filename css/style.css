@@ -284,6 +284,7 @@ label.btn { display: inline-flex; align-items: center; }
 .seal-sample h3 { font-size: 16px; font-weight: 600; margin: 12px 0 6px; }
 .seal-sample ol { margin: 0; padding-left: 22px; }
 .seal-sample li { margin-bottom: 6px; }
+.preview-body img { max-width: 100%; height: auto; margin: 6px 0; border: 1px solid var(--line); border-radius: 6px; }
 /* The 184 dash separator is wider than the card: show it as a single clipped line */
 .preview-body p { margin: 0 0 8px; }
 .preview-body p.sep { margin: 0; white-space: nowrap; overflow: hidden; color: var(--muted); letter-spacing: -0.05em; }

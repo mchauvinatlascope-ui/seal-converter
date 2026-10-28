@@ -186,6 +186,10 @@
     const started = () => chapters.some((c) => c.title || c.sections.length);
 
     blocks.forEach((block, index) => {
+      if (block.kind === 'image') {
+        target().push({ type: 'image', src: block.src, alt: block.alt });
+        return;
+      }
       if (block.kind === 'table') {
         if (!block.rows.length && !block.head) return;
         // A bench sheet table (# | STEP | DONE) is a list of steps, not a table.
@@ -339,10 +343,19 @@
     return inlineRuns(el).filter((r) => r.text);
   }
 
+  // Only an image that travels with the document (data:) or one Seal can fetch (http).
+  function isUsableImage(src) {
+    return /^(?:data:image\/|https?:)/i.test(src || '');
+  }
+
   function domToBlocks(rootEl) {
     // Word pastes its own list numbers in hidden spans; the list itself says it is a list.
     rootEl.querySelectorAll('[style*="mso-list:Ignore"], [style*="mso-list: Ignore"]').forEach((s) => s.remove());
     const blocks = [];
+    const pushImage = (img) => {
+      const src = img.getAttribute('src') || '';
+      if (isUsableImage(src)) blocks.push({ kind: 'image', src, alt: img.getAttribute('alt') || '' });
+    };
 
     // A nested list is sometimes inside its <li> and sometimes a sibling of it
     // (Word and Google Docs both do the second), so both shapes count as one level deeper.
@@ -363,9 +376,14 @@
         if (h) blocks.push({ kind: 'heading', level: el.classList.contains('doc-title') ? 0 : Number(h[1]), runs: inlineRuns(el) });
         else if (tag === 'P') {
           const listPara = /MsoListParagraph/.test(el.className);
-          blocks.push({ kind: listPara ? 'item' : 'para', depth: depth + indentOf(el), runs: inlineRuns(el) });
+          const runs = inlineRuns(el);
+          if (runsText(runs).trim()) blocks.push({ kind: listPara ? 'item' : 'para', depth: depth + indentOf(el), runs });
+          // A picture sitting inside a paragraph is a block of its own.
+          for (const img of el.querySelectorAll('img')) pushImage(img);
         } else if (tag === 'UL' || tag === 'OL') {
           walkList(el, depth);
+        } else if (tag === 'IMG') {
+          pushImage(el);
         } else if (tag === 'TABLE') {
           const rows = Array.from(el.querySelectorAll('tr')).map((tr) => Array.from(tr.children));
           // A header row is made of <th>, or is bold all the way across.
