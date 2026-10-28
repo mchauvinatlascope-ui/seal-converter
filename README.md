@@ -34,6 +34,8 @@ You can bring a protocol in three ways:
 
 - **Word file**: click *Import .docx* or drop the file on the Source panel. Heading styles become chapters and sections, Word lists become steps, tables stay tables, and bold and italic are kept.
 - **Paste from Word or a web page**: paste into the empty Source box. The formatting that came with the paste is used the same way.
+Sub levels are kept: when a list or an indented paragraph has levels, the top level becomes a section title and the levels below become its steps.
+
 - **Plain text**: type or paste lines. A line starting with `I.`, `II.` is a chapter, `a.`, `b.` a section, and other lines are steps. Lines separated by tabs become a table.
 
 Seal renumbers everything, so the original numbers (`1.`, `a)`, bullets) are dropped. Values with units turn blue, em dashes become commas, and superscripts such as 10⁶ are kept.

@@ -5,7 +5,7 @@
   const MINUS = '[-\\u2212]';
 
   // x 10^6 | × 10⁶ | e6
-  const SCI = `(?:${SP}[x×]${SP}10(?:${SP}\\^?${SP}${MINUS}?\\d+|[⁻]?[⁰¹²³⁴⁵⁶⁷⁸⁹]+)|e[-+]?\\d+)`;
+  const SCI = `(?:${SP}[x×]${SP}10(?:${SP}\\^?${SP}${MINUS}?\\d+|[⁻]?[⁰¹²³⁴⁵⁶⁷⁸⁹]+)|[eE][-+]?\\d+|${SP}[x×]${SP}\\d+[eE][-+]?\\d+)`;
   // 5 | 0.5 | 1,000 | 1 x 10^6 | 2e6 | -80
   const NUM = `(?:${MINUS})?\\d+(?:[.,]\\d+)?${SCI}?`;
   // 5-10 | 5–10 | 5 to 10 | 37 ± 1
@@ -21,7 +21,7 @@
     '[µμun]mol', 'mmol', 'mol',
     'kDa', 'Da',
     '[µμu]g', 'ng', 'pg', 'mg', 'kg', 'g',
-    'IU', 'U',
+    'IU', 'U', 'PFU', 'TCID50', 'CFU',
     'minutes', 'minute', 'mins', 'min',
     'seconds', 'second', 'secs', 'sec', 's',
     'hours', 'hour', 'hrs', 'hr', 'h',
@@ -41,7 +41,7 @@
     `${RANGE}${SP}${UNIT}${PER}`, // 50 µL, 1 mM, 300 x g, 10 µg/mL
     `\\d+(?:[.,]\\d+)?(?:\\s*(?:-|–|to)\\s*\\d+(?:[.,]\\d+)?)?${SCI}`, // counts: 7.5 to 22.5 × 10⁵
     `\\d+${SP}(?::|\\/|in)${SP}\\d+(?![\\/\\d])`, // dilutions 1:200, 1/50, 1 in 100
-    `[xX×]${SP}\\d+`, // x3
+    `[xX×]${SP}\\d(?!\\d)`, // x3 (a longer number is usually a name, such as influenza x31)
     `pH${SP}\\d+(?:\\.\\d+)?`,
     `(?:${WORD_NUMBERS})\\s+times`,
     '[Oo]nce|[Tt]wice|[Tt]hrice',

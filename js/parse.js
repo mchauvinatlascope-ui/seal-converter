@@ -14,7 +14,7 @@
 
   const ROMAN = /^\s*([IVX]{1,6})[.)]\s+/;
   const LETTER = /^\s*([a-zA-Z])[.)]\s+/;
-  const NUMBER = /^\s*(?:step\s*)?\d{1,3}(?:\.\d{1,2})*[.):]?\s+(?=\S)/i;
+  const NUMBER = /^\s*(?:step\s*)?\d{1,3}(?:\.\d{1,2})*[.):]\s+(?=\S)/i;
   const BULLET = /^\s*[-•*·▪◦–]\s+/;
   const HEADING_MAX = 80;
 
@@ -141,6 +141,8 @@
     const numbered = lines.map((b) => readMarker(b.runs)).filter((m) => m.type === 'number');
     const numberedTitles = numbered.length > 0 && numbered.every((m) => m.title) && numbered.length < lines.length / 2;
     const textHasHeadings = numberedTitles || lines.some((b) => /^(roman|letter)$/.test(readMarker(b.runs).type));
+    // When a list or indentation has sub levels, the top level holds the section titles.
+    const deepest = blocks.reduce((max, b) => Math.max(max, b.depth || 0), 0);
 
     const chapters = [];
     let chapter = null;
@@ -200,10 +202,12 @@
       }
 
       const m = readMarker(block.runs);
+      const depth = block.depth || 0;
       if (m.type === 'roman') newChapter(m.runs);
       else if (m.type === 'letter') newSection(m.runs);
       else if (m.type === 'number' && block.kind === 'line' && numberedTitles) newChapter(m.runs);
-      else if (block.kind === 'item' || m.type === 'number' || m.type === 'bullet') addStep(m.runs);
+      else if (deepest > 0 && depth === 0 && block.kind !== 'line' && looksLikeTitle(runsText(m.runs))) newSection(m.runs);
+      else if (depth > 0 || block.kind === 'item' || m.type === 'number' || m.type === 'bullet') addStep(m.runs);
       else if (block.kind === 'para' && !hasHeadings && isBoldTitle(block.runs)) newSection(block.runs);
       // Plain lines are steps, except an introduction before the first heading
       // and a note right after a table.
@@ -249,6 +253,16 @@
     return chars.every((c) => map[c]) ? chars.map((c) => map[c]).join('') : fallback + text;
   }
 
+  // Word and Google Docs indent sub steps with margin-left instead of nesting them.
+  function indentOf(el) {
+    const margin = el.style && (el.style.marginLeft || el.style.paddingLeft);
+    if (!margin) return 0;
+    const value = parseFloat(margin);
+    if (!value) return 0;
+    const px = /pt$/.test(margin) ? value * 4 / 3 : /e[mn]$/.test(margin) ? value * 16 : value;
+    return Math.min(3, Math.floor(px / 24));
+  }
+
   function isBoldEl(el) {
     if (/^(B|STRONG|TH)$/.test(el.tagName)) return true;
     const w = el.style && el.style.fontWeight;
@@ -277,7 +291,19 @@
     // Word pastes its own list numbers in hidden spans; the list itself says it is a list.
     rootEl.querySelectorAll('[style*="mso-list:Ignore"], [style*="mso-list: Ignore"]').forEach((s) => s.remove());
     const blocks = [];
-    const walk = (node) => {
+
+    // A nested list is sometimes inside its <li> and sometimes a sibling of it
+    // (Word and Google Docs both do the second), so both shapes count as one level deeper.
+    const walkList = (list, depth) => {
+      for (const el of list.children) {
+        if (el.tagName === 'UL' || el.tagName === 'OL') { walkList(el, depth + 1); continue; }
+        if (el.tagName !== 'LI') continue;
+        blocks.push({ kind: 'item', depth, runs: inlineRuns(el) });
+        for (const sub of el.children) if (sub.tagName === 'UL' || sub.tagName === 'OL') walkList(sub, depth + 1);
+      }
+    };
+
+    const walk = (node, depth = 0) => {
       for (const el of node.children) {
         const tag = el.tagName;
         const h = tag.match(/^H([1-6])$/);
@@ -285,14 +311,9 @@
         if (h) blocks.push({ kind: 'heading', level: el.classList.contains('doc-title') ? 0 : Number(h[1]), runs: inlineRuns(el) });
         else if (tag === 'P') {
           const listPara = /MsoListParagraph/.test(el.className);
-          blocks.push({ kind: listPara ? 'item' : 'para', runs: inlineRuns(el) });
+          blocks.push({ kind: listPara ? 'item' : 'para', depth: depth + indentOf(el), runs: inlineRuns(el) });
         } else if (tag === 'UL' || tag === 'OL') {
-          for (const li of el.children) {
-            if (li.tagName !== 'LI') continue;
-            blocks.push({ kind: 'item', runs: inlineRuns(li) });
-            // Nested lists become steps too.
-            for (const sub of li.children) if (sub.tagName === 'UL' || sub.tagName === 'OL') walk({ children: [sub] });
-          }
+          walkList(el, depth);
         } else if (tag === 'TABLE') {
           const rows = Array.from(el.querySelectorAll('tr')).map((tr) => Array.from(tr.children));
           // A header row is made of <th>, or is bold all the way across.
@@ -303,7 +324,7 @@
             head: headRow ? toRuns(rows[0]) : null,
             rows: (headRow ? rows.slice(1) : rows).map(toRuns),
           });
-        } else if (/^(DIV|SECTION|ARTICLE|MAIN|BODY|BLOCKQUOTE|LI|CENTER|FONT|SPAN)$/.test(tag) && el.children.length) walk(el);
+        } else if (/^(DIV|SECTION|ARTICLE|MAIN|BODY|BLOCKQUOTE|LI|CENTER|FONT|SPAN)$/.test(tag) && el.children.length) walk(el, depth + indentOf(el));
         else if (!/^(STYLE|SCRIPT|META|LINK|TITLE|HEAD)$/.test(tag) && el.textContent.trim()) {
           blocks.push({ kind: 'para', runs: inlineRuns(el) });
         }

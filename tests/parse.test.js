@@ -68,6 +68,25 @@ test('tab separated lines become a table, with a header row only when it reads l
     `<tr><td>Cells float</td><td>Wait ${B('24 h')}</td></tr></table>`);
 });
 
+test('sub levels: the top level gives sections, the levels below give steps', () => {
+  const item = (text, depth) => ({ kind: 'item', depth, runs: [run(text)] });
+  const html = Seal.document(Parse.blocksToDoc([
+    item('Preparation', 0),
+    item('Take a 50 mL tube.', 1),
+    item('Treatment', 0),
+    item('Weigh the mice.', 1),
+  ]));
+  assert.equal(html,
+    `<h3>a. Preparation</h3><ol><li>Take a ${B('50 mL')} tube.</li></ol>` +
+    '<h3>b. Treatment</h3><ol><li>Weigh the mice.</li></ol>');
+});
+
+test('a step starting with a quantity keeps it', () => {
+  assert.equal(fromText('50 mL tube with 20 mL bleach.'),
+    `<ol><li>${B('50 mL')} tube with ${B('20 mL')} bleach.</li></ol>`);
+  assert.equal(fromText('1. Weigh the mice.'), '<ol><li>Weigh the mice.</li></ol>');
+});
+
 test('headings: a single top heading is the title, the next level gives chapters', () => {
   const doc = Parse.blocksToDoc([
     { kind: 'heading', level: 1, runs: [run('Example protocol')] },

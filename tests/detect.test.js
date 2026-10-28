@@ -38,6 +38,16 @@ test('dilutions and repeats', () => {
   assert.deepEqual(values('A 10-fold dilution at pH 7.4.'), ['10-fold', 'pH 7.4']);
 });
 
+test('scientific notation written in full', () => {
+  assert.deepEqual(values('Dilute to 0.167 x 1E6 PFU/mL from 2 x 1E7 PFU/mL.'),
+    ['0.167 x 1E6 PFU/mL', '2 x 1E7 PFU/mL']);
+  assert.deepEqual(values('Give a 5,000 PFU dose in 30 µL.'), ['5,000 PFU', '30 µL']);
+});
+
+test('a strain name keeps its number, a repeat count is one digit', () => {
+  assert.deepEqual(values('Thaw Influenza A x31 and wash x3.'), ['x3']);
+});
+
 test('numbers glued to names are not values', () => {
   assert.deepEqual(values('Stain CD45 with BV421 and PE-Cy7.'), []);
   assert.deepEqual(values('Take 5 mice and 3 samples from group 2.'), []);
