@@ -8,13 +8,13 @@ Everything runs in your browser. Files you open and text you paste stay on your 
 
 ## Status
 
-Work in progress. The Protocol tab reads a protocol, lets you correct the formatting and copies the result into Seal. The Experiment and Antibody mix tabs are next.
+Work in progress. Protocols and experiments convert and copy into Seal. The antibody mix calculator is next.
 
-| Module | What it will do |
+| Module | What it does |
 | --- | --- |
-| Protocol | Import a .docx or paste text, highlight values with units, copy for Seal |
-| Experiment | Same, with a template for the linked protocol, mice, deviations and volumes used |
-| Antibody mix | Import a panel from .xlsx and compute mix volumes as a Seal table |
+| Protocol | Open a .docx or .html file, or paste text, then copy the Seal version |
+| Experiment | A short header, the mice, what was done, what changed, and the volumes used |
+| Antibody mix | Import a panel from .xlsx and compute mix volumes as a Seal table (next) |
 
 ## Use it
 
@@ -56,6 +56,14 @@ The preview is editable. Select text in it and use the toolbar:
 A button that is already on removes the format instead of adding it. You can also correct the wording in the preview.
 
 **Up** and **Down** move the line the caret sits in between chapter, section and step. Everything is renumbered, so a step promoted to a section takes the next free letter.
+
+## Experiment
+
+The Experiment tab is for a procedure you already have written somewhere. Fill in the protocol ID, the date and the operator, paste your text under *What was done*, and add what changed on the day under *Deviations and notes*.
+
+The mice and the volumes used are pasted straight from Excel or Word: a header line, then one line per row, columns separated by tabs. They come out as Seal tables.
+
+Chapters your pasted text already has (`I.`, `II.`) are kept; a plain list of steps becomes a chapter called Procedure.
 
 ## Copy into Seal
 

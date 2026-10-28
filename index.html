@@ -68,7 +68,7 @@
             <h3>Seal preview</h3>
             <button class="btn btn-primary" id="protocol-copy">Copy for Seal</button>
           </header>
-          <div class="toolbar" role="toolbar" aria-label="Formatting">
+          <div class="toolbar" id="protocol-toolbar" role="toolbar" aria-label="Formatting">
             <button class="tool" data-format="v" title="Value in blue bold (Ctrl+Shift+V)"><span class="tool-blue">Aa</span> Value</button>
             <button class="tool" data-format="b" title="Bold, for reagents and warnings (Ctrl+B)"><strong>B</strong></button>
             <button class="tool" data-format="i" title="Italic, for remarks (Ctrl+I)"><em>I</em></button>
@@ -81,7 +81,7 @@
           </div>
           <div class="seal-sample" aria-live="polite">
             <p class="sample-label" id="protocol-label">Example output</p>
-            <div id="protocol-sample"></div>
+            <div id="protocol-sample" class="preview-body"></div>
           </div>
         </article>
       </div>
@@ -90,27 +90,66 @@
     <section class="panel" role="tabpanel" id="panel-experiment" aria-labelledby="tab-experiment" hidden>
       <div class="panel-head">
         <h2>Experiment</h2>
-        <p>Record what was actually done: the linked protocol, the mice, the deviations and the volumes used.</p>
+        <p>Add a short header to a procedure you already have, record what changed, and copy the whole thing into Seal.</p>
       </div>
       <div class="workspace">
         <article class="card">
-          <header class="card-head"><h3>Template</h3></header>
-          <ul class="outline">
-            <li><span>Seal protocol ID</span></li>
-            <li><span>Design at a glance</span></li>
-            <li><span>Mice</span><small>ID, age, genotype, group</small></li>
-            <li><span>Deviations and notes</span></li>
-            <li><span>Volumes actually used</span></li>
-          </ul>
-          <p class="empty-note pad">Available from step 7</p>
+          <header class="card-head"><h3>Experiment details</h3></header>
+          <div class="form">
+            <div class="form-row">
+              <label>Seal protocol ID
+                <input type="text" id="exp-protocol" data-field placeholder="ML-014 v4.0">
+              </label>
+              <label>Experiment
+                <input type="text" id="exp-name" data-field placeholder="MC2026-D001">
+              </label>
+            </div>
+            <div class="form-row">
+              <label>Date
+                <input type="date" id="exp-date" data-field>
+              </label>
+              <label>Operator
+                <input type="text" id="exp-operator" data-field placeholder="Initials">
+              </label>
+            </div>
+            <label>Design at a glance
+              <textarea id="exp-design" data-field rows="3" placeholder="4 groups, n = 5, immunised on day 0, dLN harvested on day 10."></textarea>
+            </label>
+            <label>Mice
+              <span class="field-note">Paste the rows from Excel or Word, header line first. Columns keep their tabs.</span>
+              <textarea id="exp-mice" data-field rows="4" spellcheck="false" placeholder="ID&#9;Age&#9;Genotype&#9;Group"></textarea>
+            </label>
+            <label>What was done
+              <span class="field-note">Paste the experiment text you already have. Chapters, sections and steps are read as in the Protocol tab.</span>
+              <textarea id="exp-method" data-field rows="6" spellcheck="false" placeholder="I. Day 0&#10;Weigh the mice and record the weight.&#10;Inject 50 µL subcutaneously."></textarea>
+            </label>
+            <label>Deviations and notes
+              <textarea id="exp-deviations" data-field rows="3" placeholder="One line per thing that changed on the day."></textarea>
+            </label>
+            <label>Volumes actually used
+              <textarea id="exp-volumes" data-field rows="3" placeholder="Reagent&#9;Planned&#9;Used"></textarea>
+            </label>
+          </div>
         </article>
         <article class="card">
           <header class="card-head">
             <h3>Seal preview</h3>
-            <button class="btn btn-primary" disabled>Copy for Seal</button>
+            <button class="btn btn-primary" id="exp-copy">Copy for Seal</button>
           </header>
-          <div class="empty">
-            <p class="empty-title">The formatted experiment will appear here</p>
+          <div class="toolbar" id="exp-toolbar" role="toolbar" aria-label="Formatting">
+            <button class="tool" data-format="v" title="Value in blue bold (Ctrl+Shift+V)"><span class="tool-blue">Aa</span> Value</button>
+            <button class="tool" data-format="b" title="Bold, for reagents and warnings (Ctrl+B)"><strong>B</strong></button>
+            <button class="tool" data-format="i" title="Italic, for remarks (Ctrl+I)"><em>I</em></button>
+            <button class="tool" data-format="none" title="Remove formatting">Clear</button>
+            <span class="tool-sep" aria-hidden="true"></span>
+            <button class="tool" data-level="up" title="Make this line a chapter, a section, or a step">Up</button>
+            <button class="tool" data-level="down" title="Make this line a section, or a step">Down</button>
+            <span class="tool-role"></span>
+            <span class="toolbar-hint">Select text in the preview to format it</span>
+          </div>
+          <div class="seal-sample" aria-live="polite">
+            <p class="sample-label" id="exp-label">Fill in the fields on the left</p>
+            <div id="exp-preview" class="preview-body"></div>
           </div>
         </article>
       </div>
@@ -134,7 +173,7 @@
   </main>
 
   <footer class="foot">
-    <span>v0.7.0</span>
+    <span>v0.8.0</span>
   </footer>
 
   <script src="js/seal.js"></script>
@@ -142,6 +181,7 @@
   <script src="js/parse.js"></script>
   <script src="js/edit.js"></script>
   <script src="js/copy.js"></script>
+  <script src="js/editor.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

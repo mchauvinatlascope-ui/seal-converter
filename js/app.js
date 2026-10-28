@@ -32,102 +32,9 @@
   show(location.hash.slice(1));
 })();
 
-// Protocol: source (typed text, pasted HTML or a .docx) on the left, Seal preview on the right.
-(function () {
-  const { value, bold, note } = Seal;
-  const card = document.getElementById('protocol-source');
-  const input = document.getElementById('protocol-input');
-  const fileInput = document.getElementById('protocol-file');
-  const imported = document.getElementById('protocol-imported');
-  const importedName = document.getElementById('protocol-imported-name');
-  const importedNote = document.getElementById('protocol-imported-note');
-  const clearBtn = document.getElementById('protocol-clear');
-  const READY_NOTE = importedNote.textContent;
-  const preview = document.getElementById('protocol-sample');
-  const label = document.getElementById('protocol-label');
-
-  const example = Seal.document([
-    { title: 'Before experiments', sections: [
-      { title: 'Biotin-LPETG preparation', steps: [
-        `Inject ${value('50 µL')} of ${bold('biotin-LPETG')} at ${value('1 mM')} subcutaneously at the immunisation site, ${value('6 times')}, ${value('20 min')} apart.`,
-        `Keep the ${bold('syringes')} on ice ${note('avoid bubbles')}.`,
-      ] },
-    ] },
-  ]);
-
-  // HTML read from a .docx or a rich paste; null while the text box is the source.
-  let importedHtml = null;
-  let errorBox = null;
-
-  function plural(n, word) { return `${n} ${word}${n === 1 ? '' : 's'}`; }
-
-  function show(doc) {
-    const html = Seal.document(doc);
-    const chapters = doc.filter((c) => c.title).length;
-    const steps = (html.match(/<li>/g) || []).length;
-    const values = (html.match(/data-native-color="blue"/g) || []).length;
-    label.textContent = [chapters && plural(chapters, 'chapter'), plural(steps, 'step'), plural(values, 'value')]
-      .filter(Boolean).join(', ');
-    paint(html);
-  }
-
-  // The 184 dash separator is wider than the card: drawn as a clipped line in the preview only.
-  function paint(html) {
-    preview.innerHTML = html;
-    for (const p of preview.querySelectorAll('p')) if (/^-{184}$/.test(p.textContent)) p.className = 'sep';
-  }
-
-  function render() {
-    if (importedHtml !== null) return show(Parse.blocksToDoc(Parse.htmlToBlocks(importedHtml)));
-    const text = input.value;
-    if (!text.trim()) {
-      label.textContent = 'Example output';
-      paint(example);
-      return;
-    }
-    const blocks = Parse.looksLikeHtml(text) ? Parse.htmlToBlocks(text) : Parse.textToBlocks(text);
-    show(Parse.blocksToDoc(blocks));
-  }
-
-  function setImported(html, name) {
-    importedHtml = html;
-    importedName.textContent = name;
-    importedNote.textContent = READY_NOTE;
-    imported.hidden = false;
-    input.hidden = true;
-    setError(null);
-    render();
-  }
-
-  // The Word reader is 620 kB and loads on the first file, which takes a moment.
-  function setReading(name) {
-    importedName.textContent = name;
-    importedNote.textContent = 'Reading the file…';
-    imported.hidden = false;
-    input.hidden = true;
-    clearBtn.disabled = true;
-    setError(null);
-  }
-
-  function clearImport() {
-    importedHtml = null;
-    imported.hidden = true;
-    input.hidden = false;
-    fileInput.value = '';
-    render();
-    input.focus();
-  }
-
-  function setError(message) {
-    if (errorBox) { errorBox.remove(); errorBox = null; }
-    if (!message) return;
-    errorBox = document.createElement('p');
-    errorBox.className = 'error';
-    errorBox.textContent = message;
-    card.querySelector('.card-head').after(errorBox);
-  }
-
-  // mammoth.js is large, so it loads the first time a Word file is opened.
+// Opening files: Word through mammoth, a saved web page as it is, plain text in the box.
+const Files = (function () {
+  // mammoth.js is 620 kB, so it loads the first time a Word file is opened.
   let mammothReady = null;
   function loadMammoth() {
     mammothReady = mammothReady || new Promise((resolve, reject) => {
@@ -140,12 +47,102 @@
     return mammothReady;
   }
 
-  async function openFile(file) {
-    // An exported web page, a protocol list page, or anything already in HTML.
-    if (/\.html?$/i.test(file.name)) {
-      setImported(await file.text(), file.name);
+  async function readDocx(file) {
+    const mammoth = await loadMammoth();
+    const result = await mammoth.convertToHtml(
+      { arrayBuffer: await file.arrayBuffer() },
+      { styleMap: ["p[style-name='Title'] => h1.doc-title:fresh"] }
+    );
+    return result.value;
+  }
+
+  return { readDocx };
+})();
+
+// Protocol: source on the left (typed, pasted or opened), Seal preview on the right.
+(function () {
+  const { value, bold, note } = Seal;
+  const card = document.getElementById('protocol-source');
+  const input = document.getElementById('protocol-input');
+  const fileInput = document.getElementById('protocol-file');
+  const imported = document.getElementById('protocol-imported');
+  const importedName = document.getElementById('protocol-imported-name');
+  const importedNote = document.getElementById('protocol-imported-note');
+  const clearBtn = document.getElementById('protocol-clear');
+  const READY_NOTE = importedNote.textContent;
+
+  const editor = createEditor({
+    preview: document.getElementById('protocol-sample'),
+    label: document.getElementById('protocol-label'),
+    toolbar: document.getElementById('protocol-toolbar'),
+    copyBtn: document.getElementById('protocol-copy'),
+  });
+
+  const example = Seal.document([
+    { title: 'Before experiments', sections: [
+      { title: 'Biotin-LPETG preparation', steps: [
+        `Inject ${value('50 µL')} of ${bold('biotin-LPETG')} at ${value('1 mM')} subcutaneously at the immunisation site, ${value('6 times')}, ${value('20 min')} apart.`,
+        `Keep the ${bold('syringes')} on ice ${note('avoid bubbles')}.`,
+      ] },
+    ] },
+  ]);
+
+  // HTML read from a file or a rich paste; null while the text box is the source.
+  let importedHtml = null;
+  let errorBox = null;
+
+  function render() {
+    if (importedHtml !== null) {
+      editor.showDocument(Parse.blocksToDoc(Parse.htmlToBlocks(importedHtml)));
       return;
     }
+    const text = input.value;
+    if (!text.trim()) { editor.showEmpty(example); return; }
+    const blocks = Parse.looksLikeHtml(text) ? Parse.htmlToBlocks(text) : Parse.textToBlocks(text);
+    editor.showDocument(Parse.blocksToDoc(blocks));
+  }
+
+  function setImported(html, name) {
+    importedHtml = html;
+    importedName.textContent = name;
+    importedNote.textContent = READY_NOTE;
+    imported.hidden = false;
+    input.hidden = true;
+    clearBtn.disabled = false;
+    setError(null);
+    render();
+  }
+
+  function clearImport() {
+    importedHtml = null;
+    imported.hidden = true;
+    input.hidden = false;
+    fileInput.value = '';
+    render();
+    input.focus();
+  }
+
+  function setReading(name) {
+    importedName.textContent = name;
+    importedNote.textContent = 'Reading the file…';
+    imported.hidden = false;
+    input.hidden = true;
+    clearBtn.disabled = true;
+    setError(null);
+  }
+
+  function setError(message) {
+    if (errorBox) { errorBox.remove(); errorBox = null; }
+    if (!message) return;
+    errorBox = document.createElement('p');
+    errorBox.className = 'error';
+    errorBox.textContent = message;
+    card.querySelector('.card-head').after(errorBox);
+  }
+
+  async function openFile(file) {
+    // An exported web page, a protocol list page, or anything already in HTML.
+    if (/\.html?$/i.test(file.name)) { setImported(await file.text(), file.name); return; }
     if (/\.(txt|md|csv|tsv)$/i.test(file.name)) {
       clearImport();
       input.value = await file.text();
@@ -158,17 +155,11 @@
     }
     setReading(file.name);
     try {
-      const mammoth = await loadMammoth();
-      const result = await mammoth.convertToHtml(
-        { arrayBuffer: await file.arrayBuffer() },
-        { styleMap: ["p[style-name='Title'] => h1.doc-title:fresh"] }
-      );
-      setImported(result.value, file.name);
+      setImported(await Files.readDocx(file), file.name);
     } catch (err) {
       clearImport();
       setError(`This file could not be read (${err.message}).`);
     }
-    clearBtn.disabled = false;
   }
 
   input.addEventListener('input', render);
@@ -196,285 +187,93 @@
     if (file) openFile(file);
   });
 
-  // ---- Editing the preview by hand (step 5) ----
+  render();
+})();
 
-  // Character offsets of the selection inside one line of the preview.
-  function offsetsIn(el, range) {
-    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
-    let pos = 0;
-    let start = null;
-    let end = null;
-    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-      if (node === range.startContainer) start = pos + range.startOffset;
-      if (node === range.endContainer) end = pos + range.endOffset;
-      pos += node.nodeValue.length;
-    }
-    if (start === null) start = range.intersectsNode(el) ? 0 : null;
-    if (end === null) end = range.intersectsNode(el) ? pos : null;
-    return start === null || end === null ? null : { start: Math.min(start, end), end: Math.max(start, end) };
-  }
+// Experiment: a short header, the mice, what was done, and what changed on the day.
+(function () {
+  const fields = Array.from(document.querySelectorAll('#panel-experiment [data-field]'));
+  const get = (name) => (document.getElementById(`exp-${name}`).value || '').trim();
 
-  // The lines the user can format: steps, paragraphs, titles and table cells.
-  const LINES = 'li, p, h2, h3, td, th';
-
-  function selectedLines() {
-    const sel = window.getSelection();
-    if (!sel || sel.isCollapsed || !sel.rangeCount) return [];
-    const range = sel.getRangeAt(0);
-    if (!preview.contains(range.commonAncestorContainer)) return [];
-    const out = [];
-    for (const el of preview.querySelectorAll(LINES)) {
-      if (el.querySelector(LINES) || !range.intersectsNode(el)) continue;
-      const offsets = offsetsIn(el, range);
-      if (offsets && offsets.end > offsets.start) out.push({ el, ...offsets });
-    }
-    return out;
-  }
-
-  function applyFormat(kind) {
-    const lines = selectedLines();
-    if (!lines.length) return;
-    // One click formats everything selected, unless it is all formatted already.
-    const on = kind !== 'none' && !lines.every(({ el, start, end }) =>
-      Edit.hasFormat(Parse.runsFromElement(el), start, end, kind));
-    for (const { el, start, end } of lines) {
-      const runs = Parse.runsFromElement(el);
-      const next = kind === 'none' ? Edit.clearFormat(runs, start, end) : Edit.setFormat(runs, start, end, kind, on);
-      el.innerHTML = Edit.renderRuns(next);
-    }
-    // Keep the same characters selected, so the user can try another button.
-    const first = lines[0];
-    const last = lines[lines.length - 1];
-    const sel = window.getSelection();
-    const range = document.createRange();
-    const point = (el, offset) => {
-      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
-      let pos = 0;
-      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-        if (pos + node.nodeValue.length >= offset) return [node, offset - pos];
-        pos += node.nodeValue.length;
-      }
-      return [el, el.childNodes.length];
-    };
-    range.setStart(...point(first.el, first.start));
-    range.setEnd(...point(last.el, last.end));
-    sel.removeAllRanges();
-    sel.addRange(range);
-    updateTools();
-  }
-
-  // ---- Chapter, section or step: moving a line between the three ----
-
-  // What the caret sits in, and where that line can go.
-  const ROLES = ['chapter', 'section', 'step'];
-
-  function lineAt() {
-    const sel = window.getSelection();
-    if (!sel || !sel.rangeCount) return null;
-    let node = sel.getRangeAt(0).startContainer;
-    if (!preview.contains(node)) return null;
-    if (node.nodeType === 3) node = node.parentNode;
-    const el = node.closest('h2, h3, li, p');
-    if (!el || el.classList.contains('sep')) return null;
-    const role = el.tagName === 'H2' ? 'chapter' : el.tagName === 'H3' ? 'section' : el.tagName === 'LI' ? 'step' : 'text';
-    return { el, role };
-  }
-
-  // Rebuilds the whole preview from its own content, so numbering follows.
-  function rebuild(changer) {
-    const blocks = [];
-    for (const el of preview.children) {
-      if (el.tagName === 'P' && el.classList.contains('sep')) continue;
-      if (el.tagName === 'TABLE') {
-        const rows = Array.from(el.querySelectorAll('tr'));
-        const head = rows[0] && Array.from(rows[0].children).every((c) => c.tagName === 'TH') ? rows.shift() : null;
-        blocks.push({
-          kind: 'table',
-          head: head && Array.from(head.children).map((c) => c.innerHTML),
-          rows: rows.map((tr) => Array.from(tr.children).map((c) => c.innerHTML)),
-        });
-        continue;
-      }
-      if (el.tagName === 'OL') {
-        for (const li of el.children) blocks.push({ kind: 'step', el: li, html: li.innerHTML });
-        continue;
-      }
-      const kind = el.tagName === 'H2' ? 'chapter' : el.tagName === 'H3' ? 'section' : 'text';
-      // A title shown as "I. Day 0" is stored as "Day 0": Seal numbers it again.
-      const html = kind === 'text' ? el.innerHTML : stripMarker(el.innerHTML);
-      blocks.push({ kind, el, html });
-    }
-    const changed = changer(blocks);
-    if (!changed) return;
-
-    // Back to the shape Seal.document() renders.
-    const chapters = [];
-    let chapter = null;
-    let section = null;
-    const ensure = () => {
-      if (!chapter) { chapter = { title: null, blocks: [], sections: [] }; chapters.push(chapter); }
-      return chapter;
-    };
-    const target = () => (section || ensure()).blocks;
-    for (const block of blocks) {
-      if (block.kind === 'chapter') {
-        chapter = { title: block.html, blocks: [], sections: [] };
-        chapters.push(chapter);
-        section = null;
-      } else if (block.kind === 'section') {
-        section = { title: block.html, blocks: [] };
-        ensure().sections.push(section);
-      } else if (block.kind === 'step') {
-        const list = target();
-        const last = list[list.length - 1];
-        if (last && last.type === 'steps') last.items.push(block.html);
-        else list.push({ type: 'steps', items: [block.html] });
-      } else if (block.kind === 'table') {
-        target().push({ type: 'table', head: block.head, rows: block.rows });
-      } else {
-        target().push({ type: 'para', html: block.html });
-      }
-    }
-    // Titles are plain text in Seal, so a title keeps its words, not its tags.
-    for (const ch of chapters) {
-      if (ch.title) ch.title = textOf(ch.title);
-      for (const sec of ch.sections) sec.title = textOf(sec.title);
-    }
-    paint(Seal.document(chapters));
-    updateTools();
-  }
-
-  // The I. and a. the preview shows come from the renderer, not from the title.
-  function stripMarker(html) {
-    return textOf(html).replace(/^(?:[IVXLC]+|[a-z]{1,2})[.)]\s+/, '');
-  }
-
-  function textOf(html) {
-    const holder = document.createElement('div');
-    holder.innerHTML = html;
-    return holder.textContent.replace(/\s+/g, ' ').trim();
-  }
-
-  function moveLine(direction) {
-    const line = lineAt();
-    if (!line) return;
-    const wanted = {
-      up: { step: 'section', text: 'section', section: 'chapter', chapter: 'chapter' },
-      down: { chapter: 'section', section: 'step', step: 'step', text: 'text' },
-    }[direction][line.role];
-    if (wanted === line.role) return;
-    rebuild((blocks) => {
-      const block = blocks.find((b) => b.el === line.el);
-      if (!block) return false;
-      block.kind = wanted;
-      return true;
-    });
-  }
-
-  const tools = Array.from(document.querySelectorAll('.tool'));
-  const hint = document.getElementById('protocol-hint');
-  const roleLabel = document.getElementById('protocol-role');
-
-  function updateTools() {
-    const lines = selectedLines();
-    const line = lineAt();
-    const ROLE_NAMES = { chapter: 'Chapter', section: 'Section', step: 'Step', text: 'Paragraph' };
-    roleLabel.textContent = line ? ROLE_NAMES[line.role] : '';
-    for (const tool of tools) {
-      const kind = tool.dataset.format;
-      if (tool.dataset.level) {
-        tool.disabled = !line || (tool.dataset.level === 'up' && line.role === 'chapter')
-          || (tool.dataset.level === 'down' && (line.role === 'step' || line.role === 'text'));
-        continue;
-      }
-      tool.disabled = !lines.length;
-      if (kind === 'none') continue;
-      const active = lines.length > 0 && lines.every(({ el, start, end }) =>
-        Edit.hasFormat(Parse.runsFromElement(el), start, end, kind));
-      tool.setAttribute('aria-pressed', String(active));
-    }
-    hint.textContent = lines.length
-      ? 'Formatting applies to the selected text'
-      : 'Select text to format it, or click a line and use Up and Down';
-  }
-
-  for (const tool of tools) {
-    // mousedown would drop the selection before the click arrives.
-    tool.addEventListener('mousedown', (e) => e.preventDefault());
-    tool.addEventListener('click', () => {
-      if (tool.dataset.level) moveLine(tool.dataset.level);
-      else applyFormat(tool.dataset.format);
-    });
-  }
-
-  document.addEventListener('selectionchange', () => { if (!preview.hidden) updateTools(); });
-
-  preview.addEventListener('keydown', (e) => {
-    if (!(e.ctrlKey || e.metaKey)) return;
-    const key = e.key.toLowerCase();
-    const kind = key === 'b' ? 'b' : key === 'i' ? 'i' : (key === 'v' && e.shiftKey) ? 'v' : null;
-    if (!kind) return;
-    e.preventDefault();
-    applyFormat(kind);
+  const editor = createEditor({
+    preview: document.getElementById('exp-preview'),
+    label: document.getElementById('exp-label'),
+    toolbar: document.getElementById('exp-toolbar'),
+    copyBtn: document.getElementById('exp-copy'),
+    emptyLabel: 'Fill in the fields on the left',
   });
 
-  // ---- Copy for Seal (step 6) ----
-
-  const copyBtn = document.getElementById('protocol-copy');
-
-  function flash(message, ok = true) {
-    copyBtn.textContent = message;
-    copyBtn.classList.toggle('btn-done', ok);
-    clearTimeout(flash.timer);
-    flash.timer = setTimeout(() => {
-      copyBtn.textContent = 'Copy for Seal';
-      copyBtn.classList.remove('btn-done');
-    }, 2200);
+  // "Protocol: ML-014" with the label in bold and the answer in blue bold.
+  function entry(label, text) {
+    return `${Seal.bold(`${label}:`)} ${Detect.highlight(text)}`;
   }
 
-  // Older browsers, and any page served without https, have no clipboard.write.
-  function copyBySelection(html) {
-    const holder = document.createElement('div');
-    holder.setAttribute('contenteditable', 'true');
-    holder.style.cssText = 'position:fixed;left:-9999px;top:0;white-space:pre-wrap;';
-    holder.innerHTML = html;
-    document.body.appendChild(holder);
-    const sel = window.getSelection();
-    const saved = sel.rangeCount ? sel.getRangeAt(0) : null;
-    const range = document.createRange();
-    range.selectNodeContents(holder);
-    sel.removeAllRanges();
-    sel.addRange(range);
-    let ok = false;
-    try { ok = document.execCommand('copy'); } catch { ok = false; }
-    sel.removeAllRanges();
-    if (saved) sel.addRange(saved);
-    holder.remove();
-    return ok;
+  // A free answer stays prose: one paragraph per line, values in blue.
+  function paragraphs(text) {
+    return text.split(/\n/).map((line) => line.trim()).filter(Boolean)
+      .map((line) => ({ type: 'para', html: Detect.highlight(Detect.cleanDashes(line)) }));
   }
 
-  async function copyForSeal() {
-    const html = Copy.sealHtml(preview.innerHTML);
-    const text = Copy.plainText(html);
-    try {
-      await navigator.clipboard.write([new ClipboardItem({
-        'text/html': new Blob([html], { type: 'text/html' }),
-        'text/plain': new Blob([text], { type: 'text/plain' }),
-      })]);
-      flash('Copied, paste in Seal');
-      return;
-    } catch {
-      // falls through to the selection based copy
+  function blocksFromText(text) {
+    if (!text.trim()) return [];
+    const doc = Parse.blocksToDoc(Parse.textToBlocks(text));
+    // A short answer has no chapters of its own, so only its content is kept.
+    return doc.flatMap((ch) => [
+      ...(ch.title ? [{ type: 'para', html: Seal.bold(ch.title) }] : []),
+      ...ch.blocks,
+      ...ch.sections.flatMap((sec) => [{ type: 'para', html: Seal.bold(sec.title) }, ...sec.blocks]),
+    ]);
+  }
+
+  function build() {
+    const header = [
+      ['Protocol', get('protocol')],
+      ['Experiment', get('name')],
+      ['Date', get('date')],
+      ['Operator', get('operator')],
+    ].filter(([, text]) => text).map(([label, text]) => ({ type: 'para', html: entry(label, text) }));
+
+    const design = get('design');
+    const mice = get('mice');
+    const method = get('method');
+    const deviations = get('deviations');
+    const volumes = get('volumes');
+
+    const chapters = [];
+    if (header.length || design) {
+      chapters.push({
+        title: 'Experiment',
+        blocks: [
+          ...header,
+          ...(design ? [{ type: 'para', html: Seal.bold('Design at a glance:') }, ...paragraphs(design)] : []),
+        ],
+        sections: [],
+      });
     }
-    if (copyBySelection(html)) flash('Copied, paste in Seal');
-    else flash('Copy failed, select the preview and press Ctrl+C', false);
+    if (mice) {
+      const blocks = Parse.blocksToDoc(Parse.textToBlocks(mice)).flatMap((ch) => ch.blocks);
+      chapters.push({ title: 'Mice', blocks, sections: [] });
+    }
+    if (method) {
+      const doc = Parse.blocksToDoc(Parse.textToBlocks(method));
+      // Keep the chapters of a pasted procedure; wrap a plain list of steps in one.
+      if (doc.some((ch) => ch.title)) chapters.push(...doc.filter((ch) => ch.title || ch.blocks.length));
+      else chapters.push({ title: 'Procedure', blocks: doc.flatMap((ch) => ch.blocks), sections: [] });
+    }
+    if (deviations) chapters.push({ title: 'Deviations and notes', blocks: blocksFromText(deviations), sections: [] });
+    if (volumes) chapters.push({ title: 'Volumes actually used', blocks: blocksFromText(volumes), sections: [] });
+    return chapters;
   }
 
-  copyBtn.addEventListener('click', copyForSeal);
+  function render() {
+    const chapters = build();
+    if (!chapters.length) {
+      editor.showEmpty('<p class="hint">The Seal version appears here as you type.</p>');
+      return;
+    }
+    editor.showDocument(chapters);
+  }
 
-  preview.contentEditable = 'true';
-  preview.spellcheck = false;
-
+  for (const field of fields) field.addEventListener('input', render);
   render();
-  updateTools();
 })();
