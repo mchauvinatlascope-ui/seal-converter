@@ -158,22 +158,64 @@
     <section class="panel" role="tabpanel" id="panel-mix" aria-labelledby="tab-mix" hidden>
       <div class="panel-head">
         <h2>Antibody mix</h2>
-        <p>Import a panel from .xlsx or type it in, set the number of samples, and get the volumes as a Seal table.</p>
+        <p>Import a panel from .xlsx or paste it from Excel, set the number of samples, and copy the volumes into Seal.</p>
       </div>
-      <article class="card">
-        <header class="card-head"><h3>Panel</h3></header>
-        <div class="table-wrap">
-          <table class="grid">
-            <thead><tr><th>Channel</th><th>Fluorochrome</th><th>Marker</th><th>Clone</th><th>Supplier</th><th>Cat. no.</th><th>Dilution</th></tr></thead>
-            <tbody><tr><td colspan="7" class="empty-row">No antibodies yet. Available from step 8.</td></tr></tbody>
-          </table>
-        </div>
-      </article>
+      <div class="workspace">
+        <article class="card" id="mix-source">
+          <header class="card-head">
+            <h3>Panel</h3>
+            <label class="btn">
+              Open .xlsx
+              <input type="file" id="mix-file" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
+            </label>
+          </header>
+          <div class="form">
+            <div class="form-row">
+              <label>Samples
+                <input type="number" id="mix-samples" data-mix min="1" step="1" value="6">
+              </label>
+              <label>Excess %
+                <input type="number" id="mix-excess" data-mix min="0" step="5" value="10">
+              </label>
+              <label>Volume per test, µL
+                <input type="number" id="mix-vf" data-mix min="1" step="10" value="100">
+              </label>
+            </div>
+            <label>Panel
+              <span class="field-note">Paste from Excel, header line first. Needs a dilution column; channel, fluorochrome, marker, clone, supplier and cat. no. are optional.</span>
+              <textarea id="mix-panel" data-mix rows="9" spellcheck="false" placeholder="Channel&#9;Fluorochrome&#9;Marker&#9;Clone&#9;Supplier&#9;Cat. no.&#9;Dilution&#10;BUV395&#9;BUV395&#9;CD90.2&#9;53-2.1&#9;BD&#9;565257&#9;1:200"></textarea>
+            </label>
+            <p class="mix-summary" id="mix-summary"></p>
+          </div>
+        </article>
+        <article class="card">
+          <header class="card-head">
+            <h3>Seal preview</h3>
+            <button class="btn btn-primary" id="mix-copy">Copy for Seal</button>
+          </header>
+          <div class="toolbar" id="mix-toolbar" role="toolbar" aria-label="Formatting">
+            <button class="tool" data-format="v" title="Value in blue bold (Ctrl+Shift+V)"><span class="tool-blue">Aa</span> Value</button>
+            <button class="tool" data-format="b" title="Bold, for reagents and warnings (Ctrl+B)"><strong>B</strong></button>
+            <button class="tool" data-format="i" title="Italic, for remarks (Ctrl+I)"><em>I</em></button>
+            <button class="tool" data-format="none" title="Remove formatting">Clear</button>
+            <span class="tool-sep" aria-hidden="true"></span>
+            <button class="tool" data-level="up" title="Make this line a chapter, a section, or a step">Up</button>
+            <button class="tool" data-level="down" title="Make this line a section, or a step">Down</button>
+            <span class="tool-role"></span>
+            <span class="toolbar-hint">Select text in the preview to format it</span>
+          </div>
+          <div class="seal-sample" aria-live="polite">
+            <p class="sample-label" id="mix-label">Paste a panel to see the volumes</p>
+            <div id="mix-preview" class="preview-body"></div>
+          </div>
+        </article>
+      </div>
     </section>
+
   </main>
 
   <footer class="foot">
-    <span>v0.9.0</span>
+    <span>v0.10.0</span>
   </footer>
 
   <script src="js/seal.js"></script>
@@ -181,6 +223,7 @@
   <script src="js/parse.js"></script>
   <script src="js/edit.js"></script>
   <script src="js/copy.js"></script>
+  <script src="js/mix.js"></script>
   <script src="js/editor.js"></script>
   <script src="js/app.js"></script>
 </body>

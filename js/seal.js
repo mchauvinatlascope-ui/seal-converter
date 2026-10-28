@@ -104,6 +104,7 @@
       if (b.type === 'para') return paragraph(b.html);
       if (b.type === 'table') return rawTable(b.head, b.rows);
       if (b.type === 'image') return image(b.src, b.alt);
+      if (b.type === 'raw') return b.html;
       return '';
     }).join('');
   }

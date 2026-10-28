@@ -307,6 +307,9 @@ label.btn { display: inline-flex; align-items: center; }
 .form textarea { resize: vertical; line-height: 1.5; }
 .form input:focus, .form textarea:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
 
+.mix-summary { margin: 0; font-size: 13px; color: var(--ink-2); }
+.mix-summary .warn { color: #a12a1f; }
+
 /* Experiment outline */
 .outline { list-style: none; margin: 0; padding: 12px 16px; flex: 1; }
 .outline li {

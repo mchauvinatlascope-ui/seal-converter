@@ -8,13 +8,13 @@ Everything runs in your browser. Files you open and text you paste stay on your 
 
 ## Status
 
-Work in progress. Protocols and experiments convert and copy into Seal. The antibody mix calculator is next.
+Protocols, experiments and antibody mixes all convert and copy into Seal. FMO tubes and the order of addition are still to come.
 
 | Module | What it does |
 | --- | --- |
 | Protocol | Open a .docx or .html file, or paste text, then copy the Seal version |
 | Experiment | A short header, the mice, what was done, what changed, and the volumes used |
-| Antibody mix | Import a panel from .xlsx and compute mix volumes as a Seal table (next) |
+| Antibody mix | Import a panel from .xlsx and compute mix volumes as a Seal table |
 
 ## Use it
 
@@ -71,6 +71,23 @@ The mice and the volumes used are pasted straight from Excel or Word: a header l
 
 Chapters your pasted text already has (`I.`, `II.`) are kept; a plain list of steps becomes a chapter called Procedure.
 
+## Antibody mix
+
+Open a panel from .xlsx, or paste it from Excel with the header line first. The only column the calculator needs is the dilution, written `1:200`, `1/200`, `200` or `0.005`; channel, fluorochrome, marker, clone, supplier and catalogue number are carried through to the table when they are there.
+
+Set the number of samples, the excess and the volume per test, and the preview gives the panel, the master mix and the single stains as Seal tables. The rules are the ones from the lab spreadsheet:
+
+| Quantity | Rule |
+| --- | --- |
+| Volume per test | `Vf`, 100 µL by default |
+| Total volume | `tests × Vf`, where tests = samples plus the excess |
+| Brilliant Stain Buffer | `Vtotal / 2` |
+| Each antibody | `Vtotal / dilution` |
+| PBS | `Vtotal − BSB − sum of the antibodies` |
+| Single stain | `Vf / dilution` |
+
+FMO tubes and the order the reagents go in are not in yet.
+
 ## Copy into Seal
 
 *Copy for Seal* puts two versions on the clipboard: the HTML, with the exact markup Seal keeps, and a plain text version for anywhere that takes no formatting. Paste into a Seal protocol or experiment with Ctrl+V.
@@ -93,4 +110,4 @@ No server is involved. The app never sends protocols, experiment data or panels 
 
 MIT, see [LICENSE](LICENSE).
 
-Third-party code: [mammoth.js](https://github.com/mwilliamson/mammoth.js) 1.12.0 (BSD 2-Clause), in `vendor/` with its licence.
+Third-party code in `vendor/`, each with its licence: [mammoth.js](https://github.com/mwilliamson/mammoth.js) 1.12.0 (BSD 2-Clause) reads Word files, [SheetJS](https://sheetjs.com) 0.18.5 (Apache 2.0) reads workbooks.

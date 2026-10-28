@@ -277,3 +277,140 @@ const Files = (function () {
   for (const field of fields) field.addEventListener('input', render);
   render();
 })();
+
+// Antibody mix: a panel in, the volumes to pipette out, as Seal tables.
+(function () {
+  const card = document.getElementById('mix-source');
+  const fileInput = document.getElementById('mix-file');
+  const panelInput = document.getElementById('mix-panel');
+  const summary = document.getElementById('mix-summary');
+
+  const editor = createEditor({
+    preview: document.getElementById('mix-preview'),
+    label: document.getElementById('mix-label'),
+    toolbar: document.getElementById('mix-toolbar'),
+    copyBtn: document.getElementById('mix-copy'),
+    emptyLabel: 'Paste a panel to see the volumes',
+  });
+
+  function number(id, fallback) {
+    const value = Number(document.getElementById(id).value);
+    return Number.isFinite(value) && value > 0 ? value : fallback;
+  }
+
+  // SheetJS is 860 kB, so it loads the first time a workbook is opened.
+  let sheetReady = null;
+  function loadSheetJs() {
+    sheetReady = sheetReady || new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'vendor/xlsx.full.min.js';
+      s.onload = () => resolve(window.XLSX);
+      s.onerror = () => { sheetReady = null; reject(new Error('Could not load the spreadsheet reader.')); };
+      document.head.appendChild(s);
+    });
+    return sheetReady;
+  }
+
+  const µL = (volume) => `${volume} µL`;
+  // Volumes and dilutions are values to respect; a clone or a catalogue number is not.
+  const val = (text) => (text ? Seal.value(text) : '');
+  const txt = (text) => Seal.esc(text || '');
+  const table = (head, rows) => ({
+    type: 'raw',
+    html: Seal.rawTable(head.map(Seal.bold), rows),
+  });
+
+  function settings() {
+    return {
+      samples: number('mix-samples', 1),
+      excess: Number(document.getElementById('mix-excess').value) || 0,
+      vf: number('mix-vf', 100),
+    };
+  }
+
+  function render() {
+    const rows = panelInput.value.split(/\r?\n/).map((line) => line.split('\t'));
+    const antibodies = Mix.readPanel(rows);
+    const options = settings();
+    const mix = Mix.computeMix({ antibodies, ...options });
+
+    summary.innerHTML = mix.warnings.length
+      ? `<span class="warn">${Seal.esc(mix.warnings.join(' '))}</span>`
+      : `${mix.rows.length} antibodies, ${options.samples} samples + ${options.excess} % excess, total ${mix.vTotal} µL.`;
+
+    if (!mix.rows.length) {
+      editor.showEmpty('<p class="hint">The volumes appear here once the panel has a dilution column.</p>');
+      return;
+    }
+
+    const sections = [];
+    // The panel itself, when the file carries more than markers and dilutions.
+    if (antibodies.some((ab) => ab.channel || ab.clone || ab.supplier || ab.catalogue)) {
+      sections.push({
+        title: 'Panel',
+        blocks: [table(
+          ['Channel', 'Fluorochrome', 'Marker', 'Clone', 'Supplier', 'Cat. no.', 'Dilution'],
+          antibodies.map((ab) => [txt(ab.channel), txt(ab.fluorochrome), txt(ab.marker), txt(ab.clone),
+            txt(ab.supplier), txt(ab.catalogue), val(ab.dilution ? `1:${ab.dilution}` : '')])
+        )],
+      });
+    }
+    sections.push({
+      title: 'Master mix',
+      blocks: [table(['Reagent', 'Dilution', 'Volume'], [
+        [txt('PBS'), '', val(µL(mix.pbs))],
+        [Seal.bold('Brilliant Stain Buffer'), '', val(µL(mix.bsb))],
+        ...mix.rows.map((row) => [Seal.bold(row.name), val(`1:${row.dilution}`), val(µL(row.volume))]),
+        [Seal.bold('Total'), '', val(µL(mix.vTotal))],
+      ])],
+    });
+    sections.push({
+      title: 'Single stains',
+      blocks: [table(['Antibody', 'Volume in one test'],
+        mix.singleStains.map((stain) => [Seal.bold(stain.name), val(µL(stain.volume))]))],
+    });
+
+    editor.showDocument([{
+      title: 'Antibody mix',
+      blocks: [{
+        type: 'para',
+        html: `${Seal.bold('Samples:')} ${Seal.value(String(options.samples))}, `
+          + `${Seal.bold('excess:')} ${Seal.value(`${options.excess} %`)}, `
+          + `${Seal.bold('volume per test:')} ${Seal.value(µL(options.vf))}, `
+          + `${Seal.bold('total:')} ${Seal.value(µL(mix.vTotal))}.`,
+      }],
+      sections,
+    }]);
+  }
+
+  async function openWorkbook(file) {
+    try {
+      const XLSX = await loadSheetJs();
+      const book = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+      const sheet = book.Sheets[book.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, blankrows: false, defval: '' });
+      panelInput.value = rows.map((row) => row.join('\t')).join('\n');
+      render();
+    } catch (err) {
+      summary.innerHTML = `<span class="warn">This file could not be read (${Seal.esc(err.message)}).</span>`;
+    }
+  }
+
+  for (const field of document.querySelectorAll('#panel-mix [data-mix]')) {
+    field.addEventListener('input', render);
+  }
+  fileInput.addEventListener('change', () => { if (fileInput.files[0]) openWorkbook(fileInput.files[0]); });
+
+  let depth = 0;
+  card.addEventListener('dragenter', (e) => { e.preventDefault(); depth++; card.classList.add('dragging'); });
+  card.addEventListener('dragover', (e) => e.preventDefault());
+  card.addEventListener('dragleave', () => { if (--depth <= 0) { depth = 0; card.classList.remove('dragging'); } });
+  card.addEventListener('drop', (e) => {
+    e.preventDefault();
+    depth = 0;
+    card.classList.remove('dragging');
+    if (e.dataTransfer.files[0]) openWorkbook(e.dataTransfer.files[0]);
+  });
+
+  render();
+})();
