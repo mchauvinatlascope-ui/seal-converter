@@ -32,10 +32,15 @@
   show(location.hash.slice(1));
 })();
 
-// Example in the Protocol preview, built by the same code that will feed Seal.
+// Protocol preview: the example until something is typed, then each line as a step
+// with dashes cleaned and values in blue. Built by the same code that will feed Seal.
 (function () {
   const { value, bold, note } = Seal;
-  document.getElementById('protocol-sample').innerHTML = Seal.document([
+  const input = document.getElementById('protocol-input');
+  const preview = document.getElementById('protocol-sample');
+  const label = document.getElementById('protocol-label');
+
+  const example = Seal.document([
     { title: 'Before experiments', sections: [
       { title: 'Biotin-LPETG preparation', steps: [
         `Inject ${value('50 µL')} of ${bold('biotin-LPETG')} at ${value('1 mM')} subcutaneously at the immunisation site, ${value('6 times')}, ${value('20 min')} apart.`,
@@ -43,4 +48,19 @@
       ] },
     ] },
   ]);
+
+  function render() {
+    const lines = input.value.split('\n').map((l) => l.trim()).filter(Boolean);
+    if (!lines.length) {
+      label.textContent = 'Example output';
+      preview.innerHTML = example;
+      return;
+    }
+    const found = lines.reduce((n, l) => n + Detect.findValues(Detect.cleanDashes(l)).length, 0);
+    label.textContent = `${found} value${found === 1 ? '' : 's'} detected`;
+    preview.innerHTML = Seal.steps(lines.map((l) => Detect.highlight(Detect.cleanDashes(l))));
+  }
+
+  input.addEventListener('input', render);
+  render();
 })();

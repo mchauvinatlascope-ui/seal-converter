@@ -1,4 +1,4 @@
-# seal-formatter
+# seal-converter
 
 A small web app that turns lab protocols, experiment records and antibody mix calculations into HTML that pastes cleanly into the Seal electronic lab notebook.
 
@@ -8,7 +8,7 @@ Everything runs in your browser. Files you open and text you paste stay on your 
 
 ## Status
 
-Early work in progress. The page layout is in place; the three modules are being built one at a time.
+Early work in progress. In the Protocol tab you can already type or paste steps, one per line, and see values with units turn blue. Word import and copying to Seal come next.
 
 | Module | What it will do |
 | --- | --- |
@@ -18,13 +18,13 @@ Early work in progress. The page layout is in place; the three modules are being
 
 ## Use it
 
-Open the hosted version on GitHub Pages (link coming with the first release).
+Open the hosted version: https://mchauvinatlascope-ui.github.io/seal-converter/
 
 To run it locally, clone the repository and open `index.html` in a browser. There is no build step and nothing to install.
 
 ```sh
 git clone <repository-url>
-cd seal-formatter
+cd seal-converter
 open index.html   # or double-click the file
 ```
 
