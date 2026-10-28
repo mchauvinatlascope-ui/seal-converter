@@ -8,7 +8,7 @@ Everything runs in your browser. Files you open and text you paste stay on your 
 
 ## Status
 
-Work in progress. The Protocol tab already reads a protocol and shows the Seal version; copying to Seal comes next.
+Work in progress. The Protocol tab reads a protocol, lets you correct the formatting and copies the result into Seal. The Experiment and Antibody mix tabs are next.
 
 | Module | What it will do |
 | --- | --- |
@@ -52,6 +52,12 @@ The preview is editable. Select text in it and use the toolbar:
 - **Clear** removes formatting from the selection.
 
 A button that is already on removes the format instead of adding it. You can also correct the wording in the preview.
+
+## Copy into Seal
+
+*Copy for Seal* puts two versions on the clipboard: the HTML, with the exact markup Seal keeps, and a plain text version for anywhere that takes no formatting. Paste into a Seal protocol or experiment with Ctrl+V.
+
+Where the browser refuses clipboard access, for example on a page served without https, the app falls back to selecting the preview and copying it.
 
 ## Tests
 

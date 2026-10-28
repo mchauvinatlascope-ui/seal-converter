@@ -269,6 +269,60 @@
     applyFormat(kind);
   });
 
+  // ---- Copy for Seal (step 6) ----
+
+  const copyBtn = document.getElementById('protocol-copy');
+
+  function flash(message, ok = true) {
+    copyBtn.textContent = message;
+    copyBtn.classList.toggle('btn-done', ok);
+    clearTimeout(flash.timer);
+    flash.timer = setTimeout(() => {
+      copyBtn.textContent = 'Copy for Seal';
+      copyBtn.classList.remove('btn-done');
+    }, 2200);
+  }
+
+  // Older browsers, and any page served without https, have no clipboard.write.
+  function copyBySelection(html) {
+    const holder = document.createElement('div');
+    holder.setAttribute('contenteditable', 'true');
+    holder.style.cssText = 'position:fixed;left:-9999px;top:0;white-space:pre-wrap;';
+    holder.innerHTML = html;
+    document.body.appendChild(holder);
+    const sel = window.getSelection();
+    const saved = sel.rangeCount ? sel.getRangeAt(0) : null;
+    const range = document.createRange();
+    range.selectNodeContents(holder);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch { ok = false; }
+    sel.removeAllRanges();
+    if (saved) sel.addRange(saved);
+    holder.remove();
+    return ok;
+  }
+
+  async function copyForSeal() {
+    const html = Copy.sealHtml(preview.innerHTML);
+    const text = Copy.plainText(html);
+    try {
+      await navigator.clipboard.write([new ClipboardItem({
+        'text/html': new Blob([html], { type: 'text/html' }),
+        'text/plain': new Blob([text], { type: 'text/plain' }),
+      })]);
+      flash('Copied, paste in Seal');
+      return;
+    } catch {
+      // falls through to the selection based copy
+    }
+    if (copyBySelection(html)) flash('Copied, paste in Seal');
+    else flash('Copy failed, select the preview and press Ctrl+C', false);
+  }
+
+  copyBtn.addEventListener('click', copyForSeal);
+
   preview.contentEditable = 'true';
   preview.spellcheck = false;
 
