@@ -28,6 +28,14 @@ cd seal-formatter
 open index.html   # or double-click the file
 ```
 
+## Tests
+
+The HTML builder has unit tests that run with Node.js 18 or later, without installing anything:
+
+```sh
+npm test
+```
+
 ## Privacy
 
 No server is involved. The app never sends protocols, experiment data or panels anywhere. The repository contains only made-up examples; please do not commit real lab material.

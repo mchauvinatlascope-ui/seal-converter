@@ -203,12 +203,12 @@ main { flex: 1; width: 100%; max-width: 1240px; margin: 0 auto; padding: 28px cl
   font-size: 12px;
   font-weight: 600;
 }
-.seal-sample h4 { font-size: 19px; font-weight: 650; margin-bottom: 8px; }
-.seal-sample h5 { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+.seal-sample h2 { font-size: 19px; font-weight: 650; margin: 4px 0 8px; }
+.seal-sample h3 { font-size: 16px; font-weight: 600; margin: 12px 0 6px; }
 .seal-sample ol { margin: 0; padding-left: 22px; }
 .seal-sample li { margin-bottom: 6px; }
-.seal-sample .v { color: var(--seal-blue); font-weight: 700; }
-@media (prefers-color-scheme: dark) { .seal-sample .v { color: #6ea6f0; } }
+/* The 184 dash separator is wider than the card: show it as a single clipped line */
+#protocol-sample p { margin: 0; white-space: nowrap; overflow: hidden; color: var(--muted); letter-spacing: -0.05em; }
 
 /* Experiment outline */
 .outline { list-style: none; margin: 0; padding: 12px 16px; flex: 1; }

@@ -31,3 +31,16 @@
   window.addEventListener('hashchange', () => show(location.hash.slice(1)));
   show(location.hash.slice(1));
 })();
+
+// Example in the Protocol preview, built by the same code that will feed Seal.
+(function () {
+  const { value, bold, note } = Seal;
+  document.getElementById('protocol-sample').innerHTML = Seal.document([
+    { title: 'Before experiments', sections: [
+      { title: 'Biotin-LPETG preparation', steps: [
+        `Inject ${value('50 µL')} of ${bold('biotin-LPETG')} at ${value('1 mM')} subcutaneously at the immunisation site, ${value('6 times')}, ${value('20 min')} apart.`,
+        `Keep the ${bold('syringes')} on ice ${note('avoid bubbles')}.`,
+      ] },
+    ] },
+  ]);
+})();
