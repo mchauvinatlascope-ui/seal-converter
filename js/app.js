@@ -59,23 +59,25 @@ const Files = (function () {
   return { readDocx };
 })();
 
-// Protocol: source on the left (typed, pasted or opened), Seal preview on the right.
+// Convert: a queue of documents on the left, the Seal version on the right.
 (function () {
   const { value, bold, note } = Seal;
-  const card = document.getElementById('protocol-source');
-  const input = document.getElementById('protocol-input');
-  const fileInput = document.getElementById('protocol-file');
-  const imported = document.getElementById('protocol-imported');
-  const importedName = document.getElementById('protocol-imported-name');
-  const importedNote = document.getElementById('protocol-imported-note');
-  const clearBtn = document.getElementById('protocol-clear');
-  const READY_NOTE = importedNote.textContent;
+  const card = document.getElementById('convert-source');
+  const fileInput = document.getElementById('convert-files');
+  const list = document.getElementById('convert-list');
+  const emptyState = document.getElementById('convert-empty');
+  const progress = document.getElementById('convert-progress');
+  const pasteBox = document.getElementById('convert-input');
+  const title = document.getElementById('convert-title');
+  const nextBtn = document.getElementById('convert-next');
+  const copyBtn = document.getElementById('convert-copy');
 
   const editor = createEditor({
-    preview: document.getElementById('protocol-sample'),
-    label: document.getElementById('protocol-label'),
-    toolbar: document.getElementById('protocol-toolbar'),
-    copyBtn: document.getElementById('protocol-copy'),
+    preview: document.getElementById('convert-preview'),
+    label: document.getElementById('convert-label'),
+    toolbar: document.getElementById('convert-toolbar'),
+    copyBtn,
+    onCopy: () => { if (current) markDone(current); },
   });
 
   const example = Seal.document([
@@ -87,93 +89,150 @@ const Files = (function () {
     ] },
   ]);
 
-  // HTML read from a file or a rich paste; null while the text box is the source.
-  let importedHtml = null;
-  let errorBox = null;
+  // One entry per document: { name, file, kind, source, html, done, error }
+  const documents = [];
+  let current = null;
 
   function render() {
-    if (importedHtml !== null) {
-      editor.showDocument(Parse.blocksToDoc(Parse.htmlToBlocks(importedHtml)));
-      return;
+    list.innerHTML = '';
+    for (const doc of documents) {
+      const item = document.createElement('li');
+      item.className = 'queue-item';
+      if (doc === current) item.classList.add('is-current');
+      if (doc.done) item.classList.add('is-done');
+      item.innerHTML = `<span class="queue-tick" aria-hidden="true"></span>`
+        + `<span class="queue-name"></span>`
+        + `<button class="queue-drop" title="Remove from the list" aria-label="Remove">×</button>`;
+      item.querySelector('.queue-name').textContent = doc.error ? `${doc.name} — ${doc.error}` : doc.name;
+      item.addEventListener('click', (e) => {
+        if (e.target.closest('.queue-drop')) { remove(doc); return; }
+        open(doc);
+      });
+      list.appendChild(item);
     }
-    const text = input.value;
-    if (!text.trim()) { editor.showEmpty(example); return; }
-    const blocks = Parse.looksLikeHtml(text) ? Parse.htmlToBlocks(text) : Parse.textToBlocks(text);
-    editor.showDocument(Parse.blocksToDoc(blocks));
+    emptyState.hidden = documents.length > 0;
+    const done = documents.filter((d) => d.done).length;
+    progress.hidden = documents.length === 0;
+    progress.textContent = `${done} of ${documents.length} copied`;
+    nextBtn.hidden = !documents.some((d) => !d.done && d !== current);
   }
 
-  function setImported(html, name) {
-    importedHtml = html;
-    importedName.textContent = name;
-    importedNote.textContent = READY_NOTE;
-    imported.hidden = false;
-    input.hidden = true;
-    clearBtn.disabled = false;
-    setError(null);
+  function remove(doc) {
+    const index = documents.indexOf(doc);
+    documents.splice(index, 1);
+    if (current === doc) {
+      current = documents[index] || documents[index - 1] || null;
+      if (current) open(current); else showExample();
+    }
     render();
   }
 
-  function clearImport() {
-    importedHtml = null;
-    imported.hidden = true;
-    input.hidden = false;
-    fileInput.value = '';
+  function showExample() {
+    title.textContent = 'Seal preview';
+    editor.showEmpty(example);
+  }
+
+  // What the user corrected in the preview is kept with the document.
+  function save() {
+    if (current && !current.error) current.html = editor.html();
+  }
+
+  async function open(doc) {
+    save();
+    current = doc;
     render();
-    input.focus();
-  }
-
-  function setReading(name) {
-    importedName.textContent = name;
-    importedNote.textContent = 'Reading the file…';
-    imported.hidden = false;
-    input.hidden = true;
-    clearBtn.disabled = true;
-    setError(null);
-  }
-
-  function setError(message) {
-    if (errorBox) { errorBox.remove(); errorBox = null; }
-    if (!message) return;
-    errorBox = document.createElement('p');
-    errorBox.className = 'error';
-    errorBox.textContent = message;
-    card.querySelector('.card-head').after(errorBox);
-  }
-
-  async function openFile(file) {
-    // An exported web page, a protocol list page, or anything already in HTML.
-    if (/\.html?$/i.test(file.name)) { setImported(await file.text(), file.name); return; }
-    if (/\.(txt|md|csv|tsv)$/i.test(file.name)) {
-      clearImport();
-      input.value = await file.text();
-      render();
-      return;
+    title.textContent = doc.name;
+    if (doc.error) { editor.showEmpty(`<p class="hint">${Seal.esc(doc.error)}</p>`); return; }
+    if (doc.html === null) {
+      editor.showEmpty('<p class="hint">Reading the file…</p>');
+      try {
+        doc.source = doc.source !== null ? doc.source : await readFile(doc.file);
+        doc.html = Seal.document(Parse.blocksToDoc(blocksOf(doc)));
+      } catch (err) {
+        doc.error = err.message;
+        render();
+        editor.showEmpty(`<p class="hint">${Seal.esc(err.message)}</p>`);
+        return;
+      }
     }
-    if (!/\.docx$/i.test(file.name)) {
-      setError('Open a .docx, .html or .txt file. Save an older .doc file as .docx in Word first.');
-      return;
-    }
-    setReading(file.name);
-    try {
-      setImported(await Files.readDocx(file), file.name);
-    } catch (err) {
-      clearImport();
-      setError(`This file could not be read (${err.message}).`);
-    }
+    if (current !== doc) return; // the user clicked another document meanwhile
+    editor.showHtml(doc.html);
   }
 
-  input.addEventListener('input', render);
+  function blocksOf(doc) {
+    if (doc.kind === 'html') return Parse.htmlToBlocks(doc.source);
+    return Parse.looksLikeHtml(doc.source) ? Parse.htmlToBlocks(doc.source) : Parse.textToBlocks(doc.source);
+  }
 
-  // A paste from Word or a web page carries HTML: use it to keep headings, lists, tables and bold.
-  input.addEventListener('paste', (e) => {
-    const html = e.clipboardData && e.clipboardData.getData('text/html');
-    if (!html || !/<(p|h[1-6]|li|td|table|b|strong)[\s>]/i.test(html) || input.value.trim()) return;
-    e.preventDefault();
-    setImported(html, 'Pasted content');
+  async function readFile(file) {
+    if (/\.docx$/i.test(file.name)) return Files.readDocx(file);
+    return file.text();
+  }
+
+  function kindOf(name) {
+    if (/\.docx$/i.test(name)) return 'html';
+    if (/\.html?$/i.test(name)) return 'html';
+    if (/\.(txt|md|csv|tsv)$/i.test(name)) return 'text';
+    return null;
+  }
+
+  function add(files) {
+    let first = null;
+    for (const file of files) {
+      const kind = kindOf(file.name);
+      const doc = {
+        name: file.name,
+        file,
+        kind: kind || 'text',
+        source: null,
+        html: null,
+        done: false,
+        error: kind ? null : 'Not a .docx, .html or .txt file.',
+      };
+      documents.push(doc);
+      first = first || doc;
+    }
+    render();
+    if (first && (!current || current.done)) open(first);
+  }
+
+  function markDone(doc) {
+    doc.done = true;
+    render();
+  }
+
+  nextBtn.addEventListener('click', () => {
+    const start = documents.indexOf(current) + 1;
+    const next = documents.slice(start).find((d) => !d.done) || documents.find((d) => !d.done && d !== current);
+    if (next) open(next);
   });
 
-  fileInput.addEventListener('change', () => { if (fileInput.files[0]) openFile(fileInput.files[0]); });
-  clearBtn.addEventListener('click', clearImport);
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files.length) add(Array.from(fileInput.files));
+    fileInput.value = '';
+  });
+
+  // Pasted text behaves like a document of its own.
+  let pasted = null;
+  function showPasted() {
+    const text = pasteBox.value;
+    if (!text.trim()) {
+      if (pasted) { remove(pasted); pasted = null; }
+      return;
+    }
+    if (!pasted) {
+      pasted = { name: 'Pasted document', file: null, kind: 'text', source: text, html: null, done: false, error: null };
+      documents.push(pasted);
+    }
+    pasted.source = text;
+    pasted.html = Seal.document(Parse.blocksToDoc(blocksOf(pasted)));
+    pasted.done = false;
+    current = pasted;
+    render();
+    title.textContent = pasted.name;
+    editor.showHtml(pasted.html);
+  }
+  pasteBox.addEventListener('input', showPasted);
 
   let depth = 0;
   card.addEventListener('dragenter', (e) => { e.preventDefault(); depth++; card.classList.add('dragging'); });
@@ -183,99 +242,11 @@ const Files = (function () {
     e.preventDefault();
     depth = 0;
     card.classList.remove('dragging');
-    const file = e.dataTransfer.files[0];
-    if (file) openFile(file);
+    if (e.dataTransfer.files.length) add(Array.from(e.dataTransfer.files));
   });
 
   render();
-})();
-
-// Experiment: a short header, the mice, what was done, and what changed on the day.
-(function () {
-  const fields = Array.from(document.querySelectorAll('#panel-experiment [data-field]'));
-  const get = (name) => (document.getElementById(`exp-${name}`).value || '').trim();
-
-  const editor = createEditor({
-    preview: document.getElementById('exp-preview'),
-    label: document.getElementById('exp-label'),
-    toolbar: document.getElementById('exp-toolbar'),
-    copyBtn: document.getElementById('exp-copy'),
-    emptyLabel: 'Fill in the fields on the left',
-  });
-
-  // "Protocol: ML-014" with the label in bold and the answer in blue bold.
-  function entry(label, text) {
-    return `${Seal.bold(`${label}:`)} ${Detect.highlight(text)}`;
-  }
-
-  // A free answer stays prose: one paragraph per line, values in blue.
-  function paragraphs(text) {
-    return text.split(/\n/).map((line) => line.trim()).filter(Boolean)
-      .map((line) => ({ type: 'para', html: Detect.highlight(Detect.cleanDashes(line)) }));
-  }
-
-  function blocksFromText(text) {
-    if (!text.trim()) return [];
-    const doc = Parse.blocksToDoc(Parse.textToBlocks(text));
-    // A short answer has no chapters of its own, so only its content is kept.
-    return doc.flatMap((ch) => [
-      ...(ch.title ? [{ type: 'para', html: Seal.bold(ch.title) }] : []),
-      ...ch.blocks,
-      ...ch.sections.flatMap((sec) => [{ type: 'para', html: Seal.bold(sec.title) }, ...sec.blocks]),
-    ]);
-  }
-
-  function build() {
-    const header = [
-      ['Protocol', get('protocol')],
-      ['Experiment', get('name')],
-      ['Date', get('date')],
-      ['Operator', get('operator')],
-    ].filter(([, text]) => text).map(([label, text]) => ({ type: 'para', html: entry(label, text) }));
-
-    const design = get('design');
-    const mice = get('mice');
-    const method = get('method');
-    const deviations = get('deviations');
-    const volumes = get('volumes');
-
-    const chapters = [];
-    if (header.length || design) {
-      chapters.push({
-        title: 'Experiment',
-        blocks: [
-          ...header,
-          ...(design ? [{ type: 'para', html: Seal.bold('Design at a glance:') }, ...paragraphs(design)] : []),
-        ],
-        sections: [],
-      });
-    }
-    if (mice) {
-      const blocks = Parse.blocksToDoc(Parse.textToBlocks(mice)).flatMap((ch) => ch.blocks);
-      chapters.push({ title: 'Mice', blocks, sections: [] });
-    }
-    if (method) {
-      const doc = Parse.blocksToDoc(Parse.textToBlocks(method));
-      // Keep the chapters of a pasted procedure; wrap a plain list of steps in one.
-      if (doc.some((ch) => ch.title)) chapters.push(...doc.filter((ch) => ch.title || ch.blocks.length));
-      else chapters.push({ title: 'Procedure', blocks: doc.flatMap((ch) => ch.blocks), sections: [] });
-    }
-    if (deviations) chapters.push({ title: 'Deviations and notes', blocks: blocksFromText(deviations), sections: [] });
-    if (volumes) chapters.push({ title: 'Volumes actually used', blocks: blocksFromText(volumes), sections: [] });
-    return chapters;
-  }
-
-  function render() {
-    const chapters = build();
-    if (!chapters.length) {
-      editor.showEmpty('<p class="hint">The Seal version appears here as you type.</p>');
-      return;
-    }
-    editor.showDocument(chapters);
-  }
-
-  for (const field of fields) field.addEventListener('input', render);
-  render();
+  showExample();
 })();
 
 // Antibody mix: a panel in, the volumes to pipette out, as Seal tables.

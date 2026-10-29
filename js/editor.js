@@ -4,7 +4,7 @@
   const ROLE_NAMES = { chapter: 'Chapter', section: 'Section', step: 'Step', text: 'Paragraph' };
   const LINES = 'li, p, h2, h3, td, th';
 
-  function createEditor({ preview, label, toolbar, copyBtn, emptyLabel = 'Example output' }) {
+  function createEditor({ preview, label, toolbar, copyBtn, emptyLabel = 'Example output', onCopy }) {
     const tools = Array.from(toolbar.querySelectorAll('.tool'));
     const hint = toolbar.querySelector('.toolbar-hint');
     const roleLabel = toolbar.querySelector('.tool-role');
@@ -33,6 +33,20 @@
     function showEmpty(html) {
       label.textContent = emptyLabel;
       paint(html);
+    }
+
+    // A document that is already Seal HTML, counted the same way.
+    function showHtml(html) {
+      const steps = (html.match(/<li>/g) || []).length;
+      const chapters = (html.match(/<h2>/g) || []).length;
+      const values = (html.match(/data-native-color="blue"/g) || []).length;
+      label.textContent = [chapters && plural(chapters, 'chapter'), plural(steps, 'step'), plural(values, 'value')]
+        .filter(Boolean).join(', ');
+      paint(html);
+    }
+
+    function currentHtml() {
+      return Copy.sealHtml(preview.innerHTML);
     }
 
     // ---- formatting the selection ----
@@ -265,12 +279,17 @@
           'text/plain': new Blob([text], { type: 'text/plain' }),
         })]);
         flash('Copied, paste in Seal');
+        if (onCopy) onCopy();
         return;
       } catch {
         // falls through to the selection based copy
       }
-      if (copyBySelection(html)) flash('Copied, paste in Seal');
-      else flash('Copy failed, select the preview and press Ctrl+C', false);
+      if (copyBySelection(html)) {
+        flash('Copied, paste in Seal');
+        if (onCopy) onCopy();
+      } else {
+        flash('Copy failed, select the preview and press Ctrl+C', false);
+      }
     }
 
     // ---- wiring ----
@@ -302,7 +321,7 @@
     preview.contentEditable = 'true';
     preview.spellcheck = false;
 
-    return { showDocument, showEmpty, paint, updateTools };
+    return { showDocument, showEmpty, showHtml, paint, updateTools, html: currentHtml };
   }
 
   root.createEditor = createEditor;

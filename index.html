@@ -24,119 +24,53 @@
   </header>
 
   <nav class="tabs" role="tablist" aria-label="Modules">
-    <button role="tab" id="tab-protocol" aria-controls="panel-protocol" data-tab="protocol">
-      <span class="tab-num">1</span>Protocol
-    </button>
-    <button role="tab" id="tab-experiment" aria-controls="panel-experiment" data-tab="experiment">
-      <span class="tab-num">2</span>Experiment
+    <button role="tab" id="tab-convert" aria-controls="panel-convert" data-tab="convert">
+      <span class="tab-num">1</span>Convert
     </button>
     <button role="tab" id="tab-mix" aria-controls="panel-mix" data-tab="mix">
-      <span class="tab-num">3</span>Antibody mix
+      <span class="tab-num">2</span>Antibody mix
     </button>
   </nav>
 
   <main>
-    <section class="panel" role="tabpanel" id="panel-protocol" aria-labelledby="tab-protocol">
+    <section class="panel" role="tabpanel" id="panel-convert" aria-labelledby="tab-convert">
       <div class="panel-head">
-        <h2>Protocol</h2>
-        <p>Import a .docx or paste your text. Values with units turn blue, and the result pastes into Seal with its formatting intact.</p>
+        <h2>Convert</h2>
+        <p>Drop your protocols and experiments here, check each one, and paste them into Seal one after another.</p>
       </div>
       <div class="workspace">
-        <article class="card" id="protocol-source">
+        <article class="card" id="convert-source">
           <header class="card-head">
-            <h3>Source</h3>
+            <h3>Documents</h3>
             <label class="btn">
-              Open a file
-              <input type="file" id="protocol-file" accept=".docx,.html,.htm,.txt,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/html,text/plain" hidden>
+              Add files
+              <input type="file" id="convert-files" multiple accept=".docx,.html,.htm,.txt,.md,.csv,.tsv,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/html,text/plain" hidden>
             </label>
           </header>
-          <div class="imported" id="protocol-imported" hidden>
-            <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M14 6h14l10 10v24a2 2 0 0 1-2 2H14a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M28 6v10h10" fill="none" stroke="currentColor" stroke-width="2"/></svg>
-            <div>
-              <p class="imported-name" id="protocol-imported-name"></p>
-              <p class="imported-note" id="protocol-imported-note">Formatting, headings, lists and tables are read from the source. Edit the result in the preview.</p>
-            </div>
-            <button class="btn" id="protocol-clear">Clear</button>
+          <p class="queue-progress" id="convert-progress" hidden></p>
+          <ul class="queue" id="convert-list"></ul>
+          <div class="empty" id="convert-empty">
+            <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M14 6h14l10 10v24a2 2 0 0 1-2 2H14a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M28 6v10h10" fill="none" stroke="currentColor" stroke-width="2"/><path d="M18 26h12M18 32h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            <p class="empty-title">Drop .docx, .html or .txt files here</p>
+            <p class="empty-note">Several at a time. Nothing leaves your browser.</p>
           </div>
-          <label class="sr-only" for="protocol-input">Protocol text</label>
-          <textarea id="protocol-input" class="source-input" spellcheck="false"
-            placeholder="Paste a protocol from Word, SharePoint or a web page, type it, or drop a .docx or .html file here.&#10;&#10;I. Before experiments&#10;a. Buffer preparation&#10;Spin at 300 x g for 5 min at 4 °C.&#10;Stain with anti-CD45 at 1:200 for 20 min on ice."></textarea>
-          <div class="drop-veil" aria-hidden="true">Drop the file</div>
+          <details class="paste-box">
+            <summary>Or paste a document</summary>
+            <label class="sr-only" for="convert-input">Document text</label>
+            <textarea id="convert-input" class="source-input" spellcheck="false" rows="7"
+              placeholder="Paste from Word, SharePoint or a web page, or type the steps.&#10;&#10;I. Before experiments&#10;a. Buffer preparation&#10;Spin at 300 x g for 5 min at 4 °C."></textarea>
+          </details>
+          <div class="drop-veil" aria-hidden="true">Drop the files</div>
         </article>
         <article class="card">
           <header class="card-head">
-            <h3>Seal preview</h3>
-            <button class="btn btn-primary" id="protocol-copy">Copy for Seal</button>
-          </header>
-          <div class="toolbar" id="protocol-toolbar" role="toolbar" aria-label="Formatting">
-            <button class="tool" data-format="v" title="Value in blue bold (Ctrl+Shift+V)"><span class="tool-blue">Aa</span> Value</button>
-            <button class="tool" data-format="b" title="Bold, for reagents and warnings (Ctrl+B)"><strong>B</strong></button>
-            <button class="tool" data-format="i" title="Italic, for remarks (Ctrl+I)"><em>I</em></button>
-            <button class="tool" data-format="none" title="Remove formatting">Clear</button>
-            <span class="tool-sep" aria-hidden="true"></span>
-            <button class="tool" data-level="up" title="Make this line a chapter, a section, or a step">Up</button>
-            <button class="tool" data-level="down" title="Make this line a section, or a step">Down</button>
-            <span class="tool-role" id="protocol-role"></span>
-            <span class="toolbar-hint" id="protocol-hint">Select text in the preview to format it</span>
-          </div>
-          <div class="seal-sample" aria-live="polite">
-            <p class="sample-label" id="protocol-label">Example output</p>
-            <div id="protocol-sample" class="preview-body"></div>
-          </div>
-        </article>
-      </div>
-    </section>
-
-    <section class="panel" role="tabpanel" id="panel-experiment" aria-labelledby="tab-experiment" hidden>
-      <div class="panel-head">
-        <h2>Experiment</h2>
-        <p>Add a short header to a procedure you already have, record what changed, and copy the whole thing into Seal.</p>
-      </div>
-      <div class="workspace">
-        <article class="card">
-          <header class="card-head"><h3>Experiment details</h3></header>
-          <div class="form">
-            <div class="form-row">
-              <label>Seal protocol ID
-                <input type="text" id="exp-protocol" data-field placeholder="ML-014 v4.0">
-              </label>
-              <label>Experiment
-                <input type="text" id="exp-name" data-field placeholder="MC2026-D001">
-              </label>
+            <h3 id="convert-title">Seal preview</h3>
+            <div class="head-actions">
+              <button class="btn" id="convert-next" hidden>Next document</button>
+              <button class="btn btn-primary" id="convert-copy">Copy for Seal</button>
             </div>
-            <div class="form-row">
-              <label>Date
-                <input type="date" id="exp-date" data-field>
-              </label>
-              <label>Operator
-                <input type="text" id="exp-operator" data-field placeholder="Initials">
-              </label>
-            </div>
-            <label>Design at a glance
-              <textarea id="exp-design" data-field rows="3" placeholder="4 groups, n = 5, immunised on day 0, dLN harvested on day 10."></textarea>
-            </label>
-            <label>Mice
-              <span class="field-note">Paste the rows from Excel or Word, header line first. Columns keep their tabs.</span>
-              <textarea id="exp-mice" data-field rows="4" spellcheck="false" placeholder="ID&#9;Age&#9;Genotype&#9;Group"></textarea>
-            </label>
-            <label>What was done
-              <span class="field-note">Paste the experiment text you already have. Chapters, sections and steps are read as in the Protocol tab.</span>
-              <textarea id="exp-method" data-field rows="6" spellcheck="false" placeholder="I. Day 0&#10;Weigh the mice and record the weight.&#10;Inject 50 µL subcutaneously."></textarea>
-            </label>
-            <label>Deviations and notes
-              <textarea id="exp-deviations" data-field rows="3" placeholder="One line per thing that changed on the day."></textarea>
-            </label>
-            <label>Volumes actually used
-              <textarea id="exp-volumes" data-field rows="3" placeholder="Reagent&#9;Planned&#9;Used"></textarea>
-            </label>
-          </div>
-        </article>
-        <article class="card">
-          <header class="card-head">
-            <h3>Seal preview</h3>
-            <button class="btn btn-primary" id="exp-copy">Copy for Seal</button>
           </header>
-          <div class="toolbar" id="exp-toolbar" role="toolbar" aria-label="Formatting">
+          <div class="toolbar" id="convert-toolbar" role="toolbar" aria-label="Formatting">
             <button class="tool" data-format="v" title="Value in blue bold (Ctrl+Shift+V)"><span class="tool-blue">Aa</span> Value</button>
             <button class="tool" data-format="b" title="Bold, for reagents and warnings (Ctrl+B)"><strong>B</strong></button>
             <button class="tool" data-format="i" title="Italic, for remarks (Ctrl+I)"><em>I</em></button>
@@ -148,8 +82,8 @@
             <span class="toolbar-hint">Select text in the preview to format it</span>
           </div>
           <div class="seal-sample" aria-live="polite">
-            <p class="sample-label" id="exp-label">Fill in the fields on the left</p>
-            <div id="exp-preview" class="preview-body"></div>
+            <p class="sample-label" id="convert-label">Example output</p>
+            <div id="convert-preview" class="preview-body"></div>
           </div>
         </article>
       </div>
@@ -215,7 +149,7 @@
   </main>
 
   <footer class="foot">
-    <span>v0.10.0</span>
+    <span>v1.0.0</span>
   </footer>
 
   <script src="js/seal.js"></script>

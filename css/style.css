@@ -145,6 +145,8 @@ main { flex: 1; width: 100%; max-width: 1240px; margin: 0 auto; padding: 28px cl
   border-bottom: 1px solid var(--line);
 }
 .card-head h3 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+/* The open document is named here, so it keeps the case of its file name */
+#convert-title { text-transform: none; letter-spacing: 0; font-size: 14px; color: var(--ink); overflow-wrap: anywhere; }
 
 /* Buttons */
 .btn {
@@ -244,6 +246,58 @@ label.btn { display: inline-flex; align-items: center; }
 
 .preview-body[contenteditable="true"]:focus { outline: none; }
 .preview-body [contenteditable="true"]:focus-visible { outline: 2px solid var(--accent-soft); outline-offset: 2px; border-radius: 4px; }
+
+.head-actions { display: flex; align-items: center; gap: 8px; }
+
+.queue-progress {
+  margin: 0;
+  padding: 10px 16px 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.queue { list-style: none; margin: 0; padding: 10px 10px 0; display: flex; flex-direction: column; gap: 2px; }
+.queue-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+.queue-item:hover { background: var(--surface-2); }
+.queue-item.is-current { background: var(--accent-soft); border-color: var(--accent); }
+.queue-name { flex: 1; overflow-wrap: anywhere; }
+.queue-tick {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 5px;
+}
+.is-done .queue-tick {
+  border-color: #2f9e6b;
+  background: #2f9e6b url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 8.5l2.5 2.5L12 5.5' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 14px no-repeat;
+}
+.is-done .queue-name { color: var(--muted); }
+.queue-drop {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+.queue-drop:hover { background: var(--line); color: var(--ink); }
+
+.paste-box { margin: 10px 16px 16px; border-top: 1px solid var(--line); padding-top: 10px; }
+.paste-box summary { font-size: 13px; color: var(--ink-2); cursor: pointer; }
+.paste-box .source-input { width: 100%; margin-top: 8px; padding: 10px 12px; min-height: 0; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface-2); }
 
 /* Empty states */
 .empty {

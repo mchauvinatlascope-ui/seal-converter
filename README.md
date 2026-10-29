@@ -8,13 +8,7 @@ Everything runs in your browser. Files you open and text you paste stay on your 
 
 ## Status
 
-Protocols, experiments and antibody mixes all convert and copy into Seal. FMO tubes and the order of addition are still to come.
-
-| Module | What it does |
-| --- | --- |
-| Protocol | Open a .docx or .html file, or paste text, then copy the Seal version |
-| Experiment | A short header, the mice, what was done, what changed, and the volumes used |
-| Antibody mix | Import a panel from .xlsx and compute mix volumes as a Seal table |
+Protocols and experiments convert and copy into Seal. The antibody mix calculator works for the volumes; FMO tubes and the order of addition are still to come.
 
 ## Use it
 
@@ -28,21 +22,19 @@ cd seal-converter
 open index.html   # or double-click the file
 ```
 
-## Protocol import
+## Convert a batch of documents
 
-You can bring a protocol in three ways:
+Drop your files on the Documents panel, or click *Add files*; several at a time is the point. Word (.docx), a saved or exported web page (.html) and plain text (.txt) all work, and *Or paste a document* takes a paste from Word, SharePoint or a web page.
 
-- **A file**: click *Open a file* or drop it on the Source panel. Word (.docx), a saved or exported web page (.html) and plain text (.txt) all work. Heading styles become chapters and sections, Word lists become steps, tables stay tables, and bold and italic are kept.
-- **Paste from Word, SharePoint or a web page**: paste into the empty Source box. The formatting that came with the paste is used the same way.
-Sub levels are kept: a list item or an indented paragraph with deeper lines below it becomes a section title, and those lines become its steps. A short paragraph entirely in bold is read as a title too, numbered or not.
+Click a document to see its Seal version, correct anything that needs it, then *Copy for Seal* and paste into Seal. Copying ticks the document off and *Next document* moves you to the first one still to do, so a long migration stays easy to follow. Corrections you make in the preview are kept when you switch documents.
 
-A bench sheet table whose columns are `#`, `STEP` and `DONE` becomes a numbered list of steps rather than a three column table.
+What the reader does with a document:
 
-- **Plain text**: type or paste lines. A line starting with `I.`, `II.` is a chapter, `a.`, `b.` a section, and other lines are steps. Lines separated by tabs become a table.
-
-Seal renumbers everything, so the original numbers (`1.`, `a)`, bullets) are dropped. Values with units turn blue, em dashes become commas, and superscripts such as 10⁶ are kept.
-
-[`examples/example-protocol.docx`](examples/example-protocol.docx) is a made-up protocol to try the import.
+- Word heading styles, `<h1>`..`<h6>`, and short paragraphs entirely in bold become chapters and sections.
+- Lists become steps. A list item or an indented paragraph with deeper lines below it becomes a section title, and those lines its steps.
+- In plain text, `I.`, `II.` mark chapters, `a.`, `b.` sections, and a short line with no value, no final punctuation and no action verb at the start is read as a section. Tab separated lines become a table.
+- A bench sheet table whose columns are `#`, `STEP` and `DONE` becomes a numbered list of steps.
+- Values with units turn blue, em dashes become commas, superscripts such as 10⁶ and 4 °C are kept, and the original numbering is dropped because Seal numbers everything again.
 
 ## Pictures
 
@@ -62,14 +54,6 @@ The preview is editable. Select text in it and use the toolbar:
 A button that is already on removes the format instead of adding it. You can also correct the wording in the preview.
 
 **Up** and **Down** move the line the caret sits in between chapter, section and step. Everything is renumbered, so a step promoted to a section takes the next free letter.
-
-## Experiment
-
-The Experiment tab is for a procedure you already have written somewhere. Fill in the protocol ID, the date and the operator, paste your text under *What was done*, and add what changed on the day under *Deviations and notes*.
-
-The mice and the volumes used are pasted straight from Excel or Word: a header line, then one line per row, columns separated by tabs. They come out as Seal tables.
-
-Chapters your pasted text already has (`I.`, `II.`) are kept; a plain list of steps becomes a chapter called Procedure.
 
 ## Antibody mix
 
