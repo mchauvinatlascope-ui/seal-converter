@@ -26,6 +26,8 @@ open index.html   # or double-click the file
 
 Drop your files on the Documents panel, or click *Add files*. A whole folder works too, through *Add a folder* or by dropping it: subfolders are followed, and anything that is not a document is skipped. Word (.docx), a saved or exported web page (.html) and plain text (.txt) all work, and *Or paste a document* takes a paste from Word, SharePoint or a web page.
 
+*Convert all* reads and converts everything in the list at once and takes you to the first document that needs attention, so a batch can be triaged before you start pasting.
+
 Click a document to see its Seal version, correct anything that needs it, then *Copy for Seal* and paste into Seal. Copying ticks the document off and *Next document* moves you to the first one still to do, so a long migration stays easy to follow. Corrections you make in the preview are kept when you switch documents.
 
 What the reader does with a document:
@@ -35,6 +37,8 @@ What the reader does with a document:
 - In plain text, `I.`, `II.` mark chapters, `a.`, `b.` sections, and a short line with no value, no final punctuation and no action verb at the start is read as a section. Tab separated lines become a table.
 - A bench sheet table whose columns are `#`, `STEP` and `DONE` becomes a numbered list of steps.
 - Values with units turn blue, em dashes become commas, superscripts such as 10⁶ and 4 °C are kept, and the original numbering is dropped because Seal numbers everything again.
+
+The list survives closing the tab: the documents already converted, your corrections and the ticks come back next time, held in this browser alone and never sent anywhere. *Clear the list* empties it. A document whose text was too heavy to keep is listed again but needs its file a second time.
 
 ## Nothing lost without saying so
 

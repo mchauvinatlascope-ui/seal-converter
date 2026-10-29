@@ -72,6 +72,8 @@ const Files = (function () {
   const pasteBox = document.getElementById('convert-input');
   const title = document.getElementById('convert-title');
   const nextBtn = document.getElementById('convert-next');
+  const allBtn = document.getElementById('convert-all');
+  const restoredNote = document.getElementById('convert-restored');
   const copyBtn = document.getElementById('convert-copy');
 
   const editor = createEditor({
@@ -95,6 +97,9 @@ const Files = (function () {
   const documents = [];
   let current = null;
   let skippedFiles = 0;
+  let converting = false;
+  // The document the preview is actually showing, which may lag behind a click.
+  let showing = null;
 
   function render() {
     list.innerHTML = '';
@@ -127,6 +132,13 @@ const Files = (function () {
     progress.textContent = `${done} of ${documents.length} copied`
       + (skippedFiles ? `, ${skippedFiles} file(s) ignored (not .docx, .html or .txt)` : '');
     nextBtn.hidden = !documents.some((d) => !d.done && d !== current);
+    const pending = documents.filter((d) => d.html === null && !d.error).length;
+    allBtn.hidden = pending === 0;
+    allBtn.textContent = converting ? 'Converting…' : `Convert all (${pending})`;
+    allBtn.disabled = converting;
+    const warned = documents.filter((d) => d.issues && d.issues.length).length;
+    if (warned) progress.textContent += `, ${warned} to look at`;
+    remember();
   }
 
   function remove(doc) {
@@ -141,6 +153,7 @@ const Files = (function () {
 
   function showExample() {
     title.textContent = 'Seal preview';
+    showing = null;
     showIssues([]);
     editor.showEmpty(example);
   }
@@ -158,11 +171,12 @@ const Files = (function () {
 
   // What the user corrected in the preview is kept with the document.
   function save() {
-    if (current && !current.error) current.html = editor.html();
+    if (showing && !showing.error) showing.html = editor.html();
   }
 
   async function open(doc) {
     save();
+    showing = null;
     current = doc;
     render();
     title.textContent = doc.name;
@@ -185,6 +199,32 @@ const Files = (function () {
     if (current !== doc) return; // the user clicked another document meanwhile
     showIssues(doc.issues || []);
     editor.showHtml(doc.html);
+    showing = doc;
+  }
+
+  // Reads and converts a document without opening it, for Convert all.
+  async function prepare(doc) {
+    if (doc.html !== null || doc.error) return;
+    try {
+      if (doc.source === null) doc.source = await readFile(doc.file);
+      doc.html = Seal.document(Parse.blocksToDoc(blocksOf(doc)));
+      doc.issues = Check.checkDocument({ source: doc.source, result: doc.html, isHtml: doc.kind === 'html' });
+    } catch (err) {
+      doc.error = err.message;
+    }
+  }
+
+  async function convertAll() {
+    converting = true;
+    render();
+    for (const doc of documents.slice()) {
+      await prepare(doc);
+      render();
+    }
+    converting = false;
+    const warned = documents.filter((d) => d.issues && d.issues.length);
+    render();
+    if (warned.length && (!current || !current.issues || !current.issues.length)) open(warned[0]);
   }
 
   function blocksOf(doc) {
@@ -259,11 +299,66 @@ const Files = (function () {
     render();
   }
 
+  // The list lives in this browser only, so a migration can span several days.
+  const STORE = 'seal-converter.queue.v1';
+  const STORE_LIMIT = 4e6;
+
+  function remember() {
+    save();
+    const kept = documents.filter((d) => d !== pasted).map((d) => ({
+      name: d.name, folder: d.folder, kind: d.kind, done: d.done, html: d.html, issues: d.issues,
+    }));
+    // Pictures make a document heavy; the biggest lose their body rather than their place in the list.
+    let payload = JSON.stringify(kept);
+    while (payload.length > STORE_LIMIT && kept.some((d) => d.html)) {
+      const heaviest = kept.reduce((worst, d) => ((d.html || '').length > (worst.html || '').length ? d : worst), kept[0]);
+      heaviest.html = null;
+      heaviest.issues = null;
+      payload = JSON.stringify(kept);
+    }
+    try { localStorage.setItem(STORE, payload); } catch { /* private window, or no room */ }
+  }
+
+  function recall() {
+    let kept = [];
+    try { kept = JSON.parse(localStorage.getItem(STORE) || '[]'); } catch { kept = []; }
+    if (!Array.isArray(kept) || !kept.length) return;
+    for (const entry of kept) {
+      documents.push({
+        name: entry.name,
+        folder: entry.folder || '',
+        file: null,
+        kind: entry.kind || 'text',
+        source: null,
+        html: entry.html || null,
+        issues: entry.issues || null,
+        done: !!entry.done,
+        error: entry.html ? null : 'Add the file again to convert it.',
+      });
+    }
+    const done = documents.filter((d) => d.done).length;
+    restoredNote.hidden = false;
+    restoredNote.innerHTML = `<button class="link" id="convert-forget">Clear the list</button>`;
+    restoredNote.insertAdjacentText('afterbegin', `${documents.length} documents from last time, ${done} already copied. `);
+    document.getElementById('convert-forget').addEventListener('click', () => {
+      documents.length = 0;
+      current = null;
+      skippedFiles = 0;
+      restoredNote.hidden = true;
+      try { localStorage.removeItem(STORE); } catch { /* nothing to clear */ }
+      render();
+      showExample();
+    });
+    render();
+  }
+
   nextBtn.addEventListener('click', () => {
     const start = documents.indexOf(current) + 1;
     const next = documents.slice(start).find((d) => !d.done) || documents.find((d) => !d.done && d !== current);
     if (next) open(next);
   });
+
+  allBtn.addEventListener('click', convertAll);
 
   for (const input of [fileInput, folderInput]) {
     input.addEventListener('change', () => {
@@ -289,10 +384,12 @@ const Files = (function () {
     pasted.issues = Check.checkDocument({ source: text, result: pasted.html, isHtml: Parse.looksLikeHtml(text) });
     pasted.done = false;
     current = pasted;
+    showing = null;
     render();
     title.textContent = pasted.name;
     showIssues(pasted.issues);
     editor.showHtml(pasted.html);
+    showing = pasted;
   }
   pasteBox.addEventListener('input', showPasted);
 
@@ -315,8 +412,10 @@ const Files = (function () {
     if (e.dataTransfer.files.length) add(Array.from(e.dataTransfer.files));
   });
 
+  recall();
   render();
-  showExample();
+  const firstPending = documents.find((d) => !d.done && d.html);
+  if (firstPending) open(firstPending); else showExample();
 })();
 
 // Antibody mix: a panel in, the volumes to pipette out, as Seal tables.
