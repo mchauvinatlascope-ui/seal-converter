@@ -24,7 +24,7 @@ open index.html   # or double-click the file
 
 ## Convert a batch of documents
 
-Drop your files on the Documents panel, or click *Add files*; several at a time is the point. Word (.docx), a saved or exported web page (.html) and plain text (.txt) all work, and *Or paste a document* takes a paste from Word, SharePoint or a web page.
+Drop your files on the Documents panel, or click *Add files*. A whole folder works too, through *Add a folder* or by dropping it: subfolders are followed, and anything that is not a document is skipped. Word (.docx), a saved or exported web page (.html) and plain text (.txt) all work, and *Or paste a document* takes a paste from Word, SharePoint or a web page.
 
 Click a document to see its Seal version, correct anything that needs it, then *Copy for Seal* and paste into Seal. Copying ticks the document off and *Next document* moves you to the first one still to do, so a long migration stays easy to follow. Corrections you make in the preview are kept when you switch documents.
 
@@ -35,6 +35,12 @@ What the reader does with a document:
 - In plain text, `I.`, `II.` mark chapters, `a.`, `b.` sections, and a short line with no value, no final punctuation and no action verb at the start is read as a section. Tab separated lines become a table.
 - A bench sheet table whose columns are `#`, `STEP` and `DONE` becomes a numbered list of steps.
 - Values with units turn blue, em dashes become commas, superscripts such as 10⁶ and 4 °C are kept, and the original numbering is dropped because Seal numbers everything again.
+
+## Nothing lost without saying so
+
+After each conversion the app compares the document with its Seal version and warns above the preview when something did not come through: a passage that is nowhere in the result, a document that came out with no step at all, or a picture stored outside the file. A dot next to the name in the list marks the documents worth a second look.
+
+Numbering, bench sheet tick columns and the tags Word scatters through a sentence are ignored, so a warning means real content, not formatting.
 
 ## Pictures
 

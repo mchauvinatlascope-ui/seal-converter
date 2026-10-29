@@ -299,6 +299,16 @@ label.btn { display: inline-flex; align-items: center; }
 .paste-box summary { font-size: 13px; color: var(--ink-2); cursor: pointer; }
 .paste-box .source-input { width: 100%; margin-top: 8px; padding: 10px 12px; min-height: 0; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface-2); }
 
+.issues { list-style: none; margin: 0 0 14px; padding: 10px 12px; border-radius: 8px; background: #fdf4e3; border: 1px solid #e8d49a; }
+.issues li { font-size: 13px; color: #7a5a12; }
+.issues li + li { margin-top: 4px; }
+@media (prefers-color-scheme: dark) {
+  .issues { background: #2e2715; border-color: #574728; }
+  .issues li { color: #e5c378; }
+}
+.queue-warn { flex: none; width: 7px; height: 7px; border-radius: 50%; background: #d08700; }
+.queue-path { display: block; font-size: 11.5px; color: var(--muted); }
+
 /* Empty states */
 .empty {
   flex: 1;

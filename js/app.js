@@ -64,6 +64,8 @@ const Files = (function () {
   const { value, bold, note } = Seal;
   const card = document.getElementById('convert-source');
   const fileInput = document.getElementById('convert-files');
+  const folderInput = document.getElementById('convert-folder');
+  const issuesBox = document.getElementById('convert-issues');
   const list = document.getElementById('convert-list');
   const emptyState = document.getElementById('convert-empty');
   const progress = document.getElementById('convert-progress');
@@ -92,6 +94,7 @@ const Files = (function () {
   // One entry per document: { name, file, kind, source, html, done, error }
   const documents = [];
   let current = null;
+  let skippedFiles = 0;
 
   function render() {
     list.innerHTML = '';
@@ -102,8 +105,16 @@ const Files = (function () {
       if (doc.done) item.classList.add('is-done');
       item.innerHTML = `<span class="queue-tick" aria-hidden="true"></span>`
         + `<span class="queue-name"></span>`
+        + (doc.issues && doc.issues.length ? '<span class="queue-warn" title="Something may be missing"></span>' : '')
         + `<button class="queue-drop" title="Remove from the list" aria-label="Remove">×</button>`;
-      item.querySelector('.queue-name').textContent = doc.error ? `${doc.name} — ${doc.error}` : doc.name;
+      const name = item.querySelector('.queue-name');
+      name.textContent = doc.error ? `${doc.name}, ${doc.error}` : doc.name;
+      if (doc.folder) {
+        const path = document.createElement('span');
+        path.className = 'queue-path';
+        path.textContent = doc.folder;
+        name.appendChild(path);
+      }
       item.addEventListener('click', (e) => {
         if (e.target.closest('.queue-drop')) { remove(doc); return; }
         open(doc);
@@ -112,8 +123,9 @@ const Files = (function () {
     }
     emptyState.hidden = documents.length > 0;
     const done = documents.filter((d) => d.done).length;
-    progress.hidden = documents.length === 0;
-    progress.textContent = `${done} of ${documents.length} copied`;
+    progress.hidden = documents.length === 0 && !skippedFiles;
+    progress.textContent = `${done} of ${documents.length} copied`
+      + (skippedFiles ? `, ${skippedFiles} file(s) ignored (not .docx, .html or .txt)` : '');
     nextBtn.hidden = !documents.some((d) => !d.done && d !== current);
   }
 
@@ -129,7 +141,19 @@ const Files = (function () {
 
   function showExample() {
     title.textContent = 'Seal preview';
+    showIssues([]);
     editor.showEmpty(example);
+  }
+
+  // What the conversion could not carry over, named rather than left to chance.
+  function showIssues(issues) {
+    issuesBox.innerHTML = '';
+    issuesBox.hidden = !issues.length;
+    for (const issue of issues) {
+      const line = document.createElement('li');
+      line.textContent = issue.message;
+      issuesBox.appendChild(line);
+    }
   }
 
   // What the user corrected in the preview is kept with the document.
@@ -142,12 +166,15 @@ const Files = (function () {
     current = doc;
     render();
     title.textContent = doc.name;
-    if (doc.error) { editor.showEmpty(`<p class="hint">${Seal.esc(doc.error)}</p>`); return; }
+    if (doc.error) { showIssues([]); editor.showEmpty(`<p class="hint">${Seal.esc(doc.error)}</p>`); return; }
     if (doc.html === null) {
+      showIssues([]);
       editor.showEmpty('<p class="hint">Reading the file…</p>');
       try {
         doc.source = doc.source !== null ? doc.source : await readFile(doc.file);
         doc.html = Seal.document(Parse.blocksToDoc(blocksOf(doc)));
+        doc.issues = Check.checkDocument({ source: doc.source, result: doc.html, isHtml: doc.kind === 'html' });
+        render();
       } catch (err) {
         doc.error = err.message;
         render();
@@ -156,6 +183,7 @@ const Files = (function () {
       }
     }
     if (current !== doc) return; // the user clicked another document meanwhile
+    showIssues(doc.issues || []);
     editor.showHtml(doc.html);
   }
 
@@ -176,24 +204,54 @@ const Files = (function () {
     return null;
   }
 
+  // Word leaves ~$ lock files behind, and a folder carries all sorts of things.
+  function isWanted(file) {
+    const name = file.name;
+    return !/^[.~]/.test(name) && !/^~\$/.test(name) && kindOf(name) !== null;
+  }
+
   function add(files) {
+    const wanted = Array.from(files).filter(isWanted);
+    skippedFiles += Array.from(files).length - wanted.length;
     let first = null;
-    for (const file of files) {
-      const kind = kindOf(file.name);
+    for (const file of wanted) {
+      const path = file.webkitRelativePath || file.fullPath || '';
+      const folder = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '';
+      if (documents.some((d) => d.name === file.name && d.folder === folder)) continue;
       const doc = {
         name: file.name,
+        folder,
         file,
-        kind: kind || 'text',
+        kind: kindOf(file.name),
         source: null,
         html: null,
+        issues: null,
         done: false,
-        error: kind ? null : 'Not a .docx, .html or .txt file.',
+        error: null,
       };
       documents.push(doc);
       first = first || doc;
     }
     render();
     if (first && (!current || current.done)) open(first);
+  }
+
+  // A folder dropped on the card: walk it, subfolders included.
+  async function filesFromEntry(entry, path = '') {
+    if (entry.isFile) {
+      const file = await new Promise((resolve, reject) => entry.file(resolve, reject));
+      file.fullPath = path + file.name;
+      return [file];
+    }
+    const reader = entry.createReader();
+    const entries = [];
+    for (;;) {
+      const batch = await new Promise((resolve, reject) => reader.readEntries(resolve, reject));
+      if (!batch.length) break;
+      entries.push(...batch);
+    }
+    const nested = await Promise.all(entries.map((child) => filesFromEntry(child, `${path}${entry.name}/`)));
+    return nested.flat();
   }
 
   function markDone(doc) {
@@ -207,10 +265,12 @@ const Files = (function () {
     if (next) open(next);
   });
 
-  fileInput.addEventListener('change', () => {
-    if (fileInput.files.length) add(Array.from(fileInput.files));
-    fileInput.value = '';
-  });
+  for (const input of [fileInput, folderInput]) {
+    input.addEventListener('change', () => {
+      if (input.files.length) add(Array.from(input.files));
+      input.value = '';
+    });
+  }
 
   // Pasted text behaves like a document of its own.
   let pasted = null;
@@ -221,15 +281,17 @@ const Files = (function () {
       return;
     }
     if (!pasted) {
-      pasted = { name: 'Pasted document', file: null, kind: 'text', source: text, html: null, done: false, error: null };
+      pasted = { name: 'Pasted document', folder: '', file: null, kind: 'text', source: text, html: null, issues: null, done: false, error: null };
       documents.push(pasted);
     }
     pasted.source = text;
     pasted.html = Seal.document(Parse.blocksToDoc(blocksOf(pasted)));
+    pasted.issues = Check.checkDocument({ source: text, result: pasted.html, isHtml: Parse.looksLikeHtml(text) });
     pasted.done = false;
     current = pasted;
     render();
     title.textContent = pasted.name;
+    showIssues(pasted.issues);
     editor.showHtml(pasted.html);
   }
   pasteBox.addEventListener('input', showPasted);
@@ -238,10 +300,18 @@ const Files = (function () {
   card.addEventListener('dragenter', (e) => { e.preventDefault(); depth++; card.classList.add('dragging'); });
   card.addEventListener('dragover', (e) => e.preventDefault());
   card.addEventListener('dragleave', () => { if (--depth <= 0) { depth = 0; card.classList.remove('dragging'); } });
-  card.addEventListener('drop', (e) => {
+  card.addEventListener('drop', async (e) => {
     e.preventDefault();
     depth = 0;
     card.classList.remove('dragging');
+    const entries = Array.from(e.dataTransfer.items || [])
+      .map((item) => (item.webkitGetAsEntry ? item.webkitGetAsEntry() : null))
+      .filter(Boolean);
+    if (entries.some((entry) => entry.isDirectory)) {
+      const groups = await Promise.all(entries.map((entry) => filesFromEntry(entry)));
+      add(groups.flat());
+      return;
+    }
     if (e.dataTransfer.files.length) add(Array.from(e.dataTransfer.files));
   });
 

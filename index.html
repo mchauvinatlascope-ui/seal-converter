@@ -42,17 +42,23 @@
         <article class="card" id="convert-source">
           <header class="card-head">
             <h3>Documents</h3>
-            <label class="btn">
-              Add files
-              <input type="file" id="convert-files" multiple accept=".docx,.html,.htm,.txt,.md,.csv,.tsv,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/html,text/plain" hidden>
-            </label>
+            <div class="head-actions">
+              <label class="btn">
+                Add files
+                <input type="file" id="convert-files" multiple accept=".docx,.html,.htm,.txt,.md,.csv,.tsv,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/html,text/plain" hidden>
+              </label>
+              <label class="btn">
+                Add a folder
+                <input type="file" id="convert-folder" webkitdirectory directory multiple hidden>
+              </label>
+            </div>
           </header>
           <p class="queue-progress" id="convert-progress" hidden></p>
           <ul class="queue" id="convert-list"></ul>
           <div class="empty" id="convert-empty">
             <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M14 6h14l10 10v24a2 2 0 0 1-2 2H14a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M28 6v10h10" fill="none" stroke="currentColor" stroke-width="2"/><path d="M18 26h12M18 32h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-            <p class="empty-title">Drop .docx, .html or .txt files here</p>
-            <p class="empty-note">Several at a time. Nothing leaves your browser.</p>
+            <p class="empty-title">Drop files or a whole folder here</p>
+            <p class="empty-note">.docx, .html and .txt, subfolders included. Nothing leaves your browser.</p>
           </div>
           <details class="paste-box">
             <summary>Or paste a document</summary>
@@ -60,7 +66,7 @@
             <textarea id="convert-input" class="source-input" spellcheck="false" rows="7"
               placeholder="Paste from Word, SharePoint or a web page, or type the steps.&#10;&#10;I. Before experiments&#10;a. Buffer preparation&#10;Spin at 300 x g for 5 min at 4 °C."></textarea>
           </details>
-          <div class="drop-veil" aria-hidden="true">Drop the files</div>
+          <div class="drop-veil" aria-hidden="true">Drop the files or the folder</div>
         </article>
         <article class="card">
           <header class="card-head">
@@ -83,6 +89,7 @@
           </div>
           <div class="seal-sample" aria-live="polite">
             <p class="sample-label" id="convert-label">Example output</p>
+            <ul class="issues" id="convert-issues" hidden></ul>
             <div id="convert-preview" class="preview-body"></div>
           </div>
         </article>
@@ -149,7 +156,7 @@
   </main>
 
   <footer class="foot">
-    <span>v1.0.0</span>
+    <span>v1.1.0</span>
   </footer>
 
   <script src="js/seal.js"></script>
@@ -157,6 +164,7 @@
   <script src="js/parse.js"></script>
   <script src="js/edit.js"></script>
   <script src="js/copy.js"></script>
+  <script src="js/check.js"></script>
   <script src="js/mix.js"></script>
   <script src="js/editor.js"></script>
   <script src="js/app.js"></script>

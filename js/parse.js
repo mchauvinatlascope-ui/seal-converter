@@ -397,7 +397,17 @@
           // A table of empty cells is page furniture, not content.
           table.rows = table.rows.filter((row) => row.some((cell) => runsText(cell).trim()));
           if (table.rows.length) blocks.push(table);
-        } else if (/^(DIV|SECTION|ARTICLE|MAIN|BODY|BLOCKQUOTE|LI|CENTER|FONT|SPAN)$/.test(tag) && el.children.length) walk(el, depth + indentOf(el));
+        } else if (/^(DIV|SECTION|ARTICLE|MAIN|BODY|BLOCKQUOTE|LI|CENTER|FONT|SPAN)$/.test(tag) && el.children.length) {
+          // Walk into a container of blocks; a container of words is a paragraph,
+          // otherwise the text around its links would be dropped.
+          if (el.querySelector(':scope > p, :scope > div, :scope > ul, :scope > ol, :scope > table, :scope > h1, :scope > h2, :scope > h3, :scope > h4, :scope > h5, :scope > h6')) {
+            walk(el, depth + indentOf(el));
+          } else {
+            const runs = inlineRuns(el);
+            if (runsText(runs).trim()) blocks.push({ kind: 'para', depth: depth + indentOf(el), runs });
+            for (const img of el.querySelectorAll('img')) pushImage(img);
+          }
+        }
         else if (!/^(STYLE|SCRIPT|META|LINK|TITLE|HEAD)$/.test(tag) && el.textContent.trim()) {
           blocks.push({ kind: 'para', runs: inlineRuns(el) });
         }
