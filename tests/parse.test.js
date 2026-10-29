@@ -146,3 +146,45 @@ test('raw HTML typed as text is recognised', () => {
   assert.equal(Parse.looksLikeHtml('<div><h1>Title</h1></div>'), true);
   assert.equal(Parse.looksLikeHtml('Keep <5 min on ice.'), false);
 });
+
+test('numbered headings that run 1, 2, 3 become chapters, their sub numbers sections', () => {
+  const html = fromText([
+    'PROTOCOL RECORD',
+    'ML-2026-0001: a made-up run',
+    '1. Design at a glance',
+    'Four mice, two groups.',
+    '2. Buffers',
+    'Buffer\tComposition',
+    'FACS buffer\t2 % FCS',
+    '3. Labelling and harvest',
+    '3.1 Reagent',
+    'Aliquots were prepared at 2.5 mM in sterile PBS.',
+    '3.2 Injection',
+    '1. Inject: six injections, 20 min apart.',
+    '2. Harvest: nodes into cold medium.',
+  ].join('\n'));
+  const sep = `<p>${'-'.repeat(184)}</p>`;
+  assert.equal(html,
+    '<h3>a. PROTOCOL RECORD</h3><h3>b. ML-2026-0001: a made-up run</h3>' +
+    `${sep}<h2>I. Design at a glance</h2><ol><li>Four mice, two groups.</li></ol>` +
+    `${sep}<h2>II. Buffers</h2><table><tr><th><strong>Buffer</strong></th><th><strong>Composition</strong></th></tr>` +
+    `<tr><td>FACS buffer</td><td>${B('2 %')} FCS</td></tr></table>` +
+    `${sep}<h2>III. Labelling and harvest</h2>` +
+    '<h3>a. Reagent</h3><ol><li>Aliquots were prepared at ' + B('2.5 mM') + ' in sterile PBS.</li></ol>' +
+    '<h3>b. Injection</h3><ol><li>Inject: six injections, ' + B('20 min') + ' apart.</li>' +
+    '<li>Harvest: nodes into cold medium.</li></ol>');
+});
+
+test('a step that starts with a number is not mistaken for a heading', () => {
+  assert.equal(fromText('1. Dilute to 0.4 mg/mL in PBS: 20 µL of the stock.'),
+    `<ol><li>Dilute to ${B('0.4 mg/mL')} in PBS: ${B('20 µL')} of the stock.</li></ol>`);
+});
+
+test('the title block can be left out', () => {
+  const blocks = Parse.textToBlocks([
+    'PROTOCOL RECORD', 'ML-2026-0001: a made-up run', '1. Design', 'Four mice.', '2. Buffers', 'Cold PBS.',
+  ].join('\n'));
+  const html = Seal.document(Parse.blocksToDoc(blocks, { dropHeader: true }));
+  assert.equal(html.includes('PROTOCOL RECORD'), false);
+  assert.match(html, /^<p>-{184}<\/p><h2>I\. Design<\/h2>/);
+});

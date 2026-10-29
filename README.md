@@ -26,6 +26,8 @@ open index.html   # or double-click the file
 
 Drop your files on the Documents panel, or click *Add files*. A whole folder works too, through *Add a folder* or by dropping it: subfolders are followed, and anything that is not a document is skipped. Word (.docx), a saved or exported web page (.html) and plain text (.txt) all work, and *Or paste a document* takes a paste from Word, SharePoint or a web page.
 
+*Leave out the title block* drops what sits before the first heading, the document name, its reference and its version, which Seal records itself. Untick it to keep them. Changing it converts the list again.
+
 *Convert all* reads and converts everything in the list at once and takes you to the first document that needs attention, so a batch can be triaged before you start pasting.
 
 Click a document to see its Seal version, correct anything that needs it, then *Copy for Seal* and paste into Seal. Copying ticks the document off and *Next document* moves you to the first one still to do, so a long migration stays easy to follow. Corrections you make in the preview are kept when you switch documents.
@@ -34,7 +36,8 @@ What the reader does with a document:
 
 - Word heading styles, `<h1>`..`<h6>`, and short paragraphs entirely in bold become chapters and sections.
 - Lists become steps. A list item or an indented paragraph with deeper lines below it becomes a section title, and those lines its steps.
-- In plain text, `I.`, `II.` mark chapters, `a.`, `b.` sections, and a short line with no value, no final punctuation and no action verb at the start is read as a section. Tab separated lines become a table.
+- Headings numbered `1.`, `2.`, `3.` through the document become chapters, and their sub numbers (`5.1`, `5.2`) sections. Steps that start with a number are left alone, because their numbering restarts in every part.
+- In plain text, `I.`, `II.` also mark chapters, `a.`, `b.` sections, and a short line with no value, no final punctuation and no action verb at the start is read as a section. Tab separated lines become a table.
 - A bench sheet table whose columns are `#`, `STEP` and `DONE` becomes a numbered list of steps.
 - Values with units turn blue, em dashes become commas, superscripts such as 10⁶ and 4 °C are kept, and the original numbering is dropped because Seal numbers everything again.
 

@@ -56,6 +56,10 @@
           </header>
           <p class="queue-progress" id="convert-progress" hidden></p>
           <p class="queue-progress" id="convert-restored" hidden></p>
+          <label class="opt" title="Changing this converts the list again">
+            <input type="checkbox" id="convert-drop-header" checked>
+            Leave out the title block: document name, reference, version
+          </label>
           <ul class="queue" id="convert-list"></ul>
           <div class="empty" id="convert-empty">
             <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M14 6h14l10 10v24a2 2 0 0 1-2 2H14a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M28 6v10h10" fill="none" stroke="currentColor" stroke-width="2"/><path d="M18 26h12M18 32h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
@@ -158,7 +162,7 @@
   </main>
 
   <footer class="foot">
-    <span>v1.2.0</span>
+    <span>v1.3.0</span>
   </footer>
 
   <script src="js/seal.js"></script>

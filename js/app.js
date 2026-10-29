@@ -74,6 +74,7 @@ const Files = (function () {
   const nextBtn = document.getElementById('convert-next');
   const allBtn = document.getElementById('convert-all');
   const restoredNote = document.getElementById('convert-restored');
+  const dropHeaderBox = document.getElementById('convert-drop-header');
   const copyBtn = document.getElementById('convert-copy');
 
   const editor = createEditor({
@@ -186,8 +187,7 @@ const Files = (function () {
       editor.showEmpty('<p class="hint">Reading the file…</p>');
       try {
         doc.source = doc.source !== null ? doc.source : await readFile(doc.file);
-        doc.html = Seal.document(Parse.blocksToDoc(blocksOf(doc)));
-        doc.issues = Check.checkDocument({ source: doc.source, result: doc.html, isHtml: doc.kind === 'html' });
+        convert(doc);
         render();
       } catch (err) {
         doc.error = err.message;
@@ -207,8 +207,7 @@ const Files = (function () {
     if (doc.html !== null || doc.error) return;
     try {
       if (doc.source === null) doc.source = await readFile(doc.file);
-      doc.html = Seal.document(Parse.blocksToDoc(blocksOf(doc)));
-      doc.issues = Check.checkDocument({ source: doc.source, result: doc.html, isHtml: doc.kind === 'html' });
+      convert(doc);
     } catch (err) {
       doc.error = err.message;
     }
@@ -225,6 +224,15 @@ const Files = (function () {
     const warned = documents.filter((d) => d.issues && d.issues.length);
     render();
     if (warned.length && (!current || !current.issues || !current.issues.length)) open(warned[0]);
+  }
+
+  // The check always looks at the whole document, so leaving the title block
+  // out on purpose is never reported as lost content.
+  function convert(doc) {
+    const blocks = blocksOf(doc);
+    const whole = Seal.document(Parse.blocksToDoc(blocks));
+    doc.html = dropHeaderBox.checked ? Seal.document(Parse.blocksToDoc(blocks, { dropHeader: true })) : whole;
+    doc.issues = Check.checkDocument({ source: doc.source, result: whole, isHtml: doc.kind === 'html' });
   }
 
   function blocksOf(doc) {
@@ -360,6 +368,17 @@ const Files = (function () {
 
   allBtn.addEventListener('click', convertAll);
 
+  // The setting changes the shape of every document, so the list is converted again.
+  dropHeaderBox.addEventListener('change', () => {
+    for (const doc of documents) {
+      if (doc.source !== null) convert(doc);
+      else if (doc.file) { doc.html = null; doc.issues = null; }
+    }
+    showing = null;
+    render();
+    if (current) open(current); else showExample();
+  });
+
   for (const input of [fileInput, folderInput]) {
     input.addEventListener('change', () => {
       if (input.files.length) add(Array.from(input.files));
@@ -380,8 +399,7 @@ const Files = (function () {
       documents.push(pasted);
     }
     pasted.source = text;
-    pasted.html = Seal.document(Parse.blocksToDoc(blocksOf(pasted)));
-    pasted.issues = Check.checkDocument({ source: text, result: pasted.html, isHtml: Parse.looksLikeHtml(text) });
+    convert(pasted);
     pasted.done = false;
     current = pasted;
     showing = null;

@@ -65,6 +65,19 @@
     return { type: null, runs };
   }
 
+  // "3. KLH preparation, n = 4" and "5.1 Biotin-LPETG" are headings, while
+  // "0.4 mg/mL in PBS: 20 µL of the stock" is a step that happens to start with a number.
+  const NUMBER_HEADING = /^\s*(\d{1,3})(?:\.(\d{1,2}))?[.)]?\s+(?=\S)/;
+
+  function readNumberHeading(runs) {
+    const text = oneLine(runsText(runs));
+    const m = text.match(NUMBER_HEADING);
+    if (!m) return null;
+    const rest = text.slice(m[0].length);
+    if (!looksLikeTitle(rest) || !/^[\p{L}]/u.test(rest)) return null;
+    return { major: Number(m[1]), minor: m[2] ? Number(m[2]) : null, runs: dropStart(runs, m[0].length) };
+  }
+
   // A short paragraph entirely in bold reads as a heading.
   function isBoldTitle(runs) {
     return looksLikeTitle(runsText(runs)) && runs.every((r) => r.b || !r.text.trim());
@@ -137,7 +150,7 @@
   }
 
   // Blocks to the structure Seal.document() renders.
-  function blocksToDoc(blocks) {
+  function blocksToDoc(blocks, { dropHeader = false } = {}) {
     const plan = headingPlan(blocks);
     const hasHeadings = plan.chapter !== undefined;
     // In plain text, numbered lines that read like titles are chapter headings
@@ -146,6 +159,24 @@
     const numbered = lines.map((b) => readMarker(b.runs)).filter((m) => m.type === 'number');
     const numberedTitles = numbered.length > 0 && numbered.every((m) => m.title) && numbered.length < lines.length / 2;
     const textHasHeadings = numberedTitles || lines.some((b) => /^(roman|letter)$/.test(readMarker(b.runs).type));
+
+    // Numbered headings only count when they run 1, 2, 3 through the document:
+    // that is what tells them apart from the steps, which restart in every part.
+    const numberHeadings = new Map();
+    const majors = [];
+    for (const block of blocks) {
+      if (block.kind === 'table' || !block.runs) continue;
+      const heading = readNumberHeading(block.runs);
+      if (!heading) continue;
+      numberHeadings.set(block, heading);
+      if (heading.minor === null) majors.push({ block, number: heading.major });
+    }
+    const sequence = [];
+    for (const entry of majors) {
+      const last = sequence[sequence.length - 1];
+      if (entry.number === (last ? last.number + 1 : 1)) sequence.push(entry);
+    }
+    const chapterBlocks = new Set(sequence.length >= 2 ? sequence.map((entry) => entry.block) : []);
     // A line is a title when the line just after it sits one level deeper.
     const opensSubLevel = blocks.map((b, n) => {
       const next = blocks.slice(n + 1).find((other) => other.kind !== 'table');
@@ -222,8 +253,13 @@
 
       const m = readMarker(block.runs);
       const depth = block.depth || 0;
+      const heading = numberHeadings.get(block);
       if (m.type === 'roman') newChapter(m.runs);
       else if (m.type === 'letter') newSection(m.runs);
+      // A heading that belongs to the 1, 2, 3 run of the document.
+      else if (chapterBlocks.has(block)) newChapter(heading.runs);
+      // "5.1 Biotin-LPETG" sits under the chapter numbered 5.
+      else if (heading && heading.minor !== null && chapterBlocks.size) newSection(heading.runs);
       else if (m.type === 'number' && block.kind === 'line' && numberedTitles) newChapter(m.runs);
       // A list item that opens a sub level is the title of what follows.
       else if (opensSubLevel[index] && block.kind === 'item' && looksLikeTitle(runsText(m.runs))) newSection(m.runs);
@@ -235,6 +271,9 @@
       else if (block.kind === 'line' && (started() || !textHasHeadings) && !wasAfterTable) addStep(block.runs);
       else addPara(block.runs);
     });
+    // On an exported page, what comes before the first title is the document name,
+    // its reference and its version, which Seal holds itself.
+    if (dropHeader && chapters.length > 1 && !chapters[0].title) chapters.shift();
     return chapters;
   }
 

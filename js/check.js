@@ -42,7 +42,14 @@
   }
 
   // The numbering of the source is dropped on purpose, so it is dropped here too.
-  const MARKER = /^\s*(?:step\s*)?(?:\d{1,3}(?:\.\d{1,2})*|[IVXivx]{1,6}|[a-zA-Z])(?:[.)]\s+|\t)|^\s*[-•*·▪◦–]\s+/;
+  const MARKER = new RegExp([
+    '^\\s*(?:step\\s*)?\\d{1,3}\\.\\d{1,2}[.)]?\\s+', // 6.1 Master mix
+    '^\\s*(?:step\\s*)?\\d{1,3}[.)]\\s+',            // 3. KLH preparation
+    '^\\s*\\d{1,3}\\t',                              // a bench sheet row
+    '^\\s*[IVXivx]{1,6}[.)]\\s+',                    // I. Before experiments
+    '^\\s*[a-zA-Z][.)]\\s+',                         // a. Buffers
+    '^\\s*[-•*·▪◦–]\\s+',                            // a bullet
+  ].join('|'));
 
   // Passages of the source that are nowhere in the result.
   function missingPassages(sourceText, resultText) {
