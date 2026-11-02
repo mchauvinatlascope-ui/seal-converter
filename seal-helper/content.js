@@ -1,4 +1,4 @@
-// Seal Helper 0.3
+// Seal Helper 0.4
 // Ne fait que changer l affichage dans ce navigateur : n ecrit jamais dans Seal,
 // n envoie rien, ne touche pas au texte d un document.
 // La nouvelle barre et les pages Home / My work / To publish relisent les listes
@@ -8,7 +8,7 @@
 // reste comme d habitude.
 (() => {
   const KEY = 'sealHelper';
-  const DEFAULTS = { on: true, side: true, home: true, props: true, doc: true, dates: true, info: true, quiet: true };
+  const DEFAULTS = { on: true, side: true, home: true, appmenu: true, props: true, doc: true, dates: true, info: true, quiet: true };
   const CLASSES = ['side', 'props', 'doc', 'dates', 'info', 'quiet'];
   const root = document.documentElement;
   const isMac = /Mac/.test(navigator.platform);
@@ -67,6 +67,15 @@
     app: '<svg viewBox="0 0 16 16"><path d="M2.5 3h11v10h-11z M2.5 6h11"/></svg>',
     pen: '<svg viewBox="0 0 16 16"><path d="M10.5 3 13 5.5 6 12.5H3.5V10z"/></svg>',
     classic: '<svg viewBox="0 0 16 16"><path d="M2.5 3h11v10h-11z M6.5 3v10"/></svg>',
+    today: '<svg viewBox="0 0 16 16"><path d="M2.5 4h11v9.5h-11z M2.5 7h11 M5.5 2.5v3 M10.5 2.5v3"/></svg>',
+    folder: '<svg viewBox="0 0 16 16"><path d="M2 4.5h4l1.5 1.5H14V13H2z"/></svg>',
+    flask: '<svg viewBox="0 0 16 16"><path d="M6 2.5h4 M6.5 2.5v4L3 13.5h10L9.5 6.5v-4 M4.6 10.5h6.8"/></svg>',
+    proto: '<svg viewBox="0 0 16 16"><path d="M4 2.5h8v11H4z M6 5.5h4 M6 8h4 M6 10.5h2.5"/></svg>',
+    stock: '<svg viewBox="0 0 16 16"><path d="M3 5.5h10v8H3z M3 5.5 4.5 2.5h7L13 5.5 M6.5 8.5h3"/></svg>',
+    calc: '<svg viewBox="0 0 16 16"><path d="M4 2.5h8v11H4z M5.8 4.5h4.4v2H5.8z M6 9h.1 M8 9h.1 M10 9h.1 M6 11.3h.1 M8 11.3h.1 M10 11.3h.1"/></svg>',
+    tree: '<svg viewBox="0 0 16 16"><path d="M8 2.5v3 M4 13.5v-3h8v3 M8 8v2.5 M5.5 5.5h5V8h-5z"/></svg>',
+    chat: '<svg viewBox="0 0 16 16"><path d="M2.5 3.5h11v7.5H7l-3 2.5V11H2.5z"/></svg>',
+    book: '<svg viewBox="0 0 16 16"><path d="M3 3.5c2-1 4-1 5 .5 1-1.5 3-1.5 5-.5v9.5c-2-1-4-1-5 .5-1-1.5-3-1.5-5-.5z M8 4v9.5"/></svg>',
   };
   const TYPE = {
     'lab-test': ['Experiment', 'exp'], document: ['Document', 'doc'], box: ['Project', 'box'],
@@ -204,6 +213,138 @@
     chrome.storage.sync.set({ [LAB_KEY]: lab.map(({ id, label, icon, match, path }) => ({ id, label, icon, match, path })) });
   }
 
+  // ------------------------------------- appli du labo (page d accueil de Seal)
+  // L accueil du labo est une appli dans un cadre de meme origine, avec son
+  // propre menu (Overview, Projects, Experiments, Protocols, Inventory...).
+  // On relit ce menu pour la barre et, au clic, on clique dessus pour toi,
+  // en ouvrant d abord l accueil si tu es ailleurs. Rien n est ecrit.
+  const APP_KEY = 'sealHelperApp';
+  let appSections = []; // libelles du menu de l appli, gardes dans ce navigateur
+  let appActive = '';
+  let appWait = 0;
+  const APP_ICON = [[/overview|home|dashboard|start/i, 'home'], [/project/i, 'folder'], [/experiment|manip/i, 'flask'],
+    [/protocol|sop|method/i, 'proto'], [/inventor|stock|reagent|antibod|sample/i, 'stock'], [/calcul|file/i, 'calc'],
+    [/tree/i, 'tree'], [/how|faq|help|guide/i, 'help'], [/feedback|contact/i, 'chat']];
+  const appIcon = l => (APP_ICON.find(([re]) => re.test(l)) || [0, 'doc'])[1];
+  const CLICKABLE = 'a,button,[role="button"],[role="tab"],[role="link"],[role="menuitem"],li';
+
+  function appDoc() {
+    const f = $('iframe[title="Custom Content"]');
+    try { return f && f.contentDocument && f.contentDocument.body ? f.contentDocument : null; } catch (e) { return null; }
+  }
+
+  // Le menu = le plus petit bloc qui contient « Experiments » (ou « Protocols ») et au moins 4 entrees.
+  function appNav(doc) {
+    const items = $$(CLICKABLE, doc).filter(e => { const t = txt(e); return t && t.length <= 32 && (e.getClientRects().length || e.closest('[data-sh-hidden]')); });
+    const anchor = items.find(e => /^(experiments?|manips?)$/i.test(txt(e))) || items.find(e => /^protocols?$/i.test(txt(e)));
+    if (!anchor) return null;
+    let box = anchor.parentElement;
+    let inside = [];
+    while (box && box !== doc.documentElement) {
+      inside = items.filter(e => box.contains(e));
+      if (new Set(inside.map(txt)).size >= 4) break;
+      box = box.parentElement;
+    }
+    const byLabel = new Map();
+    // Pour chaque libelle, l element le plus interieur : c est lui qui porte le clic.
+    for (const e of inside) { const prev = byLabel.get(txt(e)); if (!prev || prev.contains(e)) byLabel.set(txt(e), e); }
+    const isOnItem = e => [e, ...$$('*', e)].some(x => x.getAttribute('aria-current') && x.getAttribute('aria-current') !== 'false'
+      || x.getAttribute('aria-selected') === 'true' || /(^|[\s_-])(active|selected|current)([\s_-]|$)/i.test(x.getAttribute('class') || ''));
+    let active = '';
+    for (const [l, e] of byLabel) if (isOnItem(e) || (e.parentElement && isOnItem(e.parentElement) && e.parentElement !== box)) { active = l; break; }
+    return { byLabel, active, box };
+  }
+
+  const hooked = new WeakSet();
+  function readApp() {
+    const f = $('iframe[title="Custom Content"]');
+    if (f && !hooked.has(f)) { hooked.add(f); f.addEventListener('load', schedule); }
+    const doc = appDoc();
+    const nav = doc && appNav(doc);
+    if (!nav) { appActive = ''; return; }
+    appActive = nav.active;
+    const labels = [...nav.byLabel.keys()];
+    if (JSON.stringify(labels) !== JSON.stringify(appSections)) {
+      appSections = labels;
+      try { chrome.storage.local.set({ [APP_KEY]: labels }); } catch (e) {}
+    }
+    watchApp(doc);
+    hideAppMenu(doc, nav.box);
+  }
+
+  // Le menu de l appli fait doublon avec la barre : on masque sa colonne (jamais supprimee,
+  // on clique toujours dessus pour toi). Seulement si c est bien une colonne etroite et haute.
+  function hideAppMenu(doc, box) {
+    const want = isOn('side') && isOn('appmenu');
+    const prev = $('[data-sh-hidden]', doc);
+    if (!want) { if (prev) prev.removeAttribute('data-sh-hidden'); return; }
+    if (prev) return;
+    const W = doc.documentElement.clientWidth, H = doc.documentElement.clientHeight;
+    let col = box;
+    while (col.parentElement && col.parentElement !== doc.body && col.parentElement.getBoundingClientRect().width < W * 0.45) col = col.parentElement;
+    const r = col.getBoundingClientRect();
+    if (!r.width || r.width > W * 0.45 || r.height < H * 0.5) return;
+    if (!$('#sh-app-style', doc)) {
+      const st = doc.createElement('style');
+      st.id = 'sh-app-style';
+      st.textContent = '[data-sh-hidden]{display:none!important}';
+      doc.head.append(st);
+    }
+    col.setAttribute('data-sh-hidden', '');
+  }
+
+  // Type de la fiche ouverte (icone de l en-tete) -> section du cahier qui la contient.
+  const KIND = { 'lab-test': /experiment|manip/i, box: /project/i };
+  function recordSection() {
+    if (isWorkspaceRoot() || page) return '';
+    const header = $('[data-testid="changeset-top-navbar"], [data-testid="entity-top-navbar"]');
+    const ic = header && $('[data-title-heading] [data-icon], [data-icon]', header);
+    const re = ic && KIND[ic.getAttribute('data-icon')];
+    return re ? appSections.find(l => re.test(l)) || '' : '';
+  }
+
+  // Les changements dans l appli (changer d onglet) relancent notre lecture.
+  const watched = new WeakSet();
+  function watchApp(doc) {
+    if (watched.has(doc)) return;
+    watched.add(doc);
+    new MutationObserver(schedule).observe(doc.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'aria-current', 'aria-selected'] });
+  }
+
+  function pressIn(el) {
+    const w = el.ownerDocument.defaultView || window;
+    const o = { bubbles: true, cancelable: true, view: w, button: 0, pointerType: 'mouse', isPrimary: true };
+    el.dispatchEvent(new w.PointerEvent('pointerdown', o));
+    el.dispatchEvent(new w.MouseEvent('mousedown', o));
+    el.dispatchEvent(new w.PointerEvent('pointerup', o));
+    el.dispatchEvent(new w.MouseEvent('mouseup', o));
+    el.click();
+  }
+
+  function openAppSection(label) {
+    page = null;
+    guideOpened = true;
+    clearTimeout(appWait);
+    const tryClick = () => {
+      const doc = appDoc();
+      const nav = doc && appNav(doc);
+      const el = nav && nav.byLabel.get(label);
+      if (el) { pressIn(el); appActive = label; render(true); return true; }
+      return false;
+    };
+    if (isWorkspaceRoot() && tryClick()) return;
+    if (!isWorkspaceRoot()) {
+      const d = data();
+      const home = [...d.favourites, ...d.recent].find(r => r.type && r.type[0] === 'Page');
+      if (home) press(home.el);
+      else { const m = location.pathname.match(/^\/o\/[^/]+\/s\/[^/]+/); if (m) location.assign(m[0]); return; }
+    }
+    render(true);
+    const until = Date.now() + 12000;
+    const loop = () => { if (!tryClick() && Date.now() < until) appWait = setTimeout(loop, 250); };
+    appWait = setTimeout(loop, 250);
+  }
+
   function readChangeset() {
     const nav = $('[data-testid="change-set-navigation"]');
     if (!nav) return null;
@@ -255,13 +396,15 @@
   let page = null;
   let lastRoute = '';
   let guideOpened = false;
+  let autoHome = false;
   const isWorkspaceRoot = () => /^\/o\/[^/]+\/s\/[^/]+\/?$/.test(location.pathname);
 
   function onRoute() {
     if (location.pathname === lastRoute) return;
     lastRoute = location.pathname;
     closeUntil = Date.now() + 4000;
-    page = isOn('home') && isWorkspaceRoot() && !guideOpened ? 'home' : null;
+    page = isOn('home') && isWorkspaceRoot() && !guideOpened && !appSections.length ? 'home' : null;
+    autoHome = page === 'home';
   }
 
   function go(el) {
@@ -327,7 +470,7 @@
 
     const top = h('div', { class: 'sh-block' });
     if (d.newBtn) top.append(sideItem('plus', 'New', { onclick: () => press(d.newBtn) }));
-    top.append(sideItem('home', 'Home', { on: page === 'home', onclick: () => openPage('home') }));
+    top.append(sideItem('today', 'Today', { on: page === 'home', onclick: () => openPage('home') }));
     top.append(sideItem('work', 'My work', { on: page === 'work', count: group(d.mine).length || '', onclick: () => openPage('work') }));
     top.append(sideItem('pub', 'To publish', { on: page === 'pub', count: d.pending.length || '', hot: d.pending.length > 0, onclick: () => openPage('pub') }));
     const inbox = $('[data-testid="nav-panel-inbox-button"]');
@@ -348,8 +491,17 @@
       scroll.append(h('div', { class: 'sh-group' }, 'This change'), blk);
     }
 
-    scroll.append(h('div', { class: 'sh-group' }, 'Lab'));
-    for (const sc of lab) {
+    if (appSections.length) {
+      const here = isWorkspaceRoot() && !page;
+      const inSec = recordSection();
+      scroll.append(h('div', { class: 'sh-group' }, d.lab ? (d.lab.charAt(0) + d.lab.slice(1).toLowerCase() + ' lab') : 'Lab'));
+      for (const l of appSections) {
+        scroll.append(h('button', { type: 'button', class: 'sh-row sh-app' + ((here && appActive === l) || inSec === l ? ' on' : ''), title: `Open ${l} in the lab notebook`, onclick: () => openAppSection(l) },
+          icon(appIcon(l)), h('span', { class: 'sh-t' }, l)));
+      }
+    }
+    if (!appSections.length) scroll.append(h('div', { class: 'sh-group' }, 'Lab'));
+    if (!appSections.length) for (const sc of lab) {
       const v = resolve(sc, d.views);
       const row = h('div', { class: 'sh-sc' + (v ? '' : ' unset') },
         h('button', { type: 'button', class: 'sh-row' + (page === 'pick' && pickFor === sc.id ? ' on' : ''), title: v ? `${sc.label}: ${v.key}` : `Choose the Seal view for ${sc.label}`, onclick: () => openShortcut(sc) },
@@ -367,7 +519,7 @@
         }
       }
     }
-    scroll.append(h('button', { type: 'button', class: 'sh-row sh-add', onclick: () => { pickFor = 'new'; openPage('pick'); } }, icon('plus'), h('span', { class: 'sh-t' }, 'Add a shortcut')));
+    if (!appSections.length) scroll.append(h('button', { type: 'button', class: 'sh-row sh-add', onclick: () => { pickFor = 'new'; openPage('pick'); } }, icon('plus'), h('span', { class: 'sh-t' }, 'Add a shortcut')));
 
     if (d.views.length) {
       scroll.append(h('button', { type: 'button', class: 'sh-group sh-toggle', 'aria-expanded': String(allViewsOpen), onclick: () => { allViewsOpen = !allViewsOpen; try { localStorage.setItem('sh-allviews', allViewsOpen ? '1' : '0'); } catch (e) {} render(true); } },
@@ -444,10 +596,10 @@
     const mine = group(d.mine).slice(0, 6);
     return h('div', { class: 'sh-wrap' },
       h('div', { class: 'sh-hello' },
-        h('div', {}, h('h1', {}, 'Home'), h('p', {}, summary)),
+        h('div', {}, h('h1', {}, 'Today'), h('p', {}, summary)),
         h('div', { class: 'sh-actions' },
           d.newBtn ? h('button', { type: 'button', class: 'sh-btn', onclick: () => press(d.newBtn) }, icon('plus'), 'New') : null,
-          h('button', { type: 'button', class: 'sh-btn ghost', onclick: () => openGuide(d) }, 'Open the lab guide'))),
+          h('button', { type: 'button', class: 'sh-btn ghost', onclick: () => openGuide(d) }, appSections.length ? 'Open the lab notebook' : 'Open the lab guide'))),
       h('div', { class: 'sh-grid' },
         listCard('Continue where you left off', h('button', { type: 'button', class: 'sh-more', onclick: () => openPage('work') }, 'All my work ›'),
           recent.map(entityLine), 'Records you open will show here.'),
@@ -564,11 +716,13 @@
     const header = $('[data-testid="changeset-top-navbar"], [data-testid="entity-top-navbar"]');
     const old = $('#sh-props');
     const props = isOn('props') && header ? readProps() : [];
-    const sig = props.map(p => p.label + '=' + p.value).join('|');
-    if (!props.length) { if (old) old.remove(); propsSig = ''; return; }
+    const sec = isOn('props') && header && isOn('side') ? recordSection() : '';
+    const sig = sec + '#' + props.map(p => p.label + '=' + p.value).join('|');
+    if (!props.length && !sec) { if (old) old.remove(); propsSig = ''; return; }
     if (old && sig === propsSig && old.previousElementSibling === header) return;
     propsSig = sig;
     const bar = h('div', { id: 'sh-props', class: 'sh' },
+      sec ? h('button', { type: 'button', class: 'sh-crumb', title: `Back to ${sec} in the lab notebook`, onclick: () => openAppSection(sec) }, icon('back'), sec) : null,
       props.map(p => h('button', { type: 'button', class: 'sh-prop', title: 'Go to ' + p.label, onclick: () => p.card.scrollIntoView({ behavior: 'smooth', block: 'center' }) },
         h('small', {}, p.label), /status/i.test(p.label) ? pill(p.value) : h('span', {}, p.value))));
     if (old) old.remove();
@@ -617,7 +771,7 @@
     const d = data();
     const sig = JSON.stringify([page, d.lab, d.favourites.map(r => r.title + r.status + r.current), d.recent.map(r => r.title + r.status + r.current),
       d.mine.map(r => r.title + r.status), d.changes.map(c => c.hash + c.open + c.title + c.day + c.time), d.views.map(v => v.title + v.depth + v.open),
-      d.changeset && [d.changeset.hash, d.changeset.name, d.changeset.rows.map(r => r.title + r.current)], !!d.newBtn, showEmpty, workFilter, workType, lab, labOpen, pickFor, allViewsOpen]);
+      d.changeset && [d.changeset.hash, d.changeset.name, d.changeset.rows.map(r => r.title + r.current)], !!d.newBtn, showEmpty, workFilter, workType, lab, labOpen, pickFor, allViewsOpen, appSections, appActive, isWorkspaceRoot(), recordSection()]);
     if (!force && sig === sideSig && $('#sh-side')) return;
     sideSig = sig;
     $('#sh-side')?.remove();
@@ -726,6 +880,10 @@
       if (isOn('doc')) markRules(document.body);
       if (isOn('quiet')) markFaded(document.body);
       closeInfoOnArrival();
+      if (isOn('side')) readApp();
+      else { const doc = appDoc(); const hid = doc && $('[data-sh-hidden]', doc); if (hid) hid.removeAttribute('data-sh-hidden'); }
+      // Le labo a sa propre page d accueil : on la laisse a l arrivee au lieu de Today.
+      if (page === 'home' && autoHome && $('iframe[title="Custom Content"]')) { page = null; autoHome = false; }
       render(false);
       if (isOn('props')) { renderProps(); renderOutline(); }
       else { $('#sh-props')?.remove(); $('#sh-outline')?.remove(); root.classList.remove('sh-has-outline'); }
@@ -778,6 +936,7 @@
     refresh();
   }
 
+  try { chrome.storage.local.get(APP_KEY, r => { if (Array.isArray(r[APP_KEY])) { appSections = r[APP_KEY]; schedule(); } }); } catch (e) {}
   chrome.storage.sync.get([KEY, LAB_KEY], r => {
     opts = { ...DEFAULTS, ...(r[KEY] || {}) };
     if (Array.isArray(r[LAB_KEY]) && r[LAB_KEY].length) lab = r[LAB_KEY];

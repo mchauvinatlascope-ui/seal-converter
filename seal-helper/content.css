@@ -212,3 +212,8 @@ html.sh-doc [data-native-block-type="table"] tr:not(:first-child) > :is(td, th) 
    ====================================================================== */
 html.sh-quiet [data-sh-faded] { opacity: .45; transition: opacity .12s; }
 html.sh-quiet [data-sh-faded]:hover, html.sh-quiet [data-sh-faded]:focus-within { opacity: 1; }
+
+/* 0.4 : fil d Ariane vers la section du cahier */
+#sh-props .sh-crumb { display: inline-flex; align-items: center; gap: 4px; align-self: center; font-size: 12.5px; font-weight: 500; color: var(--sh-ink2); padding: 3px 8px 3px 4px; margin-right: 6px; border-radius: 4px; border: 1px solid var(--sh-line); background: none; cursor: pointer; }
+#sh-props .sh-crumb:hover { color: var(--sh-ink); background: var(--sh-side); }
+#sh-props .sh-crumb .sh-i { width: 13px; height: 13px; }
