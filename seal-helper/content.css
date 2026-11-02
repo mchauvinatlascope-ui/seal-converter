@@ -1,48 +1,191 @@
-/* Seal Helper 0.1 : habillage seul. Chaque regle depend d une classe posee sur <html>
-   par content.js, donc tout s eteint d un coup quand l extension est coupee. */
+/* Seal Helper 0.2. Chaque regle depend d une classe sh-* posee sur <html> par content.js,
+   donc tout s eteint d un coup quand l extension est coupee. */
 
-/* --- Document propre --------------------------------------------------- */
-
-/* Marge de changement : la barre de couleur ne se montre qu au survol du bloc. */
-html.sh-doc [data-document-change-indicator] > div[aria-hidden="true"] {
-  opacity: 0;
-  transition: opacity .12s;
+/* ======================================================================
+   Jetons de nos elements (ils vivent a cote de Seal, pas dedans)
+   ====================================================================== */
+.sh {
+  --sh-bg: #ffffff;
+  --sh-side: #f7f7f5;
+  --sh-line: #e3e3df;
+  --sh-line2: #eeeeeb;
+  --sh-hover: #ececea;
+  --sh-ink: #1b1d21;
+  --sh-ink2: #5b6069;
+  --sh-ink3: #8f959f;
+  --sh-violet: #6d4bd1;
+  --sh-green: #1f7a4a;
+  --sh-greenbg: #e6f3eb;
+  --sh-amber: #9a5b00;
+  --sh-amberbg: #fbf1df;
+  --sh-greybg: #efefec;
+  --sh-focus: #2d72d2;
+  --sh-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --sh-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--sh-ui);
+  color: var(--sh-ink);
+  -webkit-font-smoothing: antialiased;
+  box-sizing: border-box;
 }
+.sh *, .sh *::before, .sh *::after { box-sizing: border-box; }
+.sh button { font: inherit; font-family: var(--sh-ui); color: inherit; background: none; border: 0; margin: 0; padding: 0; cursor: pointer; text-align: left; }
+.sh button:focus-visible, .sh [tabindex]:focus-visible { outline: 2px solid var(--sh-focus); outline-offset: -2px; border-radius: 4px; }
+.sh .sh-i, .sh .sh-chev { display: inline-grid; place-items: center; flex: none; width: 16px; height: 16px; color: var(--sh-ink2); }
+.sh svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.sh kbd { font: 10.5px var(--sh-mono); color: var(--sh-ink3); border: 1px solid var(--sh-line); border-radius: 4px; padding: 0 4px; background: var(--sh-bg); }
+.sh .sh-t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sh .sh-x { flex: none; font-size: 11px; font-weight: 600; color: var(--sh-ink2); background: var(--sh-greybg); border-radius: 4px; padding: 0 5px; margin-left: 6px; }
+.sh .sh-group { font-size: 10.5px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--sh-ink3); padding: 14px 10px 4px; }
+
+/* ======================================================================
+   Nouvelle barre de gauche : elle se pose sur l emplacement de la barre Seal
+   ====================================================================== */
+html.sh-side [data-testid="fixed-nav-header"] { visibility: hidden !important; }
+html.sh-side [data-testid="nav-panel-layout-slot"] { width: 248px !important; transition: none !important; }
+html.sh-side [data-testid="nav-panel-resize-handle"] { display: none !important; }
+
+#sh-side {
+  position: fixed; left: 0; top: 0; bottom: 0; width: 248px; z-index: 1450;
+  display: flex; flex-direction: column; gap: 2px;
+  background: var(--sh-side); border-right: 1px solid var(--sh-line);
+  padding: 10px 8px 8px; font-size: 13px;
+}
+#sh-side .sh-lab { display: flex; align-items: center; gap: 9px; padding: 2px 4px 10px 6px; font-weight: 650; font-size: 13.5px; }
+#sh-side .sh-mark { width: 22px; height: 22px; border-radius: 5px; background: #d40507; color: #fff; display: grid; place-items: center; font: 700 11px var(--sh-mono); flex: none; }
+#sh-side .sh-labname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#sh-side .sh-iconbtn { width: 28px; height: 28px; border-radius: 5px; display: grid; place-items: center; color: var(--sh-ink2); flex: none; }
+#sh-side .sh-iconbtn:hover { background: var(--sh-hover); color: var(--sh-ink); }
+#sh-side .sh-search {
+  display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 8px; margin: 0 0 8px;
+  border: 1px solid var(--sh-line); border-radius: 6px; background: var(--sh-bg); color: var(--sh-ink3); font-size: 12.5px;
+}
+#sh-side .sh-search span:not(.sh-i) { flex: 1; }
+#sh-side .sh-search:hover { border-color: #cfcfca; color: var(--sh-ink2); }
+#sh-side .sh-block { display: grid; gap: 1px; }
+#sh-side .sh-item, #sh-side .sh-row {
+  display: flex; align-items: center; gap: 9px; width: 100%; height: 30px; padding: 0 8px;
+  border-radius: 5px; font-size: 13px; color: var(--sh-ink); white-space: nowrap;
+}
+#sh-side .sh-item:hover, #sh-side .sh-row:hover { background: var(--sh-hover); }
+#sh-side .sh-item.on, #sh-side .sh-row.on { background: var(--sh-hover); font-weight: 600; }
+#sh-side .sh-n { font-size: 11.5px; color: var(--sh-ink3); font-variant-numeric: tabular-nums; }
+#sh-side .sh-n.hot { color: var(--sh-ink); font-weight: 600; }
+#sh-side .sh-n.hot::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--sh-violet); margin-right: 6px; vertical-align: 1px; }
+#sh-side .sh-scroll { flex: 1; min-height: 0; overflow-y: auto; margin: 0 -8px; padding: 0 8px; scrollbar-width: thin; }
+#sh-side .sh-row { height: 28px; font-size: 12.8px; }
+#sh-side .sh-row .sh-i { color: var(--sh-ink3); }
+#sh-side .sh-view.grp { font-weight: 600; color: var(--sh-ink2); }
+#sh-side .sh-chev svg { width: 12px; height: 12px; transition: transform .12s; }
+#sh-side .sh-chev.open svg { transform: rotate(90deg); }
+#sh-side .sh-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--sh-ink3); }
+#sh-side .sh-dot.pub { background: var(--sh-green); }
+#sh-side .sh-dot.draft { background: #c4c7cc; }
+#sh-side .sh-dot.run, #sh-side .sh-dot.plan { background: #d08a1f; }
+#sh-side .sh-cs > *, #sh-side .sh-row, #sh-side .sh-item { min-width: 0; overflow: hidden; }
+#sh-side .sh-cs { border: 1px solid var(--sh-line); border-radius: 7px; background: var(--sh-bg); padding: 4px; display: grid; gap: 1px; }
+#sh-side .sh-cs-head { display: flex; align-items: center; gap: 6px; padding: 2px 4px 4px 0; font-size: 12.5px; font-weight: 600; border-bottom: 1px solid var(--sh-line2); margin-bottom: 2px; }
+#sh-side .sh-hash { font: 600 11.5px var(--sh-mono); color: var(--sh-violet); flex: none; }
+#sh-side .sh-foot { display: flex; align-items: center; gap: 2px; border-top: 1px solid var(--sh-line); padding-top: 8px; margin-top: 4px; }
+#sh-side .sh-classic { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--sh-ink3); padding: 4px 6px; border-radius: 5px; }
+#sh-side .sh-classic:hover { color: var(--sh-ink); background: var(--sh-hover); }
+
+/* ======================================================================
+   Pages Home, My work, To publish : posees sur la zone de travail
+   ====================================================================== */
+#sh-page {
+  position: fixed; left: 248px; top: 0; right: 0; bottom: 0; z-index: 1350;
+  background: var(--sh-bg); overflow-y: auto; font-size: 13.5px;
+}
+#sh-page .sh-wrap { max-width: 1080px; margin: 0 auto; padding: 34px 40px 60px; display: grid; gap: 18px; }
+#sh-page .sh-hello { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+#sh-page h1 { margin: 0; font-size: 22px; font-weight: 650; letter-spacing: -.01em; }
+#sh-page .sh-hello p { margin: 3px 0 0; color: var(--sh-ink2); font-size: 13px; }
+#sh-page .sh-actions { display: flex; gap: 8px; }
+#sh-page .sh-btn {
+  display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px;
+  border: 1px solid #cfcfca; border-radius: 6px; background: var(--sh-bg); font-size: 13px; font-weight: 550;
+}
+#sh-page .sh-btn:hover { background: var(--sh-side); }
+#sh-page .sh-btn.ghost { border-color: var(--sh-line); color: var(--sh-ink2); font-weight: 500; }
+#sh-page .sh-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 18px; align-items: start; }
+#sh-page .sh-card { border: 1px solid var(--sh-line); border-radius: 8px; overflow: hidden; }
+#sh-page .sh-card header { display: flex; align-items: center; justify-content: space-between; padding: 11px 14px; border-bottom: 1px solid var(--sh-line2); }
+#sh-page h3 { margin: 0; font-size: 13px; font-weight: 650; }
+#sh-page .sh-more { font-size: 12.5px; color: var(--sh-ink3); }
+#sh-page .sh-more:hover { color: var(--sh-ink); }
+#sh-page .sh-line { display: flex; align-items: center; gap: 11px; width: 100%; padding: 9px 14px; border-top: 1px solid var(--sh-line2); }
+#sh-page .sh-card header + .sh-line { border-top: 0; }
+#sh-page .sh-line:hover { background: var(--sh-side); }
+#sh-page .sh-ti { width: 28px; height: 28px; border-radius: 6px; background: var(--sh-greybg); display: grid; place-items: center; flex: none; }
+#sh-page .sh-ti.v .sh-i { color: var(--sh-violet); }
+#sh-page .sh-lt { flex: 1; min-width: 0; display: grid; }
+#sh-page .sh-lt b { font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#sh-page .sh-lt small { color: var(--sh-ink3); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#sh-page .sh-go { color: var(--sh-ink3); font-size: 12.5px; white-space: nowrap; }
+#sh-page .sh-line:hover .sh-go, #sh-page tr:hover .sh-go { color: var(--sh-ink); }
+#sh-page .sh-empty { margin: 0; padding: 18px 14px; color: var(--sh-ink3); font-size: 13px; }
+#sh-page .sh-input { height: 32px; width: 260px; max-width: 100%; border: 1px solid var(--sh-line); border-radius: 6px; padding: 0 10px; font: inherit; font-size: 13px; color: var(--sh-ink); background: var(--sh-bg); }
+#sh-page .sh-input:focus { outline: 2px solid var(--sh-focus); outline-offset: -1px; }
+#sh-page .sh-table { width: 100%; border-collapse: collapse; }
+#sh-page .sh-table th { text-align: left; font-size: 10.5px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--sh-ink3); padding: 8px 12px; border-bottom: 1px solid var(--sh-line); }
+#sh-page .sh-table td { padding: 10px 12px; border-bottom: 1px solid var(--sh-line2); vertical-align: middle; }
+#sh-page .sh-table tbody tr { cursor: pointer; }
+#sh-page .sh-table tbody tr:hover td { background: var(--sh-side); }
+#sh-page .sh-table .sh-day td { background: var(--sh-side); color: var(--sh-ink2); font-size: 11.5px; font-weight: 600; padding: 6px 12px; cursor: default; }
+#sh-page .sh-cell { display: flex; align-items: center; gap: 9px; min-width: 0; }
+#sh-page .sh-cell b { font-weight: 550; }
+#sh-page .sh-muted { color: var(--sh-ink2); }
+#sh-page .sh-num { text-align: right; font-variant-numeric: tabular-nums; width: 90px; }
+#sh-page .sh-hashcell { font: 600 12px var(--sh-mono); color: var(--sh-violet); width: 80px; }
+#sh-page .sh-faint td { color: var(--sh-ink3); }
+
+.sh .sh-pill { display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 8px; border-radius: 10px; font-size: 11.5px; font-weight: 600; white-space: nowrap; background: var(--sh-greybg); color: var(--sh-ink2); }
+.sh .sh-pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.sh .sh-pill.pub { background: var(--sh-greenbg); color: var(--sh-green); }
+.sh .sh-pill.run, .sh .sh-pill.plan { background: var(--sh-amberbg); color: var(--sh-amber); }
+
+/* ======================================================================
+   Fiche : bandeau de proprietes sous l en-tete, plan de la page a droite
+   ====================================================================== */
+#sh-props {
+  display: flex; flex-wrap: wrap; gap: 4px 28px; padding: 10px 24px 11px;
+  border-bottom: 1px solid var(--sh-line2); background: var(--sh-bg); flex: none;
+}
+#sh-props .sh-prop { display: grid; gap: 1px; font-size: 13px; padding: 2px 4px; margin: 0 -4px; border-radius: 4px; }
+#sh-props .sh-prop:hover { background: var(--sh-side); }
+#sh-props small { font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--sh-ink3); }
+
+html.sh-has-outline [data-page-scroll-container] { padding-right: 230px !important; }
+#sh-outline {
+  position: fixed; right: 64px; top: 150px; width: 196px; max-height: calc(100vh - 200px); overflow-y: auto;
+  z-index: 200; display: grid; gap: 1px; border-left: 1px solid var(--sh-line); padding: 0 0 0 4px; scrollbar-width: none;
+}
+#sh-outline .sh-group { padding: 0 10px 8px; }
+#sh-outline .sh-oh { font-size: 12.5px; color: var(--sh-ink2); padding: 4px 10px; border-radius: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; position: relative; }
+#sh-outline .sh-oh.h3 { padding-left: 22px; font-size: 12px; }
+#sh-outline .sh-oh:hover { color: var(--sh-ink); background: var(--sh-side); }
+#sh-outline .sh-oh.on { color: var(--sh-ink); font-weight: 600; }
+#sh-outline .sh-oh.on::before { content: ""; position: absolute; left: -5px; top: 5px; bottom: 5px; width: 2px; background: var(--sh-ink); }
+html.sh-page-open #sh-outline { display: none; }
+
+/* ======================================================================
+   Document propre (v0.1)
+   ====================================================================== */
+html.sh-doc [data-document-change-indicator] > div[aria-hidden="true"] { opacity: 0; transition: opacity .12s; }
 html.sh-doc [data-native-top-block]:hover > [data-document-change-indicator] > div[aria-hidden="true"],
-html.sh-doc [data-document-change-indicator]:focus-visible > div[aria-hidden="true"] {
-  opacity: 1;
-}
-
-/* Paragraphe fait seulement de tirets : un filet fin, le texte revient quand on y ecrit. */
+html.sh-doc [data-document-change-indicator]:focus-visible > div[aria-hidden="true"] { opacity: 1; }
 html.sh-doc [data-sh-rule]:not([data-sh-caret]) [data-document-paragraph] {
   background: linear-gradient(var(--color-bg3, #d4d4d4), var(--color-bg3, #d4d4d4)) center / 100% 1px no-repeat;
 }
 html.sh-doc [data-sh-rule]:not([data-sh-caret]) [data-document-paragraph],
-html.sh-doc [data-sh-rule]:not([data-sh-caret]) [data-document-paragraph] * {
-  color: transparent !important;
-}
-
-/* Tableaux : premiere ligne en en-tete, cellules en poids normal. */
-html.sh-doc [data-native-block-type="table"] tr:first-child > :is(td, th) {
-  background: var(--color-bg1, #f6f7f9);
-  color: var(--color-fg1, #333);
-}
+html.sh-doc [data-sh-rule]:not([data-sh-caret]) [data-document-paragraph] * { color: transparent !important; }
+html.sh-doc [data-native-block-type="table"] tr:first-child > :is(td, th) { background: var(--color-bg1, #f6f7f9); color: var(--color-fg1, #333); }
 html.sh-doc [data-native-block-type="table"] tr:first-child > :is(td, th),
-html.sh-doc [data-native-block-type="table"] tr:first-child > :is(td, th) * {
-  font-weight: 600 !important;
-}
-html.sh-doc [data-native-block-type="table"] tr:not(:first-child) > :is(td, th) :is(strong, b, [class*="font-bold"], [style*="font-weight"]) {
-  font-weight: inherit !important;
-}
+html.sh-doc [data-native-block-type="table"] tr:first-child > :is(td, th) * { font-weight: 600 !important; }
+html.sh-doc [data-native-block-type="table"] tr:not(:first-child) > :is(td, th) :is(strong, b, [class*="font-bold"], [style*="font-weight"]) { font-weight: inherit !important; }
 
-/* --- Listes plus calmes ------------------------------------------------ */
-
-/* Changesets vides et brouillons sans titre ou de test : en retrait, jamais caches. */
-html.sh-quiet [data-sh-faded] {
-  opacity: .45;
-  transition: opacity .12s;
-}
-html.sh-quiet [data-sh-faded]:hover,
-html.sh-quiet [data-sh-faded]:focus-within {
-  opacity: 1;
-}
+/* ======================================================================
+   Listes plus calmes (v0.1)
+   ====================================================================== */
+html.sh-quiet [data-sh-faded] { opacity: .45; transition: opacity .12s; }
+html.sh-quiet [data-sh-faded]:hover, html.sh-quiet [data-sh-faded]:focus-within { opacity: 1; }

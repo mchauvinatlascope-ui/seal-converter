@@ -1,10 +1,10 @@
 const KEY = 'sealHelper';
-const DEFAULTS = { on: true, doc: true, dates: true, info: true, quiet: true };
+const DEFAULTS = { on: true, side: true, home: true, props: true, doc: true, dates: true, info: true, quiet: true };
 const IDS = Object.keys(DEFAULTS);
 
 function paint(opts) {
   for (const id of IDS) document.getElementById(id).checked = !!opts[id];
-  for (const row of document.querySelectorAll('.row')) row.classList.toggle('off', !opts.on);
+  document.getElementById('all').classList.toggle('off', !opts.on);
 }
 
 chrome.storage.sync.get(KEY, r => {
