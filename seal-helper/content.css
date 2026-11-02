@@ -479,3 +479,9 @@ html.sh-side, html.sh-side body { overflow-x: hidden !important; }
 #sh-side .sh-classic { margin-left: 0; padding: 4px 5px; white-space: nowrap; }
 #sh-side .sh-ver { margin-left: auto; padding: 0 2px; }
 #sh-side .sh-helpmenu { left: -28px; }
+
+/* 1.0.2 : etat de chargement */
+#sh-page .sh-loading { color: var(--sh-ink3); font-style: italic; }
+#sh-page .sh-loading::before { content: ""; display: inline-block; width: 10px; height: 10px; margin-right: 8px; border: 2px solid var(--sh-line); border-top-color: var(--sh-ink3); border-radius: 50%; vertical-align: -1px; animation: sh-spin .9s linear infinite; }
+@keyframes sh-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { #sh-page .sh-loading::before { animation: none; } }

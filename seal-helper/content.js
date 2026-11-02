@@ -14,7 +14,7 @@
   const isMac = /Mac/.test(navigator.platform);
   let opts = { ...DEFAULTS };
   const isOn = k => opts.on && opts[k];
-  const VERSION = '1.0.1';
+  const VERSION = '1.0.2';
 
   // ---------------------------------------------------------------- outils
   function h(tag, attrs, ...kids) {
@@ -562,6 +562,8 @@
   // Trois facons de masquer le menu, de la plus propre a la plus prudente. Chacune est verifiee
   // apres coup : si le contenu du cahier n est plus a l ecran, on passe a la suivante.
   const HIDE_WAYS = ['out', 'thin', 'plain', 'none'];
+  const WAY_KEY = 'sealHelperHideWay';
+  let learnedWay = ''; // facon retenue dans ce navigateur, relue au depart
   const ZERO = 'width:0!important;height:0!important;min-width:0!important;min-height:0!important;flex:0 0 0!important;padding:0!important;margin:0!important;border:0!important;overflow:hidden!important;visibility:hidden!important;pointer-events:none!important';
   const GRID = '*:has(>X){grid-template-columns:minmax(0,1fr)!important}X~*{grid-column:1/-1!important;min-width:0}';
   const HIDE_CSS = {
@@ -570,7 +572,7 @@
     plain: 'X{visibility:hidden!important;pointer-events:none!important;overflow:hidden!important}',
     none: '',
   };
-  const hideWay = doc => doc.documentElement.getAttribute('data-sh-way') || 'out';
+  const hideWay = doc => doc.documentElement.getAttribute('data-sh-way') || learnedWay || 'out';
   function ensureHideStyle(doc, el) {
     const way = hideWay(doc);
     // Le rail connu (aside.rail) est vise par sa structure : s il est recree par l appli, il reste cache.
@@ -606,19 +608,20 @@
   const badSince = new WeakMap();
   function verifyHide(doc) {
     const hid = $('[data-sh-hidden]', doc);
-    if (!hid || hideWay(doc) === 'none') return;
-    if (doc.body.querySelectorAll('*').length < 30) return; // l appli n a encore rien affiche
+    if (!hid || hideWay(doc) === 'plain' || hideWay(doc) === 'none') return;
+    if ($('#sh-veil') || doc.body.querySelectorAll('*').length < 30) return; // en transition, ou l appli n a encore rien affiche
     if (contentVisible(doc)) { badSince.delete(doc); return; }
     const t = badSince.get(doc) || Date.now();
     badSince.set(doc, t);
     if (Date.now() - t < 700) { setTimeout(() => { try { verifyHide(doc); } catch (e) {} }, 400); return; }
-    const next = HIDE_WAYS[Math.min(HIDE_WAYS.indexOf(hideWay(doc)) + 1, HIDE_WAYS.length - 1)];
+    const next = HIDE_WAYS[Math.min(HIDE_WAYS.indexOf(hideWay(doc)) + 1, HIDE_WAYS.indexOf('plain'))];
     doc.documentElement.setAttribute('data-sh-way', next);
+    learnedWay = next;
+    try { chrome.storage.local.set({ [WAY_KEY]: next }); } catch (e) {}
     badSince.delete(doc);
     console.warn('[Seal Helper] notebook content hidden by the menu rule, switching to', next);
     ensureHideStyle(doc, hid);
-    if (next === 'none') { hid.removeAttribute('data-sh-hidden'); toast('The notebook menu is kept: hiding it hid the page.', 'warn', 5000); }
-    else setTimeout(() => { try { verifyHide(doc); } catch (e) {} }, 400);
+    setTimeout(() => { try { verifyHide(doc); } catch (e) {} }, 400);
   }
   // Etat de la page pour la fenetre de l extension : structure seulement, jamais de contenu.
   function diagnose() {
@@ -703,10 +706,12 @@
     return out;
   }
 
+  const paneLoaded = name => { const pane = $(`[data-nav-pane="${name}"]`); return !!pane && pane.children.length > 0; };
   function data() {
     const views = readViews();
     const changes = readChanges() || [];
     return {
+      changesLoaded: paneLoaded('changes'),
       lab: txt($('[data-testid="system-name"]')),
       favourites: readSection('section-entities:favourites') || [],
       recent: readSection('section-entities:recent-activity') || [],
@@ -1077,7 +1082,7 @@
     const stats = h('div', { class: 'sh-stats' },
       mExp ? stat('Experiments', mExp.n, mExp.label.replace(/^experiments?\s*/i, '') || 'in progress', () => openAppSection(secFor(/experiment/i) || mExp.label), 'blue')
         : stat('In progress', drafts.length, drafts.length === 1 ? 'draft record' : 'draft records', () => { workType = ''; openPage('work'); }),
-      stat('To publish', d.pending.length, d.pending.length ? 'waiting for review' : 'all published', () => openPage('pub'), d.pending.length ? 'hot' : ''),
+      stat('To publish', d.changesLoaded ? d.pending.length : '…', d.pending.length ? 'waiting for review' : d.changesLoaded ? 'all published' : 'loading', () => openPage('pub'), d.pending.length ? 'hot' : ''),
       mProj ? stat('Projects', mProj.n, ad.cards.length ? `${ad.cards.filter(c => /active|progress/i.test(c.status)).length} active` : 'in the lab', () => openAppSection(secFor(/project/i) || 'Projects'), 'violet')
         : stat('Published', published.length, 'in your recent records', () => openPage('work')),
       mProt ? stat('Protocols', mProt.n, 'templates ready to run', () => openAppSection(secFor(/protocol/i) || 'Protocols'), 'teal')
@@ -1148,7 +1153,7 @@
       pend.length ? pend.slice(0, 5).map(c => h('button', { type: 'button', class: 'sh-check', onclick: () => go(c.el) },
         h('span', { class: 'sh-box' }), h('span', { class: 'sh-lt' }, h('b', {}, c.title), h('small', {}, [c.hash, c.day, c.time].filter(Boolean).join(' · '))),
         c.n > 1 ? h('span', { class: 'sh-x' }, '×' + c.n) : null))
-        : h('p', { class: 'sh-empty' }, 'Nothing waiting. Everything you changed is published.'));
+        : h('p', { class: 'sh-empty' + (d.changesLoaded ? '' : ' sh-loading') }, d.changesLoaded ? 'Nothing waiting. Everything you changed is published.' : 'Loading your changes from Seal…'));
 
     // Fil d activite : changements groupes par jour, facon journal de labo.
     const feed = h('div', { class: 'sh-feed' });
@@ -1315,7 +1320,8 @@
       tabs,
       h('section', { class: 'sh-panel' }, list.length ? h('table', { class: 'sh-table' },
         h('thead', {}, h('tr', {}, h('th', {}, 'Change'), h('th', {}, 'What'), h('th', { class: 'sh-num' }, 'Records'), h('th', { class: 'sh-num' }, 'Last edit'), h('th', {}, ''))), body)
-        : h('p', { class: 'sh-empty' }, 'Nothing waiting. Everything you changed is published.')));
+        : d.changesLoaded ? h('p', { class: 'sh-empty' }, 'Nothing waiting. Everything you changed is published.')
+        : h('p', { class: 'sh-empty sh-loading' }, 'Loading your changes from Seal…')));
   }
 
   // ------------------------------------------------ fiche : proprietes et plan
@@ -1405,7 +1411,7 @@
     const d = data();
     const sig = JSON.stringify([page, d.lab, d.favourites.map(r => r.title + r.status + r.current), d.recent.map(r => r.title + r.status + r.current),
       d.mine.map(r => r.title + r.status), d.changes.map(c => c.hash + c.open + c.title + c.day + c.time), d.views.map(v => v.title + v.depth + v.open),
-      d.changeset && [d.changeset.hash, d.changeset.name, d.changeset.rows.map(r => r.title + r.current)], !!d.newBtn, showEmpty, workFilter, workType, workSrc, workStatus, tipsDone, helpOpen, lab, labOpen, pickFor, allViewsOpen, appSections, appActive, atNotebook(), recordSection(), location.pathname, newOpen, appCreates, appData && appData.at]);
+      d.changeset && [d.changeset.hash, d.changeset.name, d.changeset.rows.map(r => r.title + r.current)], !!d.newBtn, d.changesLoaded, showEmpty, workFilter, workType, workSrc, workStatus, tipsDone, helpOpen, lab, labOpen, pickFor, allViewsOpen, appSections, appActive, atNotebook(), recordSection(), location.pathname, newOpen, appCreates, appData && appData.at]);
     if (!force && sig === sideSig && $('#sh-side')) return;
     sideSig = sig;
     $('#sh-side')?.remove();
@@ -1515,7 +1521,7 @@
     if (isOn('doc')) step('doc', () => markRules(document.body));
     if (isOn('quiet')) step('quiet', () => markFaded(document.body));
     step('info', closeInfoOnArrival);
-    if (isOn('side')) { step('app', readApp); step('panes', ensurePanes); step('views', expandViews); step('resume', resumePending); }
+    if (isOn('side')) { if (page && !paneLoaded('changes') && Date.now() - panesTried > 3000) panesTried = 0; step('app', readApp); step('panes', ensurePanes); step('views', expandViews); step('resume', resumePending); }
     else step('unhide', () => { const doc = appDoc(); const hid = doc && $('[data-sh-hidden]', doc); if (hid) hid.removeAttribute('data-sh-hidden'); });
     if (isOn('side')) step('arrive', arriveOnToday);
     step('side', () => render(false));
@@ -1580,7 +1586,8 @@
     refresh();
   }
 
-  try { chrome.storage.local.get([APP_KEY, 'sealHelperAppCreates', APPDATA_KEY], r => {
+  try { chrome.storage.local.get([APP_KEY, 'sealHelperAppCreates', APPDATA_KEY, WAY_KEY], r => {
+    if (HIDE_WAYS.includes(r[WAY_KEY])) learnedWay = r[WAY_KEY];
     if (Array.isArray(r[APP_KEY])) appSections = r[APP_KEY];
     if (Array.isArray(r.sealHelperAppCreates)) appCreates = r.sealHelperAppCreates;
     if (r[APPDATA_KEY] && r[APPDATA_KEY].metrics) appData = r[APPDATA_KEY];
