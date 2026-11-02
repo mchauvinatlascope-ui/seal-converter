@@ -4,12 +4,23 @@ A Chrome extension that makes Seal calmer and easier to read. It only changes ho
 
 ## Install (2 minutes)
 
-1. Download `seal-helper-0.7.0.zip` and unzip it.
+1. Download `seal-helper-0.8.0.zip` and unzip it.
 2. Open `chrome://extensions` and switch on **Developer mode** (top right).
 3. Click **Load unpacked** and pick the unzipped `seal-helper` folder.
 4. Open Seal. Click the extension icon (puzzle piece, then pin Seal Helper) to switch each setting on or off.
 
 To update: replace the folder with the new one, then click the reload arrow on the Seal Helper card in `chrome://extensions`.
+
+## If you see no change
+
+Click the extension icon on a Seal tab: the first card says whether Seal Helper is **active on this tab**, **paused**, or whether the tab **needs a reload** after an update (one button does it). After replacing the folder, always press the reload arrow on the Seal Helper card in `chrome://extensions`, then reload Seal. The sidebar shows its version (v0.8.0) at the bottom.
+
+## What 0.8 adds
+
+- **New from a template**: the New menu has two groups. *In the lab notebook* presses the notebook's own buttons (New experiment, New project, New protocol, New antibody panel), each with a one-line hint. *From a Seal template* opens the matching Seal view (Protocols, Projects, Experiments when such a view exists) and its **+ New instance** list, where every template of that type is offered; nothing is created until you pick one.
+- **You always see what is happening**: a short message at the bottom says what is being opened ("Opening New experiment…", "Choose a template in the list") and, if a button cannot be found, what to do instead. If reaching the notebook needs a page reload, the action you asked for is replayed after it.
+- **Never a blank sidebar**: each part of the page is read on its own, so one unexpected page can no longer stop the sidebar from showing. The extension popup tells you whether it is running on the current tab.
+- **Where you are**: inside a Seal view, the sidebar says *View / Protocols*.
 
 ## What 0.7 does
 

@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "Seal Helper",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "A calmer, easier to read Seal. Changes how Seal looks in your browser only; it never writes to Seal and sends nothing anywhere.",
-  "permissions": ["storage"],
+  "permissions": ["storage", "activeTab"],
   "content_scripts": [
     {
       "matches": ["https://us.platform.seal.run/o/malaghan/*"],

@@ -14,6 +14,7 @@
   const isMac = /Mac/.test(navigator.platform);
   let opts = { ...DEFAULTS };
   const isOn = k => opts.on && opts[k];
+  const VERSION = '0.8.0';
 
   // ---------------------------------------------------------------- outils
   function h(tag, attrs, ...kids) {
@@ -75,6 +76,9 @@
     calc: '<svg viewBox="0 0 16 16"><path d="M4 2.5h8v11H4z M5.8 4.5h4.4v2H5.8z M6 9h.1 M8 9h.1 M10 9h.1 M6 11.3h.1 M8 11.3h.1 M10 11.3h.1"/></svg>',
     tree: '<svg viewBox="0 0 16 16"><path d="M8 2.5v3 M4 13.5v-3h8v3 M8 8v2.5 M5.5 5.5h5V8h-5z"/></svg>',
     chat: '<svg viewBox="0 0 16 16"><path d="M2.5 3.5h11v7.5H7l-3 2.5V11H2.5z"/></svg>',
+    tpl: '<svg viewBox="0 0 16 16"><path d="M3 3h10v10H3z" stroke-dasharray="2 1.6"/><path d="M5.5 6h5 M5.5 8.5h5 M5.5 11h3"/></svg>',
+    check: '<svg viewBox="0 0 16 16"><path d="m3.5 8.5 3 3 6-7"/></svg>',
+    warn: '<svg viewBox="0 0 16 16"><path d="M8 2.5 14 13H2z M8 6.5v3 M8 11.5h.01"/></svg>',
     book: '<svg viewBox="0 0 16 16"><path d="M3 3.5c2-1 4-1 5 .5 1-1.5 3-1.5 5-.5v9.5c-2-1-4-1-5 .5-1-1.5-3-1.5-5-.5z M8 4v9.5"/></svg>',
   };
   const TYPE = {
@@ -155,6 +159,7 @@
         depth: wrap ? Math.round((parseFloat(wrap.style.paddingLeft) || 0) / 14) : 0,
         group: !!chev,
         open: chev ? chev.getAttribute('data-icon') === 'chevron-down' : false,
+        current: item.hasAttribute('data-highlighted'),
       };
     }).map((v, i, all) => {
       const path = [v.title];
@@ -328,6 +333,7 @@
   // Les boutons « + New … » de l appli : on les liste pour la barre et Today.
   const CREATE_LABEL = { experiment: 'New experiment', project: 'New project', protocol: 'New protocol', panel: 'New antibody panel', general: 'New inventory item', antibodies: 'New antibody' };
   const CREATE_ICON = { experiment: 'flask', project: 'folder', protocol: 'proto', panel: 'view', general: 'stock', antibodies: 'stock' };
+  const CREATE_HINT = { experiment: 'Pick a project, give it a title', project: 'Groups the experiments of one question', protocol: 'A copy of the master protocol to fill in', panel: 'Markers, fluorochromes, clones', general: 'Reagent, kit or consumable', antibodies: 'Clone, lot and dilution' };
   const CREATE_SECTION = { experiment: /experiment|manip/i, project: /project/i, protocol: /protocol/i, panel: /protocol|panel/i, general: /inventor/i, antibodies: /inventor/i };
   let appCreates = []; // [{ key, label }]
   let appData = null;  // ce que l accueil du labo affiche : compteurs, recents, projets
@@ -368,30 +374,93 @@
   }
 
   // Clique pour toi dans l appli (bouton + New…, fiche, section), en ouvrant l accueil s il le faut.
-  function appAct(find, after) {
+  // Si on doit recharger la page pour revenir au cahier, on garde l action demandee et on la rejoue.
+  const PENDING = 'sh-pending';
+  function appAct(find, after, what, resume) {
     page = null;
     guideOpened = true;
     clearTimeout(appWait);
     const tryIt = () => {
       const doc = appDoc();
       const el = doc && find(doc);
-      if (el) { pressIn(el); if (after) after(); render(true); return true; }
+      if (el) { pressIn(el); if (after) after(); hideToast(); render(true); return true; }
       return false;
     };
     if (isWorkspaceRoot() && tryIt()) return;
+    if (what) toast(`Opening ${what}…`);
     if (!isWorkspaceRoot()) {
       const d = data();
       const home = [...d.favourites, ...d.recent].find(r => r.type && r.type[0] === 'Page');
       if (home) press(home.el);
-      else { const m = location.pathname.match(/^\/o\/[^/]+\/s\/[^/]+/); if (m) location.assign(m[0]); return; }
+      else {
+        const m = location.pathname.match(/^\/o\/[^/]+\/s\/[^/]+/);
+        if (m) { try { if (resume) sessionStorage.setItem(PENDING, JSON.stringify({ ...resume, at: Date.now() })); } catch (e) {} location.assign(m[0]); }
+        return;
+      }
     }
     render(true);
     const until = Date.now() + 12000;
-    const loop = () => { if (!tryIt() && Date.now() < until) appWait = setTimeout(loop, 250); };
+    const loop = () => {
+      if (tryIt()) return;
+      if (Date.now() < until) appWait = setTimeout(loop, 250);
+      else if (what) toast(`Couldn’t find “${what}” in the notebook. Open it from the notebook page.`, 'warn', 6000);
+    };
     appWait = setTimeout(loop, 250);
   }
-  const openCreate = key => appAct(doc => $(`[data-create="${key}"]`, doc));
-  const openRecord = r => appAct(doc => (r.id ? $(`[data-record="${r.id}"]`, doc) : $(`[data-native="${r.native}"]`, doc)));
+  const openCreate = key => appAct(doc => $(`[data-create="${key}"]`, doc), null, CREATE_LABEL[key] || 'the notebook', { create: key });
+  const openRecord = r => appAct(doc => (r.id ? $(`[data-record="${r.id}"]`, doc) : $(`[data-native="${r.native}"]`, doc)), null, r.title, { record: r.id, native: r.native, title: r.title });
+  let resumed = false;
+  function resumePending() {
+    if (resumed || !appDoc()) return;
+    resumed = true;
+    let p = null;
+    try { p = JSON.parse(sessionStorage.getItem(PENDING) || 'null'); sessionStorage.removeItem(PENDING); } catch (e) {}
+    if (!p || Date.now() - p.at > 60000) return;
+    if (p.create) openCreate(p.create);
+    else if (p.record || p.native) openRecord({ id: p.record, native: p.native, title: p.title });
+    else if (p.section) openAppSection(p.section);
+  }
+
+  // Petit mot en bas de l ecran : ce qu on est en train d ouvrir, ou pourquoi rien ne vient.
+  let toastTimer = 0;
+  function toast(msg, kind = 'info', ms = 4000) {
+    if (!document.body) return;
+    let el = $('#sh-toast');
+    if (!el) { el = h('div', { id: 'sh-toast', class: 'sh', role: 'status', 'aria-live': 'polite' }); document.body.append(el); }
+    el.replaceChildren(icon(kind === 'warn' ? 'warn' : kind === 'ok' ? 'check' : 'today'), h('span', {}, msg));
+    el.className = 'sh show ' + kind;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(hideToast, ms);
+  }
+  function hideToast() { const el = $('#sh-toast'); if (el) el.classList.remove('show'); }
+
+  // « From template » : Seal liste les modeles dans le bouton « + New instance » de la View
+  // d une categorie (Protocols, Experiments, Projects). On ouvre la View, puis ce bouton.
+  const TEMPLATE_VIEW = { experiment: /experiment/i, protocol: /protocol/i, project: /project/i };
+  function templateView(key, views) {
+    const re = TEMPLATE_VIEW[key];
+    if (!re) return null;
+    const hits = views.filter(v => re.test(v.title) && !v.group);
+    return hits.find(v => !/template|archive/i.test(v.title)) || hits[0] || null;
+  }
+  const NEW_INSTANCE = /^\+?\s*new (instance|record|entity|item)\b/i;
+  function openFromTemplate(key, tries = 0) {
+    const views = readViews() || [];
+    if (!views.length && tries < 4) { panesTried = 0; ensurePanes(); setTimeout(() => openFromTemplate(key, tries + 1), 700); return; }
+    const v = templateView(key, views);
+    if (!v) { toast(`Seal has no “${key}s” view yet, so there is no template list to open.`, 'warn', 6000); return; }
+    toast(`Opening ${v.title}: pick a template…`);
+    go(v.el);
+    const until = Date.now() + 8000;
+    const loop = () => {
+      const scope = $('[data-testid="platform-layout"]') || document.body;
+      const btn = $$('button', scope).find(b => !b.closest('.sh') && !b.closest('[data-testid="nav-panel"]') && NEW_INSTANCE.test(txt(b)));
+      if (btn) { press(btn); toast('Choose a template in the list.', 'ok', 3500); return; }
+      if (Date.now() < until) setTimeout(loop, 250);
+      else toast('Use “+ New instance” at the top of this view to pick a template.', 'warn', 6000);
+    };
+    setTimeout(loop, 500);
+  }
 
   const hooked = new WeakSet();
   function readApp() {
@@ -471,7 +540,7 @@
   }
 
   function openAppSection(label) {
-    appAct(doc => { const nav = appNav(doc); return nav && nav.byLabel.get(label); }, () => { appActive = label; });
+    appAct(doc => { const nav = appNav(doc); return nav && nav.byLabel.get(label); }, () => { appActive = label; }, label, { section: label });
   }
 
   function readChangeset() {
@@ -550,6 +619,8 @@
     if (page) return [PAGE_NAME[page] || ''];
     if (isWorkspaceRoot()) return appActive ? ['Notebook', appActive] : ['Notebook'];
     const sec = recordSection();
+    const cur = d.views.find(v => v.current && !v.group);
+    if (cur && !sec && !$('[data-testid="entity-top-navbar"]')) return ['View', cur.title];
     const header = $('[data-testid="changeset-top-navbar"], [data-testid="entity-top-navbar"]');
     const t = header ? txt($('[data-title-text]', header)) || txt($('h1[data-document-title]')) : '';
     const short = t.split(/\s+[-–—]\s+/)[0].slice(0, 28);
@@ -619,11 +690,16 @@
 
     const top = h('div', { class: 'sh-block' });
     if (appCreates.length) {
+      const tpls = Object.keys(TEMPLATE_VIEW).filter(k => templateView(k, d.views));
+      const item = (cls, ico, tintKey, label, hint, onclick) => h('button', { type: 'button', role: 'menuitem', class: 'sh-newitem ' + cls, onclick },
+        h('span', { class: 'sh-ti sm ' + tint(tintKey) }, icon(ico)),
+        h('span', { class: 'sh-nt' }, h('span', { class: 'sh-t' }, label), hint ? h('small', {}, hint) : null));
       const menu = h('div', { class: 'sh-newmenu', role: 'menu', hidden: !newOpen },
-        appCreates.map(c => h('button', { type: 'button', role: 'menuitem', class: 'sh-newitem', onclick: () => { newOpen = false; openCreate(c.key); } },
-          h('span', { class: 'sh-ti sm ' + tint(CREATE_ICON[c.key] || 'doc') }, icon(CREATE_ICON[c.key] || 'doc')), h('span', { class: 'sh-t' }, c.label))),
-        d.newBtn ? h('button', { type: 'button', role: 'menuitem', class: 'sh-newitem other', onclick: () => { newOpen = false; press(d.newBtn); } },
-          h('span', { class: 'sh-ti sm tint-grey' }, icon('plus')), h('span', { class: 'sh-t' }, 'Other Seal record…')) : null);
+        h('div', { class: 'sh-newhead' }, 'In the lab notebook'),
+        appCreates.map(c => item('', CREATE_ICON[c.key] || 'doc', CREATE_ICON[c.key] || 'doc', c.label, CREATE_HINT[c.key], () => { newOpen = false; openCreate(c.key); })),
+        tpls.length ? h('div', { class: 'sh-newhead' }, 'From a Seal template') : null,
+        tpls.map(k => item('tpl', 'tpl', CREATE_ICON[k] || 'doc', (CREATE_LABEL[k] || 'New ' + k) + ' from template', 'Choose among the templates of ' + templateView(k, d.views).title, () => { newOpen = false; openFromTemplate(k); })),
+        d.newBtn ? item('other', 'plus', 'grey', 'Other Seal record…', 'Any record type Seal knows', () => { newOpen = false; press(d.newBtn); }) : null);
       top.append(h('div', { class: 'sh-new' },
         h('button', { type: 'button', class: 'sh-newbtn', 'aria-expanded': String(newOpen), 'aria-haspopup': 'menu', onclick: () => { newOpen = !newOpen; render(true); } },
           icon('plus'), h('span', { class: 'sh-t' }, 'New'), h('span', { class: 'sh-chev' + (newOpen ? ' open' : ''), 'aria-hidden': 'true', html: ICON.chev })),
@@ -708,6 +784,7 @@
     side.append(h('div', { class: 'sh-foot' },
       set ? h('button', { type: 'button', class: 'sh-iconbtn', title: 'Settings', onclick: () => press(set) }, icon('gear')) : null,
       help ? h('button', { type: 'button', class: 'sh-iconbtn', title: 'Help and more', onclick: () => press(help) }, icon('help')) : null,
+      h('span', { class: 'sh-ver', title: 'Seal Helper ' + VERSION }, 'v' + VERSION),
       h('button', { type: 'button', class: 'sh-classic', title: 'Show Seal without the new layout', onclick: () => save({ side: false }) }, icon('classic'), 'Classic Seal')));
     return side;
   }
@@ -1199,22 +1276,20 @@
     lastRun = Date.now();
     if (!document.body) return;
     observer.disconnect();
-    try {
-      onRoute();
-      if (isOn('dates')) shortenTexts(document.body);
-      if (isOn('doc')) markRules(document.body);
-      if (isOn('quiet')) markFaded(document.body);
-      closeInfoOnArrival();
-      if (isOn('side')) { readApp(); ensurePanes(); }
-      else { const doc = appDoc(); const hid = doc && $('[data-sh-hidden]', doc); if (hid) hid.removeAttribute('data-sh-hidden'); }
-      // Le labo a sa propre page d accueil : on la laisse a l arrivee au lieu de Today.
-      if (page === 'home' && autoHome && $('iframe[title="Custom Content"]')) { page = null; autoHome = false; }
-      render(false);
-      if (isOn('props')) { renderProps(); renderOutline(); }
-      else { $('#sh-props')?.remove(); $('#sh-outline')?.remove(); root.classList.remove('sh-has-outline'); }
-    } catch (e) {
-      console.warn('[Seal Helper]', e);
-    }
+    // Chaque etape a part : une lecture qui casse n empeche jamais la barre de s afficher.
+    const step = (name, fn) => { try { fn(); } catch (e) { console.warn('[Seal Helper] ' + name, e); } };
+    step('route', onRoute);
+    if (isOn('dates')) step('dates', () => shortenTexts(document.body));
+    if (isOn('doc')) step('doc', () => markRules(document.body));
+    if (isOn('quiet')) step('quiet', () => markFaded(document.body));
+    step('info', closeInfoOnArrival);
+    if (isOn('side')) { step('app', readApp); step('panes', ensurePanes); step('resume', resumePending); }
+    else step('unhide', () => { const doc = appDoc(); const hid = doc && $('[data-sh-hidden]', doc); if (hid) hid.removeAttribute('data-sh-hidden'); });
+    // Le labo a sa propre page d accueil : on la laisse a l arrivee au lieu de Today.
+    if (page === 'home' && autoHome && $('iframe[title="Custom Content"]')) { page = null; autoHome = false; }
+    step('side', () => render(false));
+    if (isOn('props')) { step('props', renderProps); step('outline', renderOutline); }
+    else { $('#sh-props')?.remove(); $('#sh-outline')?.remove(); root.classList.remove('sh-has-outline'); }
     observer.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['data-side-panel', 'data-highlighted'] });
   }
   function schedule() {
@@ -1287,6 +1362,10 @@
     if (document.body) schedule();
     else document.addEventListener('DOMContentLoaded', schedule, { once: true });
   });
+  try { chrome.runtime.onMessage.addListener((m, sender, reply) => {
+    if (!m || m.sh !== 'status') return;
+    reply({ v: VERSION, on: !!opts.on, side: !!isOn('side'), workspace: !!$('[data-testid="platform-layout"]'), shown: !!$('#sh-side') });
+  }); } catch (e) {}
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'sync' || !changes[KEY]) return;
     opts = { ...DEFAULTS, ...(changes[KEY].newValue || {}) };
