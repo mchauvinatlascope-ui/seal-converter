@@ -14,7 +14,7 @@
   const isMac = /Mac/.test(navigator.platform);
   let opts = { ...DEFAULTS };
   const isOn = k => opts.on && opts[k];
-  const VERSION = '0.9.0';
+  const VERSION = '0.9.1';
 
   // ---------------------------------------------------------------- outils
   function h(tag, attrs, ...kids) {
@@ -527,7 +527,8 @@
     col.setAttribute('data-sh-hidden', '');
   }
   function ensureHideStyle(doc) {
-    const css = '[data-sh-hidden]{width:0!important;min-width:0!important;flex:0 0 0!important;padding:0!important;margin:0!important;border:0!important;overflow:hidden!important;visibility:hidden!important}'
+    // Hors du flux (position absolue, taille nulle) : ni colonne ni ligne reservee dans une grille ou un flex.
+    const css = '[data-sh-hidden]{position:absolute!important;left:-9999px!important;top:0!important;width:0!important;height:0!important;min-width:0!important;min-height:0!important;flex:0 0 0!important;padding:0!important;margin:0!important;border:0!important;overflow:hidden!important;visibility:hidden!important;pointer-events:none!important}'
       + '*:has(>[data-sh-hidden]){grid-template-columns:minmax(0,1fr)!important}'
       + '[data-sh-hidden]~*{grid-column:1/-1!important;min-width:0}';
     let st = $('#sh-app-style', doc);

@@ -26,7 +26,12 @@
   color: var(--sh-ink);
   -webkit-font-smoothing: antialiased;
   box-sizing: border-box;
+  /* Nos elements sont sous <html>, pas sous <body> : rien ne doit venir de Seal. */
+  font-size: 13px; line-height: 1.45; font-weight: 400; font-style: normal; letter-spacing: normal; text-transform: none; text-align: left; text-indent: 0; word-spacing: normal; direction: ltr;
 }
+.sh *, .sh *::before, .sh *::after { line-height: inherit; }
+.sh h1, .sh h3, .sh b, .sh strong { line-height: 1.25; }
+.sh small { line-height: 1.35; }
 .sh *, .sh *::before, .sh *::after { box-sizing: border-box; }
 .sh button { font: inherit; font-family: var(--sh-ui); color: inherit; background: none; border: 0; margin: 0; padding: 0; cursor: pointer; text-align: left; }
 .sh button:focus-visible, .sh [tabindex]:focus-visible { outline: 2px solid var(--sh-focus); outline-offset: -2px; border-radius: 4px; }
