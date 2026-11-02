@@ -1,0 +1,48 @@
+/* Seal Helper 0.1 : habillage seul. Chaque regle depend d une classe posee sur <html>
+   par content.js, donc tout s eteint d un coup quand l extension est coupee. */
+
+/* --- Document propre --------------------------------------------------- */
+
+/* Marge de changement : la barre de couleur ne se montre qu au survol du bloc. */
+html.sh-doc [data-document-change-indicator] > div[aria-hidden="true"] {
+  opacity: 0;
+  transition: opacity .12s;
+}
+html.sh-doc [data-native-top-block]:hover > [data-document-change-indicator] > div[aria-hidden="true"],
+html.sh-doc [data-document-change-indicator]:focus-visible > div[aria-hidden="true"] {
+  opacity: 1;
+}
+
+/* Paragraphe fait seulement de tirets : un filet fin, le texte revient quand on y ecrit. */
+html.sh-doc [data-sh-rule]:not([data-sh-caret]) [data-document-paragraph] {
+  background: linear-gradient(var(--color-bg3, #d4d4d4), var(--color-bg3, #d4d4d4)) center / 100% 1px no-repeat;
+}
+html.sh-doc [data-sh-rule]:not([data-sh-caret]) [data-document-paragraph],
+html.sh-doc [data-sh-rule]:not([data-sh-caret]) [data-document-paragraph] * {
+  color: transparent !important;
+}
+
+/* Tableaux : premiere ligne en en-tete, cellules en poids normal. */
+html.sh-doc [data-native-block-type="table"] tr:first-child > :is(td, th) {
+  background: var(--color-bg1, #f6f7f9);
+  color: var(--color-fg1, #333);
+}
+html.sh-doc [data-native-block-type="table"] tr:first-child > :is(td, th),
+html.sh-doc [data-native-block-type="table"] tr:first-child > :is(td, th) * {
+  font-weight: 600 !important;
+}
+html.sh-doc [data-native-block-type="table"] tr:not(:first-child) > :is(td, th) :is(strong, b, [class*="font-bold"], [style*="font-weight"]) {
+  font-weight: inherit !important;
+}
+
+/* --- Listes plus calmes ------------------------------------------------ */
+
+/* Changesets vides et brouillons sans titre ou de test : en retrait, jamais caches. */
+html.sh-quiet [data-sh-faded] {
+  opacity: .45;
+  transition: opacity .12s;
+}
+html.sh-quiet [data-sh-faded]:hover,
+html.sh-quiet [data-sh-faded]:focus-within {
+  opacity: 1;
+}
