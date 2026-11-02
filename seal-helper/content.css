@@ -165,7 +165,8 @@ html.sh-side [data-testid="nav-panel-resize-handle"] { display: none !important;
 .sh .sh-pill { display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 8px; border-radius: 10px; font-size: 11.5px; font-weight: 600; white-space: nowrap; background: var(--sh-greybg); color: var(--sh-ink2); }
 .sh .sh-pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .sh .sh-pill.pub { background: var(--sh-greenbg); color: var(--sh-green); }
-.sh .sh-pill.run, .sh .sh-pill.plan { background: var(--sh-amberbg); color: var(--sh-amber); }
+.sh .sh-pill.run { background: var(--sh-bluebg, #eaf1fb); color: var(--sh-blue, #2d72d2); }
+.sh .sh-pill.plan { background: var(--sh-amberbg); color: var(--sh-amber); }
 
 /* ======================================================================
    Fiche : bandeau de proprietes sous l en-tete, plan de la page a droite
@@ -357,3 +358,51 @@ html.sh-quiet [data-sh-faded]:hover, html.sh-quiet [data-sh-faded]:focus-within 
 #sh-side .sh-app .sh-i { color: #8a8f98; }
 #sh-side .sh-app.on .sh-i { color: var(--sh-ink); }
 #sh-side .sh-mark { box-shadow: 0 1px 2px rgba(212,5,7,.35); }
+
+/* ======================================================================
+   0.7 : menu + New, cartes projets, boutons + sur les sections
+   ====================================================================== */
+#sh-side .sh-new { position: relative; margin-bottom: 4px; }
+#sh-side .sh-newbtn { display: flex; align-items: center; gap: 9px; width: 100%; height: 32px; padding: 0 10px; border-radius: 7px; background: var(--sh-ink); color: #fff; font-weight: 600; font-size: 13px; }
+#sh-side .sh-newbtn .sh-i, #sh-side .sh-newbtn .sh-chev { color: #fff; }
+#sh-side .sh-newbtn .sh-chev { transform: rotate(90deg); transition: transform .12s; }
+#sh-side .sh-newbtn .sh-chev.open { transform: rotate(-90deg); }
+#sh-side .sh-newbtn:hover { background: #2b2e34; }
+#sh-side .sh-newmenu { position: absolute; left: 0; right: 0; top: 36px; z-index: 5; background: #fff; border: 1px solid var(--sh-line); border-radius: 9px; box-shadow: 0 10px 30px -12px rgba(20,20,20,.35); padding: 6px; display: grid; gap: 1px; }
+#sh-side .sh-newmenu[hidden] { display: none; }
+#sh-side .sh-newitem { display: flex; align-items: center; gap: 10px; width: 100%; height: 34px; padding: 0 8px; border-radius: 6px; font-size: 13px; }
+#sh-side .sh-newitem:hover { background: var(--sh-side); }
+#sh-side .sh-newitem.other { border-top: 1px solid var(--sh-line2); margin-top: 4px; padding-top: 4px; height: 38px; border-radius: 0 0 6px 6px; color: var(--sh-ink2); }
+#sh-side .sh-ti.sm { width: 24px; height: 24px; border-radius: 6px; display: grid; place-items: center; flex: none; }
+#sh-side .sh-ti.sm .sh-i, #sh-side .sh-ti.sm svg { width: 13px; height: 13px; }
+#sh-side .sh-sc .sh-edit { opacity: 0; }
+#sh-side .sh-sc:hover .sh-edit, #sh-side .sh-sc .sh-edit:focus-visible { opacity: 1; }
+
+#sh-page .sh-hdr-actions { display: flex; align-items: center; gap: 14px; }
+#sh-page .sh-plus { display: inline-flex; align-items: center; gap: 4px; color: var(--sh-ink2); font-weight: 500; }
+#sh-page .sh-plus .sh-i { width: 13px; height: 13px; }
+#sh-page .sh-plus:hover { color: var(--sh-ink); }
+#sh-page .sh-btn.primary { background: var(--sh-ink); color: #fff; border-color: var(--sh-ink); }
+#sh-page .sh-btn.primary .sh-i { color: #fff; }
+#sh-page .sh-btn.primary:hover { background: #2b2e34; }
+#sh-page .sh-stat.blue b { color: var(--sh-blue); }
+#sh-page .sh-stat.violet b { color: var(--sh-violet); }
+#sh-page .sh-stat.teal b { color: var(--sh-teal); }
+
+#sh-page .sh-projects { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; padding: 0 14px 14px; }
+#sh-page .sh-project { display: grid; gap: 6px; align-content: start; padding: 13px 14px !important; border: 1px solid var(--sh-line2) !important; border-radius: 9px; min-height: 112px; transition: border-color .12s, box-shadow .12s, transform .12s; }
+#sh-page .sh-project:hover { border-color: var(--sh-line) !important; box-shadow: 0 6px 18px -10px rgba(20,20,20,.3); transform: translateY(-1px); }
+#sh-page .sh-project-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+#sh-page .sh-project-top small { font-size: 11px; color: var(--sh-ink3); white-space: nowrap; }
+#sh-page .sh-project b { font-size: 13.5px; font-weight: 650; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+#sh-page .sh-project-n { font-size: 12px; color: var(--sh-ink2); margin-top: auto; }
+#sh-page .sh-project-n strong { font-size: 15px; font-weight: 650; color: var(--sh-ink); margin-right: 2px; }
+
+#sh-page .sh-tilewrap { position: relative; }
+#sh-page .sh-tilewrap .sh-tile { width: 100%; }
+#sh-page .sh-tileplus { position: absolute; top: 10px; right: 10px; width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center; border: 1px solid var(--sh-line) !important; background: #fff !important; opacity: 0; transition: opacity .12s; }
+#sh-page .sh-tilewrap:hover .sh-tileplus, #sh-page .sh-tileplus:focus-visible { opacity: 1; }
+#sh-page .sh-tileplus:hover { background: var(--sh-side) !important; }
+#sh-page .sh-tileplus .sh-i { width: 13px; height: 13px; }
+
+.sh .sh-pill.done { background: var(--sh-greybg); color: var(--sh-ink2); }

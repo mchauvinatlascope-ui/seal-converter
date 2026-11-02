@@ -1,4 +1,4 @@
-// Seal Helper 0.6
+// Seal Helper 0.7
 // Ne fait que changer l affichage dans ce navigateur : n ecrit jamais dans Seal,
 // n envoie rien, ne touche pas au texte d un document.
 // La nouvelle barre et les pages Home / My work / To publish relisent les listes
@@ -283,7 +283,22 @@
     }
     return el;
   }
+  // Libelle d un bouton du menu sans son pictogramme.
+  const railLabel = b => [...b.childNodes].filter(n => n.nodeType === 3 || !n.matches('.nav-icon')).map(n => n.textContent).join('').replace(/\s+/g, ' ').trim();
   function appNav(doc) {
+    const rail = $('nav[aria-label="Lab navigation"]', doc);
+    if (rail) {
+      const byLabel = new Map();
+      const meta = new Map();
+      for (const b of $$('.rail-button, button, a', rail)) {
+        const l = railLabel(b);
+        if (!l || byLabel.has(l)) continue;
+        byLabel.set(l, b);
+        meta.set(l, { view: b.getAttribute('data-view') || '', external: b.tagName === 'A' && b.target === '_blank' });
+      }
+      const on = $('[aria-current="page"]', rail);
+      return { byLabel, meta, active: on ? railLabel(on) : '', box: rail };
+    }
     const all = leafTexts(doc.body);
     const hits = [];
     const seen = new Set();
@@ -310,6 +325,74 @@
     return { byLabel, active, box };
   }
 
+  // Les boutons « + New … » de l appli : on les liste pour la barre et Today.
+  const CREATE_LABEL = { experiment: 'New experiment', project: 'New project', protocol: 'New protocol', panel: 'New antibody panel', general: 'New inventory item', antibodies: 'New antibody' };
+  const CREATE_ICON = { experiment: 'flask', project: 'folder', protocol: 'proto', panel: 'view', general: 'stock', antibodies: 'stock' };
+  const CREATE_SECTION = { experiment: /experiment|manip/i, project: /project/i, protocol: /protocol/i, panel: /protocol|panel/i, general: /inventor/i, antibodies: /inventor/i };
+  let appCreates = []; // [{ key, label }]
+  let appData = null;  // ce que l accueil du labo affiche : compteurs, recents, projets
+  const APPDATA_KEY = 'sealHelperAppData';
+
+  function readCreates(doc) {
+    const seen = new Map();
+    for (const b of $$('[data-create]', doc)) {
+      const key = b.getAttribute('data-create');
+      if (!seen.has(key)) seen.set(key, { key, label: CREATE_LABEL[key] || txt(b).replace(/^\+\s*/, '') });
+    }
+    const order = ['experiment', 'project', 'protocol', 'panel', 'general', 'antibodies'];
+    return [...seen.values()].sort((x, y) => (order.indexOf(x.key) + 1 || 99) - (order.indexOf(y.key) + 1 || 99));
+  }
+
+  function readAppData(doc) {
+    const tagOf = el => { const t = $('.tag', el); return t ? txt(t) : ''; };
+    const rows = (h2re) => {
+      const panel = $$('.panel', doc).find(pn => h2re.test(txt($('h2', pn))));
+      return panel ? $$('.item-row[data-record], .item-row[data-native]', panel).map(b => ({
+        id: b.getAttribute('data-record') || '', native: b.getAttribute('data-native') || '',
+        title: txt($('strong', b)), sub: txt($('small', b)), status: tagOf(b),
+      })) : [];
+    };
+    const hero = $('.hero', doc);
+    const heroBtn = hero && $('[data-record]', hero);
+    return {
+      at: Date.now(),
+      user: txt($('.user-name', doc)),
+      metrics: $$('.metrics button[data-view]', doc).map(b => ({ view: b.getAttribute('data-view'), n: parseInt(txt($('b', b)), 10) || 0, label: txt($('span', b)) })),
+      hero: hero && heroBtn ? { id: heroBtn.getAttribute('data-record'), title: txt($('h2', hero)), sub: txt($('.muted', hero)), status: tagOf(hero) } : null,
+      experiments: rows(/recent experiments/i),
+      projects: rows(/recent projects/i),
+      protocols: rows(/^protocols$/i),
+      cards: $$('.project-card[data-record]', doc).map(c => ({ id: c.getAttribute('data-record'), title: txt($('h3', c)), sub: txt($('p', c)), status: tagOf(c),
+        n: parseInt(txt($('.project-stats b', c)), 10) || 0, updated: (txt($('.project-stats span', c)) || '').replace(/^updated\s*/i, '') })),
+    };
+  }
+
+  // Clique pour toi dans l appli (bouton + New…, fiche, section), en ouvrant l accueil s il le faut.
+  function appAct(find, after) {
+    page = null;
+    guideOpened = true;
+    clearTimeout(appWait);
+    const tryIt = () => {
+      const doc = appDoc();
+      const el = doc && find(doc);
+      if (el) { pressIn(el); if (after) after(); render(true); return true; }
+      return false;
+    };
+    if (isWorkspaceRoot() && tryIt()) return;
+    if (!isWorkspaceRoot()) {
+      const d = data();
+      const home = [...d.favourites, ...d.recent].find(r => r.type && r.type[0] === 'Page');
+      if (home) press(home.el);
+      else { const m = location.pathname.match(/^\/o\/[^/]+\/s\/[^/]+/); if (m) location.assign(m[0]); return; }
+    }
+    render(true);
+    const until = Date.now() + 12000;
+    const loop = () => { if (!tryIt() && Date.now() < until) appWait = setTimeout(loop, 250); };
+    appWait = setTimeout(loop, 250);
+  }
+  const openCreate = key => appAct(doc => $(`[data-create="${key}"]`, doc));
+  const openRecord = r => appAct(doc => (r.id ? $(`[data-record="${r.id}"]`, doc) : $(`[data-native="${r.native}"]`, doc)));
+
   const hooked = new WeakSet();
   function readApp() {
     const f = $('iframe[title="Custom Content"]');
@@ -318,6 +401,13 @@
     const nav = doc && appNav(doc);
     if (!nav) { appActive = ''; return; }
     appActive = nav.active;
+    const creates = readCreates(doc);
+    if (creates.length && JSON.stringify(creates) !== JSON.stringify(appCreates)) { appCreates = creates; try { chrome.storage.local.set({ sealHelperAppCreates: creates }); } catch (e) {} }
+    const ad = readAppData(doc);
+    if (ad.metrics.length || ad.experiments.length) {
+      const sig = JSON.stringify({ ...ad, at: 0 });
+      if (!appData || JSON.stringify({ ...appData, at: 0 }) !== sig) { appData = ad; try { chrome.storage.local.set({ [APPDATA_KEY]: ad }); } catch (e) {} }
+    }
     const labels = [...nav.byLabel.keys()];
     if (JSON.stringify(labels) !== JSON.stringify(appSections)) {
       appSections = labels;
@@ -334,18 +424,22 @@
     const prev = $('[data-sh-hidden]', doc);
     if (!want) { if (prev) prev.removeAttribute('data-sh-hidden'); return; }
     if (prev) return;
+    const rail = box.closest('aside.rail, aside');
+    if (rail) { ensureHideStyle(doc); rail.setAttribute('data-sh-hidden', ''); return; }
     const W = doc.documentElement.clientWidth, H = doc.documentElement.clientHeight;
     let col = box;
     while (col.parentElement && col.parentElement !== doc.body && col.parentElement.getBoundingClientRect().width < W * 0.45) col = col.parentElement;
     const r = col.getBoundingClientRect();
     if (!r.width || r.width > W * 0.45 || r.height < H * 0.5) return;
-    if (!$('#sh-app-style', doc)) {
-      const st = doc.createElement('style');
-      st.id = 'sh-app-style';
-      st.textContent = '[data-sh-hidden]{display:none!important}';
-      doc.head.append(st);
-    }
+    ensureHideStyle(doc);
     col.setAttribute('data-sh-hidden', '');
+  }
+  function ensureHideStyle(doc) {
+    if ($('#sh-app-style', doc)) return;
+    const st = doc.createElement('style');
+    st.id = 'sh-app-style';
+    st.textContent = '[data-sh-hidden]{display:none!important}';
+    doc.head.append(st);
   }
 
   // Type de la fiche ouverte (icone de l en-tete) -> section du cahier qui la contient.
@@ -377,27 +471,7 @@
   }
 
   function openAppSection(label) {
-    page = null;
-    guideOpened = true;
-    clearTimeout(appWait);
-    const tryClick = () => {
-      const doc = appDoc();
-      const nav = doc && appNav(doc);
-      const el = nav && nav.byLabel.get(label);
-      if (el) { pressIn(el); appActive = label; render(true); return true; }
-      return false;
-    };
-    if (isWorkspaceRoot() && tryClick()) return;
-    if (!isWorkspaceRoot()) {
-      const d = data();
-      const home = [...d.favourites, ...d.recent].find(r => r.type && r.type[0] === 'Page');
-      if (home) press(home.el);
-      else { const m = location.pathname.match(/^\/o\/[^/]+\/s\/[^/]+/); if (m) location.assign(m[0]); return; }
-    }
-    render(true);
-    const until = Date.now() + 12000;
-    const loop = () => { if (!tryClick() && Date.now() < until) appWait = setTimeout(loop, 250); };
-    appWait = setTimeout(loop, 250);
+    appAct(doc => { const nav = appNav(doc); return nav && nav.byLabel.get(label); }, () => { appActive = label; });
   }
 
   function readChangeset() {
@@ -519,8 +593,10 @@
   function statusClass(s) {
     if (/publish/i.test(s)) return 'pub';
     if (/draft/i.test(s)) return 'draft';
-    if (/run|progress|active/i.test(s)) return 'run';
+    if (/run|progress|active|ongoing/i.test(s)) return 'run';
     if (/plan/i.test(s)) return 'plan';
+    if (/complete|done|finish|signed|closed/i.test(s)) return 'done';
+    if (/hold|pause|block/i.test(s)) return 'plan';
     return 'draft';
   }
 
@@ -542,7 +618,17 @@
       icon('search'), h('span', {}, 'Search'), h('kbd', {}, isMac ? '⌘K' : 'Ctrl K')));
 
     const top = h('div', { class: 'sh-block' });
-    if (d.newBtn) top.append(sideItem('plus', 'New', { onclick: () => press(d.newBtn) }));
+    if (appCreates.length) {
+      const menu = h('div', { class: 'sh-newmenu', role: 'menu', hidden: !newOpen },
+        appCreates.map(c => h('button', { type: 'button', role: 'menuitem', class: 'sh-newitem', onclick: () => { newOpen = false; openCreate(c.key); } },
+          h('span', { class: 'sh-ti sm ' + tint(CREATE_ICON[c.key] || 'doc') }, icon(CREATE_ICON[c.key] || 'doc')), h('span', { class: 'sh-t' }, c.label))),
+        d.newBtn ? h('button', { type: 'button', role: 'menuitem', class: 'sh-newitem other', onclick: () => { newOpen = false; press(d.newBtn); } },
+          h('span', { class: 'sh-ti sm tint-grey' }, icon('plus')), h('span', { class: 'sh-t' }, 'Other Seal record…')) : null);
+      top.append(h('div', { class: 'sh-new' },
+        h('button', { type: 'button', class: 'sh-newbtn', 'aria-expanded': String(newOpen), 'aria-haspopup': 'menu', onclick: () => { newOpen = !newOpen; render(true); } },
+          icon('plus'), h('span', { class: 'sh-t' }, 'New'), h('span', { class: 'sh-chev' + (newOpen ? ' open' : ''), 'aria-hidden': 'true', html: ICON.chev })),
+        menu));
+    } else if (d.newBtn) top.append(sideItem('plus', 'New', { onclick: () => press(d.newBtn) }));
     top.append(sideItem('today', 'Today', { on: page === 'home', onclick: () => openPage('home') }));
     top.append(sideItem('work', 'My work', { on: page === 'work', count: group(d.mine).length || '', onclick: () => openPage('work') }));
     top.append(sideItem('pub', 'To publish', { on: page === 'pub', count: d.pending.length || '', hot: d.pending.length > 0, onclick: () => openPage('pub') }));
@@ -569,8 +655,11 @@
       const inSec = recordSection();
       scroll.append(h('div', { class: 'sh-group' }, d.lab ? (d.lab.charAt(0) + d.lab.slice(1).toLowerCase() + ' lab') : 'Lab'));
       for (const l of appSections) {
-        scroll.append(h('button', { type: 'button', class: 'sh-row sh-app' + ((here && appActive === l) || inSec === l ? ' on' : ''), title: `Open ${l} in the lab notebook`, onclick: () => openAppSection(l) },
-          icon(appIcon(l)), h('span', { class: 'sh-t' }, l)));
+        const create = appCreates.find(c => CREATE_SECTION[c.key] && CREATE_SECTION[c.key].test(l) && !/panel|antibodies/.test(c.key));
+        scroll.append(h('div', { class: 'sh-sc' },
+          h('button', { type: 'button', class: 'sh-row sh-app' + ((here && appActive === l) || inSec === l ? ' on' : ''), title: `Open ${l} in the lab notebook`, onclick: () => openAppSection(l) },
+            icon(appIcon(l)), h('span', { class: 'sh-t' }, l)),
+          create ? h('button', { type: 'button', class: 'sh-edit', title: create.label, 'aria-label': create.label, onclick: () => openCreate(create.key) }, icon('plus')) : null));
       }
     }
     if (!appSections.length) scroll.append(h('div', { class: 'sh-group' }, 'Lab'));
@@ -721,19 +810,35 @@
     const head = h('header', { class: 'sh-dash-head' },
       h('div', {},
         h('div', { class: 'sh-eyebrow' }, labName + ' · electronic lab notebook'),
-        h('h1', {}, hello),
+        h('h1', {}, hello + (appData && appData.user ? ', ' + appData.user.split(' ')[0] : '')),
         h('p', {}, now.toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }))),
       h('div', { class: 'sh-dash-tools' },
         q ? h('button', { type: 'button', class: 'sh-bigsearch', onclick: () => press(q) }, icon('search'), h('span', {}, 'Search records, protocols, samples…'), h('kbd', {}, isMac ? '⌘K' : 'Ctrl K')) : null,
-        d.newBtn ? h('button', { type: 'button', class: 'sh-btn', onclick: () => press(d.newBtn) }, icon('plus'), 'New record') : null));
+        appCreates.some(c => c.key === 'experiment') ? h('button', { type: 'button', class: 'sh-btn primary', onclick: () => openCreate('experiment') }, icon('plus'), 'New experiment')
+          : d.newBtn ? h('button', { type: 'button', class: 'sh-btn', onclick: () => press(d.newBtn) }, icon('plus'), 'New record') : null));
 
+    const ad = appData;
+    const metric = re => ad && ad.metrics.find(m => re.test(m.label + ' ' + m.view));
+    const mExp = metric(/experiment/i), mProj = metric(/project/i), mProt = metric(/protocol/i);
+    const secFor = re => appSections.find(l => re.test(l));
     const stats = h('div', { class: 'sh-stats' },
-      stat('In progress', drafts.length, drafts.length === 1 ? 'draft record' : 'draft records', () => { workType = ''; openPage('work'); }),
+      mExp ? stat('Experiments', mExp.n, mExp.label.replace(/^experiments?\s*/i, '') || 'in progress', () => openAppSection(secFor(/experiment/i) || mExp.label), 'blue')
+        : stat('In progress', drafts.length, drafts.length === 1 ? 'draft record' : 'draft records', () => { workType = ''; openPage('work'); }),
       stat('To publish', d.pending.length, d.pending.length ? 'waiting for review' : 'all published', () => openPage('pub'), d.pending.length ? 'hot' : ''),
-      stat('Published', published.length, 'in your recent records', () => openPage('work')),
-      stat('Last 7 days', weekCount, weekCount === 1 ? 'change made' : 'changes made', () => openPage('pub')));
+      mProj ? stat('Projects', mProj.n, ad.cards.length ? `${ad.cards.filter(c => /active|progress/i.test(c.status)).length} active` : 'in the lab', () => openAppSection(secFor(/project/i) || 'Projects'), 'violet')
+        : stat('Published', published.length, 'in your recent records', () => openPage('work')),
+      mProt ? stat('Protocols', mProt.n, 'templates ready to run', () => openAppSection(secFor(/protocol/i) || 'Protocols'), 'teal')
+        : stat('Last 7 days', weekCount, weekCount === 1 ? 'change made' : 'changes made', () => openPage('pub')));
 
-    const heroCard = hero ? h('button', { type: 'button', class: 'sh-hero', onclick: () => go(hero.el) },
+    const ah = ad && ad.hero;
+    const heroCard = ah ? h('button', { type: 'button', class: 'sh-hero', onclick: () => openRecord(ah) },
+      h('span', { class: 'sh-ti big tint-blue' }, icon('flask')),
+      h('span', { class: 'sh-hero-t' },
+        h('small', {}, 'Continue an experiment'),
+        h('b', {}, ah.title),
+        h('span', { class: 'sh-meta' }, h('span', { class: 'sh-type' }, ah.sub), pill(ah.status))),
+      h('span', { class: 'sh-open' }, 'Open', icon('chev')))
+    : hero ? h('button', { type: 'button', class: 'sh-hero', onclick: () => go(hero.el) },
       h('span', { class: 'sh-ti big ' + tint(hero.type[1]) }, icon(hero.type[1])),
       h('span', { class: 'sh-hero-t' },
         h('small', {}, 'Pick up where you left off'),
@@ -741,17 +846,49 @@
         h('span', { class: 'sh-meta' }, h('span', { class: 'sh-type' }, hero.type[0]), pill(hero.status))),
       h('span', { class: 'sh-open' }, 'Open', icon('chev'))) : null;
 
-    const next = recent.slice(1, 6).map(r => h('button', { type: 'button', class: 'sh-line', onclick: () => go(r.el) },
+    const appExps = ad ? ad.experiments.filter(x => !ah || x.id !== ah.id).slice(0, 5) : [];
+    const next = appExps.length ? appExps.map(x => h('button', { type: 'button', class: 'sh-line', onclick: () => openRecord(x) },
+      h('span', { class: 'sh-ti tint-blue' }, icon('flask')),
+      h('span', { class: 'sh-lt' }, h('b', {}, x.title), h('small', {}, x.sub)),
+      pill(x.status)))
+    : recent.slice(1, 6).map(r => h('button', { type: 'button', class: 'sh-line', onclick: () => go(r.el) },
       h('span', { class: 'sh-ti ' + tint(r.type[1]) }, icon(r.type[1])),
       h('span', { class: 'sh-lt' }, h('b', {}, r.title, r.n > 1 ? h('span', { class: 'sh-x' }, '×' + r.n) : null), h('small', {}, r.type[0])),
       pill(r.status)));
+    const newExp = appCreates.find(c => c.key === 'experiment');
+    const newProj = appCreates.find(c => c.key === 'project');
+    const newProt = appCreates.find(c => c.key === 'protocol');
+
+    // Projets du cahier en cartes, avec leur nombre d experiences.
+    const projects = ad && ad.cards.length ? h('section', { class: 'sh-panel' },
+      h('header', {}, h('h3', {}, 'Projects'), h('span', { class: 'sh-hdr-actions' },
+        newProj ? h('button', { type: 'button', class: 'sh-more sh-plus', onclick: () => openCreate('project') }, icon('plus'), newProj.label) : null,
+        h('button', { type: 'button', class: 'sh-more', onclick: () => openAppSection(secFor(/project/i) || 'Projects') }, 'All ›'))),
+      h('div', { class: 'sh-projects' }, ad.cards.slice(0, 6).map(c => h('button', { type: 'button', class: 'sh-project', onclick: () => openRecord(c) },
+        h('span', { class: 'sh-project-top' }, pill(c.status), h('small', {}, c.updated ? 'Updated ' + c.updated : '')),
+        h('b', {}, c.title),
+        h('span', { class: 'sh-project-n' }, h('strong', {}, String(c.n)), c.n === 1 ? ' experiment' : ' experiments'))))) : null;
+
+    // Modeles de protocoles du cahier.
+    const protocols = ad && ad.protocols.length ? h('section', { class: 'sh-panel' },
+      h('header', {}, h('h3', {}, 'Protocols'), h('span', { class: 'sh-hdr-actions' },
+        newProt ? h('button', { type: 'button', class: 'sh-more sh-plus', onclick: () => openCreate('protocol') }, icon('plus'), newProt.label) : null,
+        h('button', { type: 'button', class: 'sh-more', onclick: () => openAppSection(secFor(/protocol/i) || 'Protocols') }, 'All ›'))),
+      ad.protocols.slice(0, 5).map(x => h('button', { type: 'button', class: 'sh-line', onclick: () => openRecord(x) },
+        h('span', { class: 'sh-ti tint-teal' }, icon('proto')),
+        h('span', { class: 'sh-lt' }, h('b', {}, x.title), h('small', {}, x.sub || 'Protocol template'))))) : null;
 
     const sections = appSections.filter(l => !/how|faq|feedback|help|overview|start/i.test(l)).slice(0, 6);
     const notebook = sections.length ? h('section', { class: 'sh-panel' },
       h('header', {}, h('h3', {}, 'Lab notebook'), h('span', { class: 'sh-sub' }, 'Open a section')),
-      h('div', { class: 'sh-tiles' }, sections.map(l => h('button', { type: 'button', class: 'sh-tile', onclick: () => openAppSection(l) },
-        h('span', { class: 'sh-ti ' + tint(appIcon(l)) }, icon(appIcon(l))),
-        h('b', {}, l), h('small', {}, sectionText(l)))))) : null;
+      h('div', { class: 'sh-tiles' }, sections.map(l => {
+        const create = appCreates.find(c => CREATE_SECTION[c.key] && CREATE_SECTION[c.key].test(l) && !/panel|antibodies/.test(c.key));
+        return h('div', { class: 'sh-tilewrap' },
+          h('button', { type: 'button', class: 'sh-tile', onclick: () => openAppSection(l) },
+            h('span', { class: 'sh-ti ' + tint(appIcon(l)) }, icon(appIcon(l))),
+            h('b', {}, l), h('small', {}, sectionText(l))),
+          create ? h('button', { type: 'button', class: 'sh-tileplus', title: create.label, 'aria-label': create.label, onclick: () => openCreate(create.key) }, icon('plus')) : null);
+      }))) : null;
 
     const toPublish = h('section', { class: 'sh-panel' },
       h('header', {}, h('h3', {}, 'To publish'), pend.length ? h('button', { type: 'button', class: 'sh-more', onclick: () => openPage('pub') }, `All ${d.pending.length} ›`) : null),
@@ -783,13 +920,17 @@
       h('div', { class: 'sh-cols' },
         h('div', { class: 'sh-col' },
           h('section', { class: 'sh-panel' },
-            h('header', {}, h('h3', {}, 'Continue'), h('button', { type: 'button', class: 'sh-more', onclick: () => openPage('work') }, 'All my work ›')),
-            heroCard, next.length ? next : null, !hero ? h('p', { class: 'sh-empty' }, 'Records you open will show here.') : null),
-          notebook),
+            h('header', {}, h('h3', {}, appExps.length ? 'Experiments' : 'Continue'), h('span', { class: 'sh-hdr-actions' },
+              newExp ? h('button', { type: 'button', class: 'sh-more sh-plus', onclick: () => openCreate('experiment') }, icon('plus'), newExp.label) : null,
+              h('button', { type: 'button', class: 'sh-more', onclick: () => (appExps.length ? openAppSection(secFor(/experiment/i) || 'Experiments') : openPage('work')) }, appExps.length ? 'All ›' : 'All my work ›'))),
+            heroCard, next.length ? next : null, !heroCard && !next.length ? h('p', { class: 'sh-empty' }, 'Records you open will show here.') : null),
+          projects, notebook, protocols),
         h('div', { class: 'sh-col' }, toPublish, activity, favs)));
   }
 
   let pickFor = null;
+  let newOpen = false;
+  document.addEventListener('click', e => { if (newOpen && !(e.target.closest && e.target.closest('.sh-new'))) { newOpen = false; render(true); } }, true);
   let allViewsOpen = (() => { try { return localStorage.getItem('sh-allviews') === '1'; } catch (e) { return false; } })();
 
   function buildPick(d) {
@@ -955,7 +1096,7 @@
     const d = data();
     const sig = JSON.stringify([page, d.lab, d.favourites.map(r => r.title + r.status + r.current), d.recent.map(r => r.title + r.status + r.current),
       d.mine.map(r => r.title + r.status), d.changes.map(c => c.hash + c.open + c.title + c.day + c.time), d.views.map(v => v.title + v.depth + v.open),
-      d.changeset && [d.changeset.hash, d.changeset.name, d.changeset.rows.map(r => r.title + r.current)], !!d.newBtn, showEmpty, workFilter, workType, lab, labOpen, pickFor, allViewsOpen, appSections, appActive, isWorkspaceRoot(), recordSection(), location.pathname]);
+      d.changeset && [d.changeset.hash, d.changeset.name, d.changeset.rows.map(r => r.title + r.current)], !!d.newBtn, showEmpty, workFilter, workType, lab, labOpen, pickFor, allViewsOpen, appSections, appActive, isWorkspaceRoot(), recordSection(), location.pathname, newOpen, appCreates, appData && appData.at]);
     if (!force && sig === sideSig && $('#sh-side')) return;
     sideSig = sig;
     $('#sh-side')?.remove();
@@ -1133,7 +1274,12 @@
     refresh();
   }
 
-  try { chrome.storage.local.get(APP_KEY, r => { if (Array.isArray(r[APP_KEY])) { appSections = r[APP_KEY]; schedule(); } }); } catch (e) {}
+  try { chrome.storage.local.get([APP_KEY, 'sealHelperAppCreates', APPDATA_KEY], r => {
+    if (Array.isArray(r[APP_KEY])) appSections = r[APP_KEY];
+    if (Array.isArray(r.sealHelperAppCreates)) appCreates = r.sealHelperAppCreates;
+    if (r[APPDATA_KEY] && r[APPDATA_KEY].metrics) appData = r[APPDATA_KEY];
+    schedule();
+  }); } catch (e) {}
   chrome.storage.sync.get([KEY, LAB_KEY], r => {
     opts = { ...DEFAULTS, ...(r[KEY] || {}) };
     if (Array.isArray(r[LAB_KEY]) && r[LAB_KEY].length) lab = r[LAB_KEY];

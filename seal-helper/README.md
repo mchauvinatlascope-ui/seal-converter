@@ -4,17 +4,19 @@ A Chrome extension that makes Seal calmer and easier to read. It only changes ho
 
 ## Install (2 minutes)
 
-1. Download `seal-helper-0.6.0.zip` and unzip it.
+1. Download `seal-helper-0.7.0.zip` and unzip it.
 2. Open `chrome://extensions` and switch on **Developer mode** (top right).
 3. Click **Load unpacked** and pick the unzipped `seal-helper` folder.
 4. Open Seal. Click the extension icon (puzzle piece, then pin Seal Helper) to switch each setting on or off.
 
 To update: replace the folder with the new one, then click the reload arrow on the Seal Helper card in `chrome://extensions`.
 
-## What 0.6 does
+## What 0.7 does
 
 **Layout**
-- **Finds your lab notebook menu from what it shows**, whatever it is built with, and loads Seal's Views and Changes lists by itself (Seal only fills them once their tab is opened), so shortcuts and counts no longer disappear after a reload.
+- **Built for the lab notebook app**: its menu (Overview, Projects, Experiments, Protocols, Inventory, Calculators & files, How to, Lab tree, Seal FAQs, Give feedback) is read exactly and shown in the sidebar; its own menu is hidden so there is one. A **New** button at the top of the sidebar lists what the notebook can create (New experiment, New project, New protocol, New antibody panel…) and presses the notebook's own button, so templates and IDs stay the notebook's job. Each section in the sidebar has a + on hover.
+- **Today shows the notebook's real numbers**: experiments in progress, projects (with how many are active), protocol templates, plus what is waiting to be published; the experiment to continue with its real status, recent experiments with Planned / In progress pills, projects as cards with their experiment counts, protocol templates. All of it opens in the notebook.
+- **Finds a lab notebook menu from what it shows**, whatever it is built with, and loads Seal's Views and Changes lists by itself (Seal only fills them once their tab is opened), so shortcuts and counts no longer disappear after a reload.
 - **Today, a real dashboard**: greeting and date, a big search, four counters (in progress, to publish, published, last 7 days), the record to pick up with the next ones, the lab notebook sections as tiles, a to-publish checklist, the last 7 days as a strip with an activity log, favourites.
 - **Know where you are**: back and forward arrows at the top of the sidebar (Alt ← and Alt → too), Today, My work and To publish are part of the browser history, the sidebar says where you are, and a record shows Notebook › Experiments › its ID.
 - **Lab notebook in the sidebar**: if your lab's home page in Seal is a notebook app with its own menu (Overview, Projects, Experiments, Protocols, Inventory...), that menu moves into the sidebar. A click opens the section, from anywhere in Seal. On a record, the section it belongs to is highlighted and a « ‹ Experiments » button takes you back to it. The app's own menu is hidden to keep one menu (option in the extension menu); it comes back as soon as Seal Helper is off.
