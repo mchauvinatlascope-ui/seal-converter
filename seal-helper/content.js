@@ -14,7 +14,7 @@
   const isMac = /Mac/.test(navigator.platform);
   let opts = { ...DEFAULTS };
   const isOn = k => opts.on && opts[k];
-  const VERSION = '0.8.1';
+  const VERSION = '0.9.0';
 
   // ---------------------------------------------------------------- outils
   function h(tag, attrs, ...kids) {
@@ -420,7 +420,11 @@
     };
     appWait = setTimeout(loop, 250);
   }
-  const openCreate = key => appAct(doc => $(`[data-create="${key}"]`, doc), null, CREATE_LABEL[key] || 'the notebook', { create: key });
+  // Dernier choix du menu New : il remonte en tete de son groupe la fois suivante.
+  let lastNew = (() => { try { return JSON.parse(localStorage.getItem('sh-lastnew') || 'null'); } catch (e) { return null; } })();
+  function rememberNew(kind, key) { lastNew = { kind, key }; try { localStorage.setItem('sh-lastnew', JSON.stringify(lastNew)); } catch (e) {} }
+  const firstLast = (list, kind, keyOf) => { const i = lastNew && lastNew.kind === kind ? list.findIndex(x => keyOf(x) === lastNew.key) : -1; return i > 0 ? [list[i], ...list.slice(0, i), ...list.slice(i + 1)] : list; };
+  const openCreate = key => { rememberNew('create', key); appAct(doc => $(`[data-create="${key}"]`, doc), null, CREATE_LABEL[key] || 'the notebook', { create: key }); };
   const openRecord = r => appAct(doc => (r.id ? $(`[data-record="${r.id}"]`, doc) : $(`[data-native="${r.native}"]`, doc)), null, r.title, { record: r.id, native: r.native, title: r.title });
   let resumed = false;
   function resumePending() {
@@ -458,6 +462,7 @@
   }
   const NEW_INSTANCE = /^\+?\s*new (instance|record|entity|item)\b/i;
   function openFromTemplate(key, tries = 0) {
+    if (!tries) rememberNew('tpl', key);
     const views = readViews() || [];
     if (!views.length && tries < 4) { panesTried = 0; ensurePanes(); setTimeout(() => openFromTemplate(key, tries + 1), 700); return; }
     const v = templateView(key, views);
@@ -728,14 +733,15 @@
     const top = h('div', { class: 'sh-block' });
     if (appCreates.length) {
       const tpls = Object.keys(TEMPLATE_VIEW).filter(k => templateView(k, d.views) || (d.newBtn && appCreates.some(c => c.key === k)));
-      const item = (cls, ico, tintKey, label, hint, onclick) => h('button', { type: 'button', role: 'menuitem', class: 'sh-newitem ' + cls, onclick },
+      const item = (cls, ico, tintKey, label, hint, onclick, last) => h('button', { type: 'button', role: 'menuitem', class: 'sh-newitem ' + cls, onclick },
         h('span', { class: 'sh-ti sm ' + tint(tintKey) }, icon(ico)),
-        h('span', { class: 'sh-nt' }, h('span', { class: 'sh-t' }, label), hint ? h('small', {}, hint) : null));
+        h('span', { class: 'sh-nt' }, h('span', { class: 'sh-t' }, label, last ? h('span', { class: 'sh-last' }, 'Last used') : null), hint ? h('small', {}, hint) : null));
+      const isLast = (kind, key) => !!lastNew && lastNew.kind === kind && lastNew.key === key;
       const menu = h('div', { class: 'sh-newmenu', role: 'menu', hidden: !newOpen },
         h('div', { class: 'sh-newhead' }, 'In the lab notebook'),
-        appCreates.map(c => item('', CREATE_ICON[c.key] || 'doc', CREATE_ICON[c.key] || 'doc', c.label, CREATE_HINT[c.key], () => { newOpen = false; openCreate(c.key); })),
+        firstLast(appCreates, 'create', c => c.key).map(c => item('', CREATE_ICON[c.key] || 'doc', CREATE_ICON[c.key] || 'doc', c.label, CREATE_HINT[c.key], () => { newOpen = false; openCreate(c.key); }, isLast('create', c.key))),
         tpls.length ? h('div', { class: 'sh-newhead' }, 'From a Seal template') : null,
-        tpls.map(k => item('tpl', 'tpl', CREATE_ICON[k] || 'doc', (CREATE_LABEL[k] || 'New ' + k) + ' from template', templateView(k, d.views) ? 'Choose among the templates of ' + templateView(k, d.views).title : 'Choose the template in Seal’s New list', () => { newOpen = false; openFromTemplate(k); })),
+        firstLast(tpls, 'tpl', k => k).map(k => item('tpl', 'tpl', CREATE_ICON[k] || 'doc', (CREATE_LABEL[k] || 'New ' + k) + ' from template', templateView(k, d.views) ? 'Choose among the templates of ' + templateView(k, d.views).title : 'Choose the template in Seal’s New list', () => { newOpen = false; openFromTemplate(k); }, isLast('tpl', k))),
         d.newBtn ? item('other', 'plus', 'grey', 'Other Seal record…', 'Any record type Seal knows', () => { newOpen = false; press(d.newBtn); }) : null);
       top.append(h('div', { class: 'sh-new' },
         h('button', { type: 'button', class: 'sh-newbtn', 'aria-expanded': String(newOpen), 'aria-haspopup': 'menu', onclick: () => { newOpen = !newOpen; render(true); } },
@@ -1024,6 +1030,13 @@
       h('header', {}, h('h3', {}, 'Last 7 days'), h('span', { class: 'sh-sub' }, `${weekCount} change${weekCount === 1 ? '' : 's'}`)),
       week, d.changes.length ? feed : h('p', { class: 'sh-empty' }, 'No activity yet.'));
 
+    const tips = tipsDone ? null : h('section', { class: 'sh-panel sh-tips' },
+      h('header', {}, h('h3', {}, 'Getting around'), h('button', { type: 'button', class: 'sh-more', onclick: () => { tipsDone = true; try { localStorage.setItem('sh-tips', '1'); } catch (e) {} render(true); } }, 'Got it')),
+      h('ul', {},
+        h('li', {}, h('span', { class: 'sh-ti sm tint-grey' }, icon('plus')), h('span', {}, h('b', {}, 'New'), ' at the top of the sidebar creates an experiment, project or protocol, or starts one from a Seal template.')),
+        h('li', {}, h('span', { class: 'sh-ti sm tint-grey' }, icon('search')), h('span', {}, h('b', {}, isMac ? '⌘K' : 'Ctrl K'), ' searches all of Seal from anywhere.')),
+        h('li', {}, h('span', { class: 'sh-ti sm tint-grey' }, icon('back')), h('span', {}, h('b', {}, 'Back and forward'), ' arrows above the search, or Alt ← and Alt →. The line next to them says where you are.')),
+        h('li', {}, h('span', { class: 'sh-ti sm tint-grey' }, icon('classic')), h('span', {}, h('b', {}, 'Classic Seal'), ' at the bottom brings the usual Seal panel back whenever you need it.'))));
     const favs = d.favourites.length ? h('section', { class: 'sh-panel' },
       h('header', {}, h('h3', {}, 'Favourites')),
       d.favourites.map(r => h('button', { type: 'button', class: 'sh-line', onclick: () => go(r.el) },
@@ -1039,9 +1052,10 @@
               h('button', { type: 'button', class: 'sh-more', onclick: () => (appExps.length ? openAppSection(secFor(/experiment/i) || 'Experiments') : openPage('work')) }, appExps.length ? 'All ›' : 'All my work ›'))),
             heroCard, next.length ? next : null, !heroCard && !next.length ? h('p', { class: 'sh-empty' }, 'Records you open will show here.') : null),
           projects, notebook, protocols),
-        h('div', { class: 'sh-col' }, toPublish, activity, favs)));
+        h('div', { class: 'sh-col' }, tips, toPublish, activity, favs)));
   }
 
+  let tipsDone = (() => { try { return localStorage.getItem('sh-tips') === '1'; } catch (e) { return false; } })();
   let pickFor = null;
   let newOpen = false;
   document.addEventListener('click', e => { if (newOpen && !(e.target.closest && e.target.closest('.sh-new'))) { newOpen = false; render(true); } }, true);
@@ -1080,7 +1094,15 @@
 
   let workFilter = '';
   let workType = '';
+  let workSrc = ''; // '' = cahier si disponible, 'seal' = fiches recentes de Seal
+  let workStatus = '';
   function buildWork(d) {
+    const ad = appData;
+    const nb = ad && (ad.experiments.length || ad.cards.length);
+    const src = workSrc || (nb ? 'notebook' : 'seal');
+    const srcChips = nb ? h('div', { class: 'sh-chips sh-src', role: 'group', 'aria-label': 'Source' },
+      [['notebook', 'Lab notebook'], ['seal', 'Recent in Seal']].map(([k, l]) => h('button', { type: 'button', class: 'sh-chip' + (src === k ? ' on' : ''), 'aria-pressed': String(src === k), onclick: () => { workSrc = k; render(true); } }, l))) : null;
+    if (src === 'notebook') return buildNotebookWork(d, ad, srcChips);
     const all = group([...d.recent, ...d.mine]);
     const types = [...new Set(all.map(r => r.type[0]))];
     const rows = all.filter(r => (!workFilter || r.title.toLowerCase().includes(workFilter.toLowerCase())) && (!workType || r.type[0] === workType));
@@ -1096,8 +1118,43 @@
         h('td', { class: 'sh-muted' }, r.type[0]), h('td', {}, pill(r.status)), h('td', { class: 'sh-go' }, 'Open ›')))));
     return h('div', { class: 'sh-wrap' },
       h('div', { class: 'sh-hello' }, h('div', {}, h('div', { class: 'sh-eyebrow' }, eyebrow(d, 'My work')), h('h1', {}, 'My work'), h('p', {}, 'Records you opened recently or created, same names grouped together.')), input),
-      chips,
+      srcChips, chips,
       h('section', { class: 'sh-panel' }, rows.length ? table : h('p', { class: 'sh-empty' }, 'No record matches.')));
+  }
+
+  // My work, version cahier : experiences et projets lus sur l accueil du labo, filtres par statut.
+  function buildNotebookWork(d, ad, srcChips) {
+    const f = workFilter.toLowerCase();
+    const match = r => !f || (r.title + ' ' + r.sub).toLowerCase().includes(f);
+    const stKey = s => statusClass(s || '');
+    const exps = ad.experiments.filter(match).filter(r => !workStatus || stKey(r.status) === workStatus);
+    const projs = (ad.cards.length ? ad.cards : ad.projects).filter(match).filter(r => !workStatus || stKey(r.status) === workStatus);
+    const statuses = [...new Set([...ad.experiments, ...ad.cards].map(r => r.status).filter(Boolean))];
+    const stChips = statuses.length > 1 ? h('div', { class: 'sh-chips', role: 'group', 'aria-label': 'Status' },
+      [['', 'All'], ...statuses.map(st => [stKey(st), st])].filter((x, i, a) => a.findIndex(y => y[0] === x[0]) === i)
+        .map(([k, l]) => h('button', { type: 'button', class: 'sh-chip' + (workStatus === k ? ' on' : ''), 'aria-pressed': String(workStatus === k), onclick: () => { workStatus = k; render(true); } }, l))) : null;
+    const input = h('input', { type: 'search', id: 'sh-filter', class: 'sh-input', placeholder: 'Filter by name or project', value: workFilter,
+      oninput: e => { workFilter = e.target.value; render(true); const i = $('#sh-filter'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } } });
+    const secFor = re => appSections.find(l => re.test(l));
+    const expTable = h('table', { class: 'sh-table' },
+      h('thead', {}, h('tr', {}, h('th', {}, 'Experiment'), h('th', {}, 'Project'), h('th', {}, 'Status'), h('th', {}, ''))),
+      h('tbody', {}, exps.map(r => h('tr', { onclick: () => openRecord(r), tabindex: '0', onkeydown: e => e.key === 'Enter' && openRecord(r) },
+        h('td', {}, h('span', { class: 'sh-cell' }, h('span', { class: 'sh-ti sm tint-blue' }, icon('flask')), h('b', {}, r.title))),
+        h('td', { class: 'sh-muted' }, (r.sub || '').split(' · ').pop()), h('td', {}, pill(r.status)), h('td', { class: 'sh-go' }, 'Open ›')))));
+    const projTable = h('table', { class: 'sh-table' },
+      h('thead', {}, h('tr', {}, h('th', {}, 'Project'), h('th', { class: 'sh-num' }, 'Experiments'), h('th', {}, 'Status'), h('th', {}, ''))),
+      h('tbody', {}, projs.map(r => h('tr', { onclick: () => openRecord(r), tabindex: '0', onkeydown: e => e.key === 'Enter' && openRecord(r) },
+        h('td', {}, h('span', { class: 'sh-cell' }, h('span', { class: 'sh-ti sm tint-violet' }, icon('folder')), h('b', {}, r.title))),
+        h('td', { class: 'sh-num sh-muted' }, r.n != null ? String(r.n) : ''), h('td', {}, pill(r.status)), h('td', { class: 'sh-go' }, 'Open ›')))));
+    const panel = (title, re, n, table, empty) => h('section', { class: 'sh-panel' },
+      h('header', {}, h('h3', {}, title), h('span', { class: 'sh-hdr-actions' }, h('span', { class: 'sh-sub' }, n + (n === 1 ? ' shown' : ' shown')),
+        h('button', { type: 'button', class: 'sh-more', onclick: () => openAppSection(secFor(re) || title) }, 'All in the notebook ›'))),
+      n ? table : h('p', { class: 'sh-empty' }, empty));
+    return h('div', { class: 'sh-wrap' },
+      h('div', { class: 'sh-hello' }, h('div', {}, h('div', { class: 'sh-eyebrow' }, eyebrow(d, 'My work')), h('h1', {}, 'My work'), h('p', {}, 'Experiments and projects as the lab notebook shows them, with their status. Numbers refresh each time the notebook page is open.')), input),
+      srcChips, stChips,
+      panel('Experiments', /experiment|manip/i, exps.length, expTable, 'No experiment matches.'),
+      panel('Projects', /project/i, projs.length, projTable, 'No project matches.'));
   }
 
   let showEmpty = false;
@@ -1210,7 +1267,7 @@
     const d = data();
     const sig = JSON.stringify([page, d.lab, d.favourites.map(r => r.title + r.status + r.current), d.recent.map(r => r.title + r.status + r.current),
       d.mine.map(r => r.title + r.status), d.changes.map(c => c.hash + c.open + c.title + c.day + c.time), d.views.map(v => v.title + v.depth + v.open),
-      d.changeset && [d.changeset.hash, d.changeset.name, d.changeset.rows.map(r => r.title + r.current)], !!d.newBtn, showEmpty, workFilter, workType, lab, labOpen, pickFor, allViewsOpen, appSections, appActive, atNotebook(), recordSection(), location.pathname, newOpen, appCreates, appData && appData.at]);
+      d.changeset && [d.changeset.hash, d.changeset.name, d.changeset.rows.map(r => r.title + r.current)], !!d.newBtn, showEmpty, workFilter, workType, workSrc, workStatus, tipsDone, lab, labOpen, pickFor, allViewsOpen, appSections, appActive, atNotebook(), recordSection(), location.pathname, newOpen, appCreates, appData && appData.at]);
     if (!force && sig === sideSig && $('#sh-side')) return;
     sideSig = sig;
     $('#sh-side')?.remove();
