@@ -14,7 +14,7 @@
   const isMac = /Mac/.test(navigator.platform);
   let opts = { ...DEFAULTS };
   const isOn = k => opts.on && opts[k];
-  const VERSION = '0.9.1';
+  const VERSION = '0.9.2';
 
   // ---------------------------------------------------------------- outils
   function h(tag, attrs, ...kids) {
@@ -389,16 +389,48 @@
   // Clique pour toi dans l appli (bouton + New…, fiche, section), en ouvrant l accueil s il le faut.
   // Si on doit recharger la page pour revenir au cahier, on garde l action demandee et on la rejoue.
   const PENDING = 'sh-pending';
+  // Voile uni sur la zone de travail le temps qu une action se joue dans l appli : on ne voit
+  // ni son accueil ni son changement de vue, seulement le resultat.
+  let veilTimer = 0;
+  function veil(on, ms = 6000) {
+    clearTimeout(veilTimer);
+    let v = $('#sh-veil');
+    if (!on) { if (v) v.remove(); return; }
+    if (!v) { v = h('div', { id: 'sh-veil', class: 'sh', 'aria-hidden': 'true' }); root.append(v); }
+    veilTimer = setTimeout(() => veil(false), ms);
+  }
+  // Leve le voile quand l appli a fini : vue active attendue, fenetre ouverte ou fiche partie, sinon au bout de 2,5 s.
+  function settle(resume, from) {
+    const until = Date.now() + 2500;
+    const done = () => {
+      const doc = appDoc();
+      if (!doc) return location.pathname !== from;
+      if (resume && resume.section) { const nav = appNav(doc); return !!nav && nav.active === resume.section; }
+      if (resume && resume.create) return !!$('[role="dialog"], dialog[open], [class*="modal"], [class*="dialog"], [class*="overlay"]', doc);
+      return location.pathname !== from;
+    };
+    const tick = () => {
+      if (done() || Date.now() > until) { setTimeout(() => veil(false), 150); return; }
+      setTimeout(tick, 60);
+    };
+    tick();
+  }
   function appAct(find, after, what, resume) {
     page = null;
     guideOpened = true;
     clearTimeout(appWait);
+    const from = location.pathname;
+    let homeTried = 0;
     const tryIt = () => {
       const doc = appDoc();
       const el = doc && find(doc);
-      if (el) { pressIn(el); if (after) after(); hideToast(); render(true); return true; }
+      if (el) { pressIn(el); if (after) after(); hideToast(); render(true); settle(resume, from); return true; }
+      // Le bouton n est pas dans la vue courante de l appli : on repasse par son accueil, une fois.
+      if (doc && !homeTried && Date.now() - started > 600) { const nav = appNav(doc); const first = nav && nav.byLabel.values().next().value; if (first) { homeTried = 1; pressIn(first); } }
       return false;
     };
+    const started = Date.now();
+    veil(true);
     if (atNotebook() && tryIt()) return;
     if (what) toast(`Opening ${what}…`);
     if (!atNotebook()) {
@@ -416,7 +448,7 @@
     const loop = () => {
       if (tryIt()) return;
       if (Date.now() < until) appWait = setTimeout(loop, 250);
-      else if (what) toast(`Couldn’t find “${what}” in the notebook. Open it from the notebook page.`, 'warn', 6000);
+      else { veil(false); if (what) toast(`Couldn’t find “${what}” in the notebook. Open it from the notebook page.`, 'warn', 6000); }
     };
     appWait = setTimeout(loop, 250);
   }
@@ -514,10 +546,10 @@
   function hideAppMenu(doc, box) {
     const want = isOn('side') && isOn('appmenu');
     const prev = $('[data-sh-hidden]', doc);
-    if (!want) { if (prev) prev.removeAttribute('data-sh-hidden'); return; }
+    if (!want) { if (prev) prev.removeAttribute('data-sh-hidden'); $('#sh-app-style', doc)?.remove(); return; }
     if (prev) return;
     const rail = box.closest('aside.rail, aside');
-    if (rail) { ensureHideStyle(doc); rail.setAttribute('data-sh-hidden', ''); return; }
+    if (rail) { ensureHideStyle(doc, rail); rail.setAttribute('data-sh-hidden', ''); return; }
     const W = doc.documentElement.clientWidth, H = doc.documentElement.clientHeight;
     let col = box;
     while (col.parentElement && col.parentElement !== doc.body && col.parentElement.getBoundingClientRect().width < W * 0.45) col = col.parentElement;
@@ -526,16 +558,20 @@
     ensureHideStyle(doc);
     col.setAttribute('data-sh-hidden', '');
   }
-  function ensureHideStyle(doc) {
+  const selOf = el => el.tagName.toLowerCase() + [...el.classList].filter(c => /^[\w-]+$/.test(c)).map(c => '.' + c).join('');
+  function ensureHideStyle(doc, el) {
     // Hors du flux (position absolue, taille nulle) : ni colonne ni ligne reservee dans une grille ou un flex.
     const css = '[data-sh-hidden]{position:absolute!important;left:-9999px!important;top:0!important;width:0!important;height:0!important;min-width:0!important;min-height:0!important;flex:0 0 0!important;padding:0!important;margin:0!important;border:0!important;overflow:hidden!important;visibility:hidden!important;pointer-events:none!important}'
       + '*:has(>[data-sh-hidden]){grid-template-columns:minmax(0,1fr)!important}'
       + '[data-sh-hidden]~*{grid-column:1/-1!important;min-width:0}';
+    // Le rail connu (aside.rail) est vise par sa structure : s il est recree par l appli, il reste cache.
+    const sel = el && /^aside/.test(selOf(el)) ? selOf(el) : '';
+    const full = sel ? css.split('[data-sh-hidden]').join(':is([data-sh-hidden],' + sel + ')') : css;
     let st = $('#sh-app-style', doc);
-    if (st) { if (st.textContent !== css) st.textContent = css; return; }
+    if (st) { if (st.textContent !== full) st.textContent = full; return; }
     st = doc.createElement('style');
     st.id = 'sh-app-style';
-    st.textContent = css;
+    st.textContent = full;
     doc.head.append(st);
   }
 
@@ -554,7 +590,10 @@
   function watchApp(doc) {
     if (watched.has(doc)) return;
     watched.add(doc);
-    new MutationObserver(schedule).observe(doc.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'aria-current', 'aria-selected'] });
+    new MutationObserver(() => {
+      if (isOn('side') && isOn('appmenu') && !$('[data-sh-hidden]', doc)) { try { const nav = appNav(doc); if (nav) hideAppMenu(doc, nav.box); } catch (e) {} }
+      schedule();
+    }).observe(doc.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'aria-current', 'aria-selected'] });
   }
 
   function pressIn(el) {

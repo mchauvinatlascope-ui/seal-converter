@@ -457,3 +457,6 @@ html.sh-side, html.sh-side body { overflow-x: hidden !important; }
 #sh-page .sh-tips li b { color: var(--sh-ink); font-weight: 600; }
 #sh-page .sh-tips .sh-ti.sm { margin-top: 1px; }
 #sh-page .sh-tips > header { padding-bottom: 6px; }
+
+/* 0.9.2 : voile pendant qu une action se joue dans le cahier */
+#sh-veil { position: fixed; left: 248px; top: 0; right: 0; bottom: 0; z-index: 1340; background: var(--sh-canvas, #f6f6f3); }
