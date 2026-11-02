@@ -75,8 +75,8 @@ html.sh-side [data-testid="nav-panel-resize-handle"] { display: none !important;
 #sh-side .sh-row { height: 28px; font-size: 12.8px; }
 #sh-side .sh-row .sh-i { color: var(--sh-ink3); }
 #sh-side .sh-view.grp { font-weight: 600; color: var(--sh-ink2); }
-#sh-side .sh-chev svg { width: 12px; height: 12px; transition: transform .12s; }
-#sh-side .sh-chev.open svg { transform: rotate(90deg); }
+.sh .sh-chev svg { width: 12px; height: 12px; transition: transform .12s; }
+.sh .sh-chev.open svg { transform: rotate(90deg); }
 #sh-side .sh-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--sh-ink3); }
 #sh-side .sh-dot.pub { background: var(--sh-green); }
 #sh-side .sh-dot.draft { background: #c4c7cc; }
@@ -85,6 +85,20 @@ html.sh-side [data-testid="nav-panel-resize-handle"] { display: none !important;
 #sh-side .sh-cs { border: 1px solid var(--sh-line); border-radius: 7px; background: var(--sh-bg); padding: 4px; display: grid; gap: 1px; }
 #sh-side .sh-cs-head { display: flex; align-items: center; gap: 6px; padding: 2px 4px 4px 0; font-size: 12.5px; font-weight: 600; border-bottom: 1px solid var(--sh-line2); margin-bottom: 2px; }
 #sh-side .sh-hash { font: 600 11.5px var(--sh-mono); color: var(--sh-violet); flex: none; }
+#sh-side .sh-sc { position: relative; }
+#sh-side .sh-sc .sh-row { padding-right: 30px; }
+#sh-side .sh-sc.unset .sh-row { color: var(--sh-ink2); }
+#sh-side .sh-set { font-size: 11px; color: var(--sh-ink3); border: 1px dashed var(--sh-line); border-radius: 4px; padding: 0 5px; }
+#sh-side .sh-edit { position: absolute; right: 2px; top: 1px; width: 26px; height: 26px; border-radius: 5px; display: grid; place-items: center; opacity: 0; color: var(--sh-ink3); }
+#sh-side .sh-sc:hover .sh-edit, #sh-side .sh-edit:focus-visible { opacity: 1; }
+#sh-side .sh-edit:hover { background: var(--sh-line2); color: var(--sh-ink); }
+#sh-side .sh-edit svg { width: 13px; height: 13px; }
+#sh-side .sh-sub { height: 26px; font-size: 12.5px; color: var(--sh-ink2); }
+#sh-side .sh-add { color: var(--sh-ink3); font-size: 12.5px; }
+#sh-side .sh-add .sh-i { color: var(--sh-ink3); }
+#sh-side .sh-toggle { display: flex; align-items: center; gap: 4px; width: 100%; padding-left: 4px; }
+#sh-side .sh-toggle:hover { color: var(--sh-ink2); }
+#sh-side .sh-toggle .sh-chev { width: 14px; height: 14px; color: inherit; }
 #sh-side .sh-foot { display: flex; align-items: center; gap: 2px; border-top: 1px solid var(--sh-line); padding-top: 8px; margin-top: 4px; }
 #sh-side .sh-classic { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--sh-ink3); padding: 4px 6px; border-radius: 5px; }
 #sh-side .sh-classic:hover { color: var(--sh-ink); background: var(--sh-hover); }
@@ -126,6 +140,15 @@ html.sh-side [data-testid="nav-panel-resize-handle"] { display: none !important;
 #sh-page .sh-empty { margin: 0; padding: 18px 14px; color: var(--sh-ink3); font-size: 13px; }
 #sh-page .sh-input { height: 32px; width: 260px; max-width: 100%; border: 1px solid var(--sh-line); border-radius: 6px; padding: 0 10px; font: inherit; font-size: 13px; color: var(--sh-ink); background: var(--sh-bg); }
 #sh-page .sh-input:focus { outline: 2px solid var(--sh-focus); outline-offset: -1px; }
+#sh-page .sh-narrow { max-width: 720px; }
+#sh-page .sh-field { display: grid; gap: 5px; font-size: 12px; font-weight: 600; color: var(--sh-ink2); }
+#sh-page .sh-field .sh-input { width: 320px; }
+#sh-page .sh-picklist .sh-line.on { background: var(--sh-side); }
+#sh-page .sh-picklist .sh-line:first-child { border-top: 0; }
+#sh-page .sh-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: -4px; }
+#sh-page .sh-chip { height: 26px; padding: 0 11px; border-radius: 13px; border: 1px solid var(--sh-line); font-size: 12.5px; color: var(--sh-ink2); }
+#sh-page .sh-chip:hover { border-color: #cfcfca; color: var(--sh-ink); }
+#sh-page .sh-chip.on { background: var(--sh-ink); border-color: var(--sh-ink); color: #fff; }
 #sh-page .sh-table { width: 100%; border-collapse: collapse; }
 #sh-page .sh-table th { text-align: left; font-size: 10.5px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--sh-ink3); padding: 8px 12px; border-bottom: 1px solid var(--sh-line); }
 #sh-page .sh-table td { padding: 10px 12px; border-bottom: 1px solid var(--sh-line2); vertical-align: middle; }

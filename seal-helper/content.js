@@ -1,4 +1,4 @@
-// Seal Helper 0.2
+// Seal Helper 0.3
 // Ne fait que changer l affichage dans ce navigateur : n ecrit jamais dans Seal,
 // n envoie rien, ne touche pas au texte d un document.
 // La nouvelle barre et les pages Home / My work / To publish relisent les listes
@@ -65,6 +65,7 @@
     doc: '<svg viewBox="0 0 16 16"><path d="M4 2.5h5.5L12.5 5.5v8H4z M9.5 2.5v3h3"/></svg>',
     box: '<svg viewBox="0 0 16 16"><path d="M2.5 5 8 2.5 13.5 5v6L8 13.5 2.5 11z M2.5 5 8 7.5 13.5 5 M8 7.5v6"/></svg>',
     app: '<svg viewBox="0 0 16 16"><path d="M2.5 3h11v10h-11z M2.5 6h11"/></svg>',
+    pen: '<svg viewBox="0 0 16 16"><path d="M10.5 3 13 5.5 6 12.5H3.5V10z"/></svg>',
     classic: '<svg viewBox="0 0 16 16"><path d="M2.5 3h11v10h-11z M6.5 3v10"/></svg>',
   };
   const TYPE = {
@@ -142,7 +143,65 @@
         group: !!chev,
         open: chev ? chev.getAttribute('data-icon') === 'chevron-down' : false,
       };
+    }).map((v, i, all) => {
+      const path = [v.title];
+      let d = v.depth;
+      for (let j = i - 1; j >= 0 && d > 0; j--) {
+        if (all[j].group && all[j].depth < d) { path.unshift(all[j].title); d = all[j].depth; }
+      }
+      return { ...v, path, key: path.join(' / ') };
+    }).map((v, i, all) => {
+      // Deux lignes au meme chemin (un groupe et une View homonymes) : on numerote.
+      const n = all.slice(0, i).filter(x => x.key === v.key).length;
+      return n ? { ...v, key: `${v.key} #${n + 1}` } : v;
     });
+  }
+
+  // ---------------------------------------- raccourcis Lab (Experiments, ...)
+  // Chaque raccourci pointe sur une View de Seal : trouvee par son nom, ou
+  // choisie une fois par l utilisatrice (chemin garde dans ce navigateur).
+  const LAB_KEY = 'sealHelperLab';
+  const LAB_DEFAULT = [
+    { id: 'exp', label: 'Experiments', icon: 'exp', match: 'experiment|manip' },
+    { id: 'prot', label: 'Protocols', icon: 'doc', match: 'protocol|sop|method' },
+    { id: 'inv', label: 'Inventory', icon: 'box', match: 'inventor|stock|reagent|antibod|sample|freezer' },
+  ];
+  let lab = LAB_DEFAULT.map(x => ({ ...x }));
+  let labOpen = null; // raccourci-groupe deplie dans la barre
+
+  function resolve(sc, views) {
+    if (sc.path) return views.find(v => v.key === sc.path) || null;
+    if (!sc.match) return null;
+    const re = new RegExp(sc.match, 'i');
+    const hits = views.filter(v => re.test(v.title));
+    return hits.find(v => !v.group) || hits[0] || null;
+  }
+
+  // Ouvre la View du raccourci ; deplie dans Seal les groupes parents si besoin.
+  function openShortcut(sc, tries = 0) {
+    const views = readViews() || [];
+    const v = resolve(sc, views);
+    if (v) {
+      if (v.group) {
+        labOpen = labOpen === sc.id ? null : sc.id;
+        if (!v.open) press(v.el);
+        setTimeout(() => render(true), 150);
+      } else go(v.el);
+      return;
+    }
+    if (sc.path && tries < 4) {
+      const parts = sc.path.split(' / ');
+      for (let k = parts.length - 1; k > 0; k--) {
+        const anc = views.find(x => x.key === parts.slice(0, k).join(' / '));
+        if (anc && anc.group && !anc.open) { press(anc.el); setTimeout(() => openShortcut(sc, tries + 1), 250); return; }
+      }
+    }
+    pickFor = sc.id;
+    openPage('pick');
+  }
+
+  function saveLab() {
+    chrome.storage.sync.set({ [LAB_KEY]: lab.map(({ id, label, icon, match, path }) => ({ id, label, icon, match, path })) });
   }
 
   function readChangeset() {
@@ -289,9 +348,31 @@
       scroll.append(h('div', { class: 'sh-group' }, 'This change'), blk);
     }
 
+    scroll.append(h('div', { class: 'sh-group' }, 'Lab'));
+    for (const sc of lab) {
+      const v = resolve(sc, d.views);
+      const row = h('div', { class: 'sh-sc' + (v ? '' : ' unset') },
+        h('button', { type: 'button', class: 'sh-row' + (page === 'pick' && pickFor === sc.id ? ' on' : ''), title: v ? `${sc.label}: ${v.key}` : `Choose the Seal view for ${sc.label}`, onclick: () => openShortcut(sc) },
+          icon(sc.icon || 'view'), h('span', { class: 'sh-t' }, sc.label),
+          v ? (v.group ? h('span', { class: 'sh-chev' + (labOpen === sc.id && v.open ? ' open' : ''), 'aria-hidden': 'true', html: ICON.chev }) : null) : h('span', { class: 'sh-set' }, 'Choose')),
+        h('button', { type: 'button', class: 'sh-edit', title: `Change what ${sc.label} opens`, onclick: () => { pickFor = sc.id; openPage('pick'); } }, icon('pen')));
+      scroll.append(row);
+      if (v && v.group && v.open && labOpen === sc.id) {
+        const i = d.views.indexOf(v);
+        for (const c of d.views.slice(i + 1)) {
+          if (c.depth <= v.depth) break;
+          scroll.append(h('button', { type: 'button', class: 'sh-row sh-sub', title: c.title, style: `padding-left:${30 + (c.depth - v.depth - 1) * 14}px`,
+            onclick: () => (c.group ? (press(c.el), setTimeout(() => render(true), 150)) : go(c.el)) },
+          c.group ? h('span', { class: 'sh-chev' + (c.open ? ' open' : ''), 'aria-hidden': 'true', html: ICON.chev }) : icon('view'), h('span', { class: 'sh-t' }, c.title)));
+        }
+      }
+    }
+    scroll.append(h('button', { type: 'button', class: 'sh-row sh-add', onclick: () => { pickFor = 'new'; openPage('pick'); } }, icon('plus'), h('span', { class: 'sh-t' }, 'Add a shortcut')));
+
     if (d.views.length) {
-      scroll.append(h('div', { class: 'sh-group' }, 'Lists'));
-      for (const v of d.views) {
+      scroll.append(h('button', { type: 'button', class: 'sh-group sh-toggle', 'aria-expanded': String(allViewsOpen), onclick: () => { allViewsOpen = !allViewsOpen; try { localStorage.setItem('sh-allviews', allViewsOpen ? '1' : '0'); } catch (e) {} render(true); } },
+        h('span', { class: 'sh-chev' + (allViewsOpen ? ' open' : ''), 'aria-hidden': 'true', html: ICON.chev }), 'All views'));
+      if (allViewsOpen) for (const v of d.views) {
         scroll.append(h('button', {
           type: 'button', class: 'sh-row sh-view' + (v.group ? ' grp' : ''), title: v.title,
           style: `padding-left:${8 + v.depth * 14}px`,
@@ -377,10 +458,49 @@
         listCard('Favourites', null, d.favourites.map(entityLine), 'Star a record in Seal to keep it here.')));
   }
 
+  let pickFor = null;
+  let allViewsOpen = (() => { try { return localStorage.getItem('sh-allviews') === '1'; } catch (e) { return false; } })();
+
+  function buildPick(d) {
+    const isNew = pickFor === 'new';
+    const sc = isNew ? { id: 'c' + Date.now(), label: '', icon: 'view' } : lab.find(x => x.id === pickFor);
+    if (!sc) return h('div', { class: 'sh-wrap' }, h('p', { class: 'sh-empty' }, 'Shortcut not found.'));
+    const cur = resolve(sc, d.views);
+    const name = h('input', { type: 'text', id: 'sh-scname', class: 'sh-input', value: sc.label, placeholder: 'Name, e.g. Antibodies' });
+    const choose = v => {
+      const label = name.value.trim() || sc.label || v.title;
+      const next = { ...sc, label, path: v.key };
+      lab = isNew ? [...lab, next] : lab.map(x => (x.id === sc.id ? next : x));
+      saveLab();
+      page = null;
+      openShortcut(next);
+    };
+    const list = h('div', { class: 'sh-card sh-picklist' },
+      d.views.map(v => h('button', { type: 'button', class: 'sh-line' + (cur && cur.key === v.key ? ' on' : ''), style: `padding-left:${14 + v.depth * 18}px`,
+        onclick: () => (v.group && !v.open ? (press(v.el), setTimeout(() => render(true), 150)) : choose(v)) },
+      v.group ? h('span', { class: 'sh-chev' + (v.open ? ' open' : ''), 'aria-hidden': 'true', html: ICON.chev }) : icon('view'),
+      h('span', { class: 'sh-lt' }, h('b', {}, v.title), v.group ? h('small', {}, v.open ? 'Group, click to use it as the shortcut' : 'Group, click to see what is inside') : null),
+      cur && cur.key === v.key ? h('span', { class: 'sh-go' }, 'Current') : h('span', { class: 'sh-go' }, 'Use'))));
+    return h('div', { class: 'sh-wrap sh-narrow' },
+      h('div', { class: 'sh-hello' }, h('div', {}, h('h1', {}, isNew ? 'Add a shortcut' : `What should ${sc.label} open?`),
+        h('p', {}, 'Pick one of your Seal views. Seal Helper remembers it in this browser; nothing changes in Seal.'))),
+      h('label', { class: 'sh-field', for: 'sh-scname' }, h('span', {}, 'Name in the sidebar'), name),
+      d.views.length ? list : h('p', { class: 'sh-empty' }, 'No Seal views found yet. Open the Views tab in classic Seal once, then come back.'),
+      h('div', { class: 'sh-actions' },
+        h('button', { type: 'button', class: 'sh-btn ghost', onclick: () => { page = null; render(true); } }, 'Cancel'),
+        !isNew && sc.path ? h('button', { type: 'button', class: 'sh-btn ghost', onclick: () => { lab = lab.map(x => (x.id === sc.id ? { ...x, path: undefined } : x)); saveLab(); render(true); } }, 'Reset to automatic') : null,
+        !isNew ? h('button', { type: 'button', class: 'sh-btn ghost', onclick: () => { lab = lab.filter(x => x.id !== sc.id); saveLab(); page = null; render(true); } }, 'Remove from sidebar') : null));
+  }
+
   let workFilter = '';
+  let workType = '';
   function buildWork(d) {
     const all = group([...d.recent, ...d.mine]);
-    const rows = all.filter(r => !workFilter || r.title.toLowerCase().includes(workFilter.toLowerCase()));
+    const types = [...new Set(all.map(r => r.type[0]))];
+    const rows = all.filter(r => (!workFilter || r.title.toLowerCase().includes(workFilter.toLowerCase())) && (!workType || r.type[0] === workType));
+    const chips = types.length > 1 ? h('div', { class: 'sh-chips', role: 'group', 'aria-label': 'Type' },
+      ['', ...types].map(t => h('button', { type: 'button', class: 'sh-chip' + (workType === t ? ' on' : ''), 'aria-pressed': String(workType === t), onclick: () => { workType = t; render(true); } },
+        t ? t + 's' : 'All'))) : null;
     const input = h('input', { type: 'search', id: 'sh-filter', class: 'sh-input', placeholder: 'Filter by name', value: workFilter,
       oninput: e => { workFilter = e.target.value; render(true); const i = $('#sh-filter'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } } });
     const table = h('table', { class: 'sh-table' },
@@ -390,6 +510,7 @@
         h('td', { class: 'sh-muted' }, r.type[0]), h('td', {}, pill(r.status)), h('td', { class: 'sh-go' }, 'Open ›')))));
     return h('div', { class: 'sh-wrap' },
       h('div', { class: 'sh-hello' }, h('div', {}, h('h1', {}, 'My work'), h('p', {}, 'Records you opened recently or created, same names grouped together.')), input),
+      chips,
       rows.length ? table : h('p', { class: 'sh-empty' }, 'No record matches.'));
   }
 
@@ -496,14 +617,14 @@
     const d = data();
     const sig = JSON.stringify([page, d.lab, d.favourites.map(r => r.title + r.status + r.current), d.recent.map(r => r.title + r.status + r.current),
       d.mine.map(r => r.title + r.status), d.changes.map(c => c.hash + c.open + c.title + c.day + c.time), d.views.map(v => v.title + v.depth + v.open),
-      d.changeset && [d.changeset.hash, d.changeset.name, d.changeset.rows.map(r => r.title + r.current)], !!d.newBtn, showEmpty, workFilter]);
+      d.changeset && [d.changeset.hash, d.changeset.name, d.changeset.rows.map(r => r.title + r.current)], !!d.newBtn, showEmpty, workFilter, workType, lab, labOpen, pickFor, allViewsOpen]);
     if (!force && sig === sideSig && $('#sh-side')) return;
     sideSig = sig;
     $('#sh-side')?.remove();
     document.body.append(buildSide(d));
     const old = $('#sh-page');
     if (page) {
-      const pg = h('main', { id: 'sh-page', class: 'sh', 'aria-label': page }, page === 'home' ? buildHome(d) : page === 'work' ? buildWork(d) : buildPub(d));
+      const pg = h('main', { id: 'sh-page', class: 'sh', 'aria-label': page }, page === 'home' ? buildHome(d) : page === 'work' ? buildWork(d) : page === 'pick' ? buildPick(d) : buildPub(d));
       const top = old ? old.scrollTop : 0;
       if (old) old.replaceWith(pg); else document.body.append(pg);
       pg.scrollTop = top;
@@ -657,8 +778,9 @@
     refresh();
   }
 
-  chrome.storage.sync.get(KEY, r => {
+  chrome.storage.sync.get([KEY, LAB_KEY], r => {
     opts = { ...DEFAULTS, ...(r[KEY] || {}) };
+    if (Array.isArray(r[LAB_KEY]) && r[LAB_KEY].length) lab = r[LAB_KEY];
     applyClasses();
     if (document.body) schedule();
     else document.addEventListener('DOMContentLoaded', schedule, { once: true });

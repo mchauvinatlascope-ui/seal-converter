@@ -4,19 +4,19 @@ A Chrome extension that makes Seal calmer and easier to read. It only changes ho
 
 ## Install (2 minutes)
 
-1. Download `seal-helper-0.2.0.zip` and unzip it.
+1. Download `seal-helper-0.3.0.zip` and unzip it.
 2. Open `chrome://extensions` and switch on **Developer mode** (top right).
 3. Click **Load unpacked** and pick the unzipped `seal-helper` folder.
 4. Open Seal. Click the extension icon (puzzle piece, then pin Seal Helper) to switch each setting on or off.
 
 To update: replace the folder with the new one, then click the reload arrow on the Seal Helper card in `chrome://extensions`.
 
-## What 0.2 does
+## What 0.3 does
 
 **Layout**
-- **New sidebar**: Home, My work, To publish, Inbox, then the lab's lists (your Seal Views) and favourites. Inside a change, the records of that change are listed at the top, same names grouped (×8). Search with Ctrl K (⌘K on a Mac). "Classic Seal" at the bottom brings the usual Seal bar back.
+- **New sidebar**: Home, My work, To publish, Inbox, then **Lab** shortcuts (Experiments, Protocols, Inventory) and favourites. Each shortcut opens one of your Seal views: found by its name, or chosen once with the pencil next to it (remembered in this browser). Add your own with Add a shortcut. All views are still there, folded, under All views. Inside a change, the records of that change are listed at the top, same names grouped (×8). Search with Ctrl K (⌘K on a Mac). "Classic Seal" at the bottom brings the usual Seal bar back.
 - **Home**: where you left off, what is waiting to be published, what you created, your favourites. The lab guide is one click away.
-- **My work** and **To publish**: full pages, filter by name, changes grouped by day, empty changes hidden.
+- **My work** and **To publish**: full pages, filter by name or by type (Experiments, Documents, Projects), changes grouped by day, empty changes hidden.
 - **Record header and outline**: the key fields of a record (ID, owner, dates, status) under its title bar, and its headings on the right when the screen is wide enough.
 
 Every line clicks the matching Seal line for you, so opening, rights and publishing stay Seal's own.
