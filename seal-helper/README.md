@@ -4,16 +4,18 @@ A Chrome extension that makes Seal calmer and easier to read. It only changes ho
 
 ## Install (2 minutes)
 
-1. Download `seal-helper-0.4.0.zip` and unzip it.
+1. Download `seal-helper-0.5.0.zip` and unzip it.
 2. Open `chrome://extensions` and switch on **Developer mode** (top right).
 3. Click **Load unpacked** and pick the unzipped `seal-helper` folder.
 4. Open Seal. Click the extension icon (puzzle piece, then pin Seal Helper) to switch each setting on or off.
 
 To update: replace the folder with the new one, then click the reload arrow on the Seal Helper card in `chrome://extensions`.
 
-## What 0.4 does
+## What 0.5 does
 
 **Layout**
+- **Today, a real dashboard**: greeting and date, a big search, four counters (in progress, to publish, published, last 7 days), the record to pick up with the next ones, the lab notebook sections as tiles, a to-publish checklist, the last 7 days as a strip with an activity log, favourites.
+- **Know where you are**: back and forward arrows at the top of the sidebar (Alt ← and Alt → too), Today, My work and To publish are part of the browser history, the sidebar says where you are, and a record shows Notebook › Experiments › its ID.
 - **Lab notebook in the sidebar**: if your lab's home page in Seal is a notebook app with its own menu (Overview, Projects, Experiments, Protocols, Inventory...), that menu moves into the sidebar. A click opens the section, from anywhere in Seal. On a record, the section it belongs to is highlighted and a « ‹ Experiments » button takes you back to it. The app's own menu is hidden to keep one menu (option in the extension menu); it comes back as soon as Seal Helper is off.
 - **New sidebar**: Today, My work, To publish, Inbox, then the lab sections (or, for a lab without a notebook page, **Lab** shortcuts to Seal views) and favourites. Each shortcut opens one of your Seal views: found by its name, or chosen once with the pencil next to it (remembered in this browser). Add your own with Add a shortcut. All views are still there, folded, under All views. Inside a change, the records of that change are listed at the top, same names grouped (×8). Search with Ctrl K (⌘K on a Mac). "Classic Seal" at the bottom brings the usual Seal bar back.
 - **Today**: where you left off, what is waiting to be published, what you created, your favourites. The lab guide is one click away.

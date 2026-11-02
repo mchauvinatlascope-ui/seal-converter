@@ -1,4 +1,4 @@
-// Seal Helper 0.4
+// Seal Helper 0.5
 // Ne fait que changer l affichage dans ce navigateur : n ecrit jamais dans Seal,
 // n envoie rien, ne touche pas au texte d un document.
 // La nouvelle barre et les pages Home / My work / To publish relisent les listes
@@ -55,8 +55,8 @@
     inbox: '<svg viewBox="0 0 16 16"><path d="M2.5 9.5 4 3.5h8l1.5 6v4h-11z M2.5 9.5h3.5l.8 1.5h2.4l.8-1.5h3.5"/></svg>',
     plus: '<svg viewBox="0 0 16 16"><path d="M8 3v10 M3 8h10"/></svg>',
     swap: '<svg viewBox="0 0 16 16"><path d="M5 2.5v11 M2.5 5 5 2.5 7.5 5 M11 13.5v-11 M8.5 11 11 13.5l2.5-2.5"/></svg>',
-    gear: '<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.8v1.8 M8 12.4v1.8 M1.8 8h1.8 M12.4 8h1.8 M3.6 3.6l1.3 1.3 M11.1 11.1l1.3 1.3 M3.6 12.4l1.3-1.3 M11.1 4.9l1.3-1.3"/></svg>',
-    help: '<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.8"/><path d="M6.4 6.3a1.7 1.7 0 1 1 2.4 1.6c-.5.3-.8.6-.8 1.2v.4 M8 11.3v.1"/></svg>',
+    gear: '<svg viewBox="0 0 24 24" class="w24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>',
+    help: '<svg viewBox="0 0 24 24" class="w24"><circle cx="12" cy="12" r="9.5"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-2.9 2.7-2.9 4"/><path d="M12 17.5h.01"/></svg>',
     back: '<svg viewBox="0 0 16 16"><path d="M9.5 3.5 5 8l4.5 4.5"/></svg>',
     chev: '<svg viewBox="0 0 16 16"><path d="m6 4 4 4-4 4"/></svg>',
     view: '<svg viewBox="0 0 16 16"><path d="M2.5 3.5h11v9h-11z M2.5 6.5h11 M6.5 6.5v6"/></svg>',
@@ -416,7 +416,20 @@
     render(true);
   }
 
+  const PAGE_NAME = { home: 'Today', work: 'My work', pub: 'To publish', pick: 'Shortcut' };
+  function whereAmI(d) {
+    if (page) return [PAGE_NAME[page] || ''];
+    if (isWorkspaceRoot()) return appActive ? ['Notebook', appActive] : ['Notebook'];
+    const sec = recordSection();
+    const header = $('[data-testid="changeset-top-navbar"], [data-testid="entity-top-navbar"]');
+    const t = header ? txt($('[data-title-text]', header)) || txt($('h1[data-document-title]')) : '';
+    const short = t.split(/\s+[-–—]\s+/)[0].slice(0, 28);
+    return [sec || (d.changeset && d.changeset.hash ? 'Change ' + d.changeset.hash : 'Record'), short].filter(Boolean);
+  }
+
+  // Nos pages entrent dans l historique du navigateur : la fleche retour y ramene.
   function openPage(p) {
+    if (page !== p) { try { history.pushState({ ...(history.state || {}), sh: p }, '', location.href); } catch (e) {} }
     page = p;
     render(true);
     const pg = $('#sh-page');
@@ -463,6 +476,11 @@
       h('span', { class: 'sh-mark' }, (d.lab || 'S').slice(0, 1)),
       h('span', { class: 'sh-labname' }, d.lab ? d.lab.charAt(0) + d.lab.slice(1).toLowerCase() : 'Seal'),
       sw ? h('button', { type: 'button', class: 'sh-iconbtn', title: 'Switch system', onclick: () => press(sw) }, icon('swap')) : null));
+    const nav = window.navigation;
+    side.append(h('div', { class: 'sh-nav' },
+      h('button', { type: 'button', class: 'sh-arrow', title: 'Back (Alt ←)', 'aria-label': 'Back', disabled: nav && !nav.canGoBack, onclick: () => history.back() }, icon('back')),
+      h('button', { type: 'button', class: 'sh-arrow', title: 'Forward (Alt →)', 'aria-label': 'Forward', disabled: nav && !nav.canGoForward, onclick: () => history.forward() }, icon('chev')),
+      h('span', { class: 'sh-here', title: 'Where you are' }, ...whereAmI(d).flatMap((c, i) => i ? [h('span', { class: 'sh-sep' }, '/'), h('span', {}, c)] : [h('span', {}, c)]))));
 
     const q = $('[data-testid="nav-panel-query-button"]');
     if (q) side.append(h('button', { type: 'button', class: 'sh-search', onclick: () => press(q) },
@@ -588,26 +606,131 @@
     return out;
   }
 
+  // ---------------------------------------------------- tableau de bord Today
+  const TINT = { exp: 'blue', doc: 'teal', box: 'violet', app: 'grey', view: 'grey', proto: 'teal', stock: 'amber', folder: 'violet', flask: 'blue', calc: 'grey', home: 'grey', help: 'grey', tree: 'grey', chat: 'grey' };
+  const tint = k => 'tint-' + (TINT[k] || 'grey');
+  const SECTION_TEXT = [[/overview|start/i, 'Lab start page and news'], [/project/i, 'Experiments grouped by question'], [/experiment|manip/i, 'Plans, runs and results'],
+    [/protocol|sop|method/i, 'Methods and SOPs'], [/inventor|stock/i, 'Reagents, antibodies, samples'], [/calcul|file/i, 'Tools and shared files'],
+    [/tree/i, 'How records connect'], [/how|faq|help/i, 'Guides for the lab'], [/feedback/i, 'Tell the team what to improve']];
+  const sectionText = l => (SECTION_TEXT.find(([re]) => re.test(l)) || [0, ''])[1];
+
+  // « Today », « Yesterday », « Fri », « 28 Oct » -> date (jour seul).
+  function dayDate(label) {
+    const now = new Date(); now.setHours(0, 0, 0, 0);
+    if (!label || /^today$/i.test(label)) return now;
+    if (/^yesterday$/i.test(label)) return new Date(now - 864e5);
+    const wd = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].indexOf(label.slice(0, 3).toLowerCase());
+    if (wd >= 0 && !/\d/.test(label)) { const d = new Date(now); do d.setDate(d.getDate() - 1); while (d.getDay() !== wd); return d; }
+    const t = Date.parse(label + ' ' + now.getFullYear());
+    return isNaN(t) ? null : new Date(t);
+  }
+
+  function weekStrip(changes) {
+    const now = new Date(); now.setHours(0, 0, 0, 0);
+    const monday = new Date(now); monday.setDate(now.getDate() - 6); // 7 derniers jours, aujourd hui a droite
+    const counts = new Map();
+    for (const c of changes) { const d = dayDate(c.day); if (d) counts.set(d.toDateString(), (counts.get(d.toDateString()) || 0) + 1); }
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday); d.setDate(monday.getDate() + i);
+      const n = counts.get(d.toDateString()) || 0;
+      days.push(h('div', { class: 'sh-day' + (d.getTime() === now.getTime() ? ' today' : '') + (n ? ' busy' : ''), title: n ? `${n} change${n > 1 ? 's' : ''}` : 'No change' },
+        h('small', {}, d.toLocaleDateString('en-NZ', { weekday: 'short' })),
+        h('b', {}, String(d.getDate())),
+        h('span', { class: 'sh-dots' }, Array.from({ length: Math.min(n, 4) }, () => h('i', {})))));
+    }
+    const week = changes.filter(c => { const d = dayDate(c.day); return d && d >= monday; }).length;
+    return { el: h('div', { class: 'sh-week' }, days), week };
+  }
+
+  function stat(label, value, caption, onclick, accent) {
+    return h('button', { type: 'button', class: 'sh-stat' + (accent ? ' ' + accent : ''), onclick },
+      h('small', {}, label), h('b', {}, String(value)), h('span', {}, caption));
+  }
+
   function buildHome(d) {
-    const today = new Date().toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long' });
+    const now = new Date();
+    const hour = now.getHours();
+    const hello = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+    const labName = d.lab ? d.lab.charAt(0) + d.lab.slice(1).toLowerCase() + ' lab' : 'Lab';
+    const work = group([...d.recent, ...d.mine]);
+    const drafts = work.filter(r => /draft/i.test(r.status));
+    const published = work.filter(r => /publish/i.test(r.status));
     const pend = groupChanges(d.pending);
-    const summary = [today, d.pending.length ? `${d.pending.length} change${d.pending.length > 1 ? 's' : ''} to publish` : 'nothing waiting to publish'].join(' · ');
-    const recent = group(d.recent).slice(0, 6);
-    const mine = group(d.mine).slice(0, 6);
-    return h('div', { class: 'sh-wrap' },
-      h('div', { class: 'sh-hello' },
-        h('div', {}, h('h1', {}, 'Today'), h('p', {}, summary)),
-        h('div', { class: 'sh-actions' },
-          d.newBtn ? h('button', { type: 'button', class: 'sh-btn', onclick: () => press(d.newBtn) }, icon('plus'), 'New') : null,
-          h('button', { type: 'button', class: 'sh-btn ghost', onclick: () => openGuide(d) }, appSections.length ? 'Open the lab notebook' : 'Open the lab guide'))),
-      h('div', { class: 'sh-grid' },
-        listCard('Continue where you left off', h('button', { type: 'button', class: 'sh-more', onclick: () => openPage('work') }, 'All my work ›'),
-          recent.map(entityLine), 'Records you open will show here.'),
-        listCard('To publish', pend.length ? h('button', { type: 'button', class: 'sh-more', onclick: () => openPage('pub') }, `See all ${d.pending.length} ›`) : null,
-          pend.slice(0, 5).map(changeLine), 'Nothing waiting. Everything you changed is published.')),
-      h('div', { class: 'sh-grid' },
-        listCard('Created by you', null, mine.map(entityLine), 'Nothing yet.'),
-        listCard('Favourites', null, d.favourites.map(entityLine), 'Star a record in Seal to keep it here.')));
+    const { el: week, week: weekCount } = weekStrip(d.changes);
+    const recent = group(d.recent).filter(r => r.type[0] !== 'Page');
+    const hero = recent[0];
+    const q = $('[data-testid="nav-panel-query-button"]');
+
+    const head = h('header', { class: 'sh-dash-head' },
+      h('div', {},
+        h('div', { class: 'sh-eyebrow' }, labName + ' · electronic lab notebook'),
+        h('h1', {}, hello),
+        h('p', {}, now.toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }))),
+      h('div', { class: 'sh-dash-tools' },
+        q ? h('button', { type: 'button', class: 'sh-bigsearch', onclick: () => press(q) }, icon('search'), h('span', {}, 'Search records, protocols, samples…'), h('kbd', {}, isMac ? '⌘K' : 'Ctrl K')) : null,
+        d.newBtn ? h('button', { type: 'button', class: 'sh-btn', onclick: () => press(d.newBtn) }, icon('plus'), 'New record') : null));
+
+    const stats = h('div', { class: 'sh-stats' },
+      stat('In progress', drafts.length, drafts.length === 1 ? 'draft record' : 'draft records', () => { workType = ''; openPage('work'); }),
+      stat('To publish', d.pending.length, d.pending.length ? 'waiting for review' : 'all published', () => openPage('pub'), d.pending.length ? 'hot' : ''),
+      stat('Published', published.length, 'in your recent records', () => openPage('work')),
+      stat('Last 7 days', weekCount, weekCount === 1 ? 'change made' : 'changes made', () => openPage('pub')));
+
+    const heroCard = hero ? h('button', { type: 'button', class: 'sh-hero', onclick: () => go(hero.el) },
+      h('span', { class: 'sh-ti big ' + tint(hero.type[1]) }, icon(hero.type[1])),
+      h('span', { class: 'sh-hero-t' },
+        h('small', {}, 'Pick up where you left off'),
+        h('b', {}, hero.title),
+        h('span', { class: 'sh-meta' }, h('span', { class: 'sh-type' }, hero.type[0]), pill(hero.status))),
+      h('span', { class: 'sh-open' }, 'Open', icon('chev'))) : null;
+
+    const next = recent.slice(1, 6).map(r => h('button', { type: 'button', class: 'sh-line', onclick: () => go(r.el) },
+      h('span', { class: 'sh-ti ' + tint(r.type[1]) }, icon(r.type[1])),
+      h('span', { class: 'sh-lt' }, h('b', {}, r.title, r.n > 1 ? h('span', { class: 'sh-x' }, '×' + r.n) : null), h('small', {}, r.type[0])),
+      pill(r.status)));
+
+    const sections = appSections.filter(l => !/how|faq|feedback|help/i.test(l));
+    const notebook = sections.length ? h('section', { class: 'sh-panel' },
+      h('header', {}, h('h3', {}, 'Lab notebook'), h('span', { class: 'sh-sub' }, 'Open a section')),
+      h('div', { class: 'sh-tiles' }, sections.map(l => h('button', { type: 'button', class: 'sh-tile', onclick: () => openAppSection(l) },
+        h('span', { class: 'sh-ti ' + tint(appIcon(l)) }, icon(appIcon(l))),
+        h('b', {}, l), h('small', {}, sectionText(l)))))) : null;
+
+    const toPublish = h('section', { class: 'sh-panel' },
+      h('header', {}, h('h3', {}, 'To publish'), pend.length ? h('button', { type: 'button', class: 'sh-more', onclick: () => openPage('pub') }, `All ${d.pending.length} ›`) : null),
+      pend.length ? pend.slice(0, 5).map(c => h('button', { type: 'button', class: 'sh-check', onclick: () => go(c.el) },
+        h('span', { class: 'sh-box' }), h('span', { class: 'sh-lt' }, h('b', {}, c.title), h('small', {}, [c.hash, c.day, c.time].filter(Boolean).join(' · '))),
+        c.n > 1 ? h('span', { class: 'sh-x' }, '×' + c.n) : null))
+        : h('p', { class: 'sh-empty' }, 'Nothing waiting. Everything you changed is published.'));
+
+    // Fil d activite : changements groupes par jour, facon journal de labo.
+    const feed = h('div', { class: 'sh-feed' });
+    let day = null;
+    for (const c of groupChanges(d.changes).slice(0, 8)) {
+      if (c.day !== day) { day = c.day; feed.append(h('div', { class: 'sh-feed-day' }, day || 'Earlier')); }
+      feed.append(h('button', { type: 'button', class: 'sh-feed-item' + (c.open ? '' : ' faint'), onclick: () => go(c.el) },
+        h('span', { class: 'sh-feed-dot' }), h('span', { class: 'sh-feed-time' }, c.time),
+        h('span', { class: 'sh-lt' }, h('b', {}, c.title), h('small', {}, c.hash + (c.open ? ` · ${c.open} record${c.open > 1 ? 's' : ''}` : ' · empty')))));
+    }
+    const activity = h('section', { class: 'sh-panel' },
+      h('header', {}, h('h3', {}, 'Last 7 days'), h('span', { class: 'sh-sub' }, `${weekCount} change${weekCount === 1 ? '' : 's'}`)),
+      week, d.changes.length ? feed : h('p', { class: 'sh-empty' }, 'No activity yet.'));
+
+    const favs = d.favourites.length ? h('section', { class: 'sh-panel' },
+      h('header', {}, h('h3', {}, 'Favourites')),
+      d.favourites.map(r => h('button', { type: 'button', class: 'sh-line', onclick: () => go(r.el) },
+        h('span', { class: 'sh-ti ' + tint(r.type[1]) }, icon('star')), h('span', { class: 'sh-lt' }, h('b', {}, r.title), h('small', {}, r.type[0]))))) : null;
+
+    return h('div', { class: 'sh-wrap sh-dash' },
+      head, stats,
+      h('div', { class: 'sh-cols' },
+        h('div', { class: 'sh-col' },
+          h('section', { class: 'sh-panel' },
+            h('header', {}, h('h3', {}, 'Continue'), h('button', { type: 'button', class: 'sh-more', onclick: () => openPage('work') }, 'All my work ›')),
+            heroCard, next.length ? next : null, !hero ? h('p', { class: 'sh-empty' }, 'Records you open will show here.') : null),
+          notebook),
+        h('div', { class: 'sh-col' }, toPublish, activity, favs)));
   }
 
   let pickFor = null;
@@ -722,7 +845,12 @@
     if (old && sig === propsSig && old.previousElementSibling === header) return;
     propsSig = sig;
     const bar = h('div', { id: 'sh-props', class: 'sh' },
-      sec ? h('button', { type: 'button', class: 'sh-crumb', title: `Back to ${sec} in the lab notebook`, onclick: () => openAppSection(sec) }, icon('back'), sec) : null,
+      sec ? h('nav', { class: 'sh-crumbs', 'aria-label': 'You are here' },
+        h('button', { type: 'button', class: 'sh-crumb', title: 'Lab notebook', onclick: () => openAppSection(appSections[0]) }, 'Notebook'),
+        h('span', { class: 'sh-sep' }, '›'),
+        h('button', { type: 'button', class: 'sh-crumb', title: `Back to ${sec}`, onclick: () => openAppSection(sec) }, sec),
+        h('span', { class: 'sh-sep' }, '›'),
+        h('span', { class: 'sh-crumb-here' }, (txt($('[data-title-text]', header)) || '').split(/\s+[-–—]\s+/)[0].slice(0, 32))) : null,
       props.map(p => h('button', { type: 'button', class: 'sh-prop', title: 'Go to ' + p.label, onclick: () => p.card.scrollIntoView({ behavior: 'smooth', block: 'center' }) },
         h('small', {}, p.label), /status/i.test(p.label) ? pill(p.value) : h('span', {}, p.value))));
     if (old) old.remove();
@@ -771,7 +899,7 @@
     const d = data();
     const sig = JSON.stringify([page, d.lab, d.favourites.map(r => r.title + r.status + r.current), d.recent.map(r => r.title + r.status + r.current),
       d.mine.map(r => r.title + r.status), d.changes.map(c => c.hash + c.open + c.title + c.day + c.time), d.views.map(v => v.title + v.depth + v.open),
-      d.changeset && [d.changeset.hash, d.changeset.name, d.changeset.rows.map(r => r.title + r.current)], !!d.newBtn, showEmpty, workFilter, workType, lab, labOpen, pickFor, allViewsOpen, appSections, appActive, isWorkspaceRoot(), recordSection()]);
+      d.changeset && [d.changeset.hash, d.changeset.name, d.changeset.rows.map(r => r.title + r.current)], !!d.newBtn, showEmpty, workFilter, workType, lab, labOpen, pickFor, allViewsOpen, appSections, appActive, isWorkspaceRoot(), recordSection(), location.pathname]);
     if (!force && sig === sideSig && $('#sh-side')) return;
     sideSig = sig;
     $('#sh-side')?.remove();
@@ -902,7 +1030,20 @@
     schedule();
   });
   window.addEventListener('resize', schedule);
-  window.addEventListener('popstate', schedule);
+  window.addEventListener('popstate', e => {
+    const st = e.state && e.state.sh;
+    page = st || null;
+    if (st) lastRoute = location.pathname;
+    sideSig = '';
+    schedule();
+  });
+  // Alt + fleches, comme dans un navigateur, sauf en ecrivant.
+  document.addEventListener('keydown', e => {
+    if (!isOn('side') || !e.altKey || e.ctrlKey || e.metaKey) return;
+    if (e.target && (e.target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName))) return;
+    if (e.key === 'ArrowLeft') { e.preventDefault(); history.back(); }
+    if (e.key === 'ArrowRight') { e.preventDefault(); history.forward(); }
+  }, true);
 
   // Raccourcis : Ctrl/Cmd K = recherche de Seal, Echap = fermer nos pages.
   document.addEventListener('keydown', e => {
