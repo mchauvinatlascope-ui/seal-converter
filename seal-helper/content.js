@@ -1,4 +1,4 @@
-// Seal Helper 0.5
+// Seal Helper 0.6
 // Ne fait que changer l affichage dans ce navigateur : n ecrit jamais dans Seal,
 // n envoie rien, ne touche pas au texte d un document.
 // La nouvelle barre et les pages Home / My work / To publish relisent les listes
@@ -120,7 +120,11 @@
       const dateEl = $('span[title]', content);
       const tag = $('[data-seal-compound-tag]', content);
       const right = tag && $('[data-seal-compound-tag-right]', tag);
-      const title = txt($('[data-nav-panel-title]', content)).replace(/ #\d+$/, '');
+      const lab = txt($('[data-testid="system-name"]'));
+      // « Labo — receive lot: … » : le nom du labo est deja partout, on l enleve a l affichage.
+      const title = txt($('[data-nav-panel-title]', content)).replace(/ #\d+$/, '')
+        .replace(lab ? new RegExp('^' + lab.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*[—–-]\\s*', 'i') : /^$/, '')
+        .replace(/^\p{Ll}/u, c => c.toUpperCase());
       const full = dateEl ? (dateEl.getAttribute('title') || txt(dateEl)) : '';
       const short = full.replace(/ (?:[A-Z][a-z]+ ){1,3}(?:Daylight|Standard|Summer) Time\b/, '');
       const m = short.match(/^(.*?)\s*(\d{1,2}:\d{2})$/);
@@ -189,6 +193,7 @@
   // Ouvre la View du raccourci ; deplie dans Seal les groupes parents si besoin.
   function openShortcut(sc, tries = 0) {
     const views = readViews() || [];
+    if (!views.length && tries < 4) { panesTried = 0; ensurePanes(); setTimeout(() => openShortcut(sc, tries + 1), 700); return; }
     const v = resolve(sc, views);
     if (v) {
       if (v.group) {
@@ -207,6 +212,26 @@
     }
     pickFor = sc.id;
     openPage('pick');
+  }
+
+  // Seal ne remplit les listes Views et Changes qu une fois leur onglet ouvert : on les
+  // ouvre une fois pour toi dans la colonne Seal cachee, puis on revient a l onglet d avant.
+  let panesTried = 0;
+  function ensurePanes() {
+    if (Date.now() - panesTried < 15000) return;
+    const empty = name => { const pane = $(`[data-nav-pane="${name}"]`); return pane && !pane.children.length; };
+    const tabs = [empty('views') && $('[data-testid="nav-panel-tab-views"]'), empty('changes') && $('[data-testid="nav-panel-tab-changes"]')].filter(Boolean);
+    if (!tabs.length) return;
+    panesTried = Date.now();
+    const back = $('[data-testid="nav-panel-tabs"] [aria-selected="true"]');
+    let i = 0;
+    const step = () => {
+      if (i < tabs.length) { press(tabs[i++]); setTimeout(step, 300); return; }
+      if (back) press(back);
+      sideSig = '';
+      setTimeout(schedule, 300);
+    };
+    step();
   }
 
   function saveLab() {
@@ -234,24 +259,54 @@
   }
 
   // Le menu = le plus petit bloc qui contient « Experiments » (ou « Protocols ») et au moins 4 entrees.
-  function appNav(doc) {
-    const items = $$(CLICKABLE, doc).filter(e => { const t = txt(e); return t && t.length <= 32 && (e.getClientRects().length || e.closest('[data-sh-hidden]')); });
-    const anchor = items.find(e => /^(experiments?|manips?)$/i.test(txt(e))) || items.find(e => /^protocols?$/i.test(txt(e)));
-    if (!anchor) return null;
-    let box = anchor.parentElement;
-    let inside = [];
-    while (box && box !== doc.documentElement) {
-      inside = items.filter(e => box.contains(e));
-      if (new Set(inside.map(txt)).size >= 4) break;
-      box = box.parentElement;
+  // Le menu de l appli : on part des textes visibles (pas des balises, inconnues).
+  // Libelles connus d un cahier de labo ; il en faut au moins 3 pour reconnaitre le menu.
+  const GUESS = /^(overview|home|dashboard|projects?|experiments?|manips?|protocols?|sops?|methods?|inventory|stock|reagents?|samples?|calculators?( & files)?|files|how to.*|lab tree|.*faqs?|give feedback|feedback|equipment|tasks?)$/i;
+  function leafTexts(scope) {
+    const out = [];
+    const w = scope.ownerDocument.createTreeWalker(scope, NodeFilter.SHOW_TEXT);
+    for (let n = w.nextNode(); n; n = w.nextNode()) {
+      const t = n.nodeValue.replace(/\s+/g, ' ').trim();
+      const el = n.parentElement;
+      if (!t || t.length > 32 || !/\p{L}{2}/u.test(t) || !el || /^(SCRIPT|STYLE|TITLE|OPTION)$/.test(el.tagName)) continue;
+      if (!el.getClientRects().length && !el.closest('[data-sh-hidden]')) continue;
+      out.push({ t, el });
     }
+    return out;
+  }
+  function lca(a, b) { while (a && !a.contains(b)) a = a.parentElement; return a; }
+  function clickTarget(el, box) {
+    // L element qui porte le clic : le plus proche ancetre cliquable dans le menu, sinon le texte lui-meme.
+    for (let x = el; x && x !== box.parentElement; x = x.parentElement) {
+      if (x.matches('a,button,[role="button"],[role="tab"],[role="link"],[role="menuitem"],[onclick]')) return x;
+      if (x !== el && getComputedStyle(x).cursor === 'pointer' && x.parentElement && getComputedStyle(x.parentElement).cursor !== 'pointer') return x;
+    }
+    return el;
+  }
+  function appNav(doc) {
+    const all = leafTexts(doc.body);
+    const hits = [];
+    const seen = new Set();
+    for (const x of all) if (GUESS.test(x.t) && !seen.has(x.t.toLowerCase())) { seen.add(x.t.toLowerCase()); hits.push(x); }
+    if (hits.length < 3 || !hits.some(x => /^(experiments?|manips?|protocols?|projects?)$/i.test(x.t))) return null;
+    let box = hits.slice(1).reduce((a, x) => lca(a, x.el), hits[0].el);
+    if (!box) return null;
+    const lab = (txt($('[data-testid="system-name"]')) + ' lab').toLowerCase();
     const byLabel = new Map();
-    // Pour chaque libelle, l element le plus interieur : c est lui qui porte le clic.
-    for (const e of inside) { const prev = byLabel.get(txt(e)); if (!prev || prev.contains(e)) byLabel.set(txt(e), e); }
-    const isOnItem = e => [e, ...$$('*', e)].some(x => x.getAttribute('aria-current') && x.getAttribute('aria-current') !== 'false'
-      || x.getAttribute('aria-selected') === 'true' || /(^|[\s_-])(active|selected|current)([\s_-]|$)/i.test(x.getAttribute('class') || ''));
-    let active = '';
-    for (const [l, e] of byLabel) if (isOnItem(e) || (e.parentElement && isOnItem(e.parentElement) && e.parentElement !== box)) { active = l; break; }
+    for (const x of leafTexts(box)) {
+      if (byLabel.has(x.t) || x.t.toLowerCase() === lab || /·|\bseal\b.*\blinterman\b|^electronic lab notebook$/i.test(x.t) || /^\d+$/.test(x.t)) continue;
+      const target = clickTarget(x.el, box);
+      if (target !== x.el || GUESS.test(x.t) || getComputedStyle(x.el).cursor === 'pointer') byLabel.set(x.t, target);
+    }
+    if (byLabel.size < 3) return null;
+    // Section active : celle dont l allure (fond, couleur, graisse) differe des autres.
+    const sig = el => { const c = getComputedStyle(el); return c.backgroundColor + c.color + c.fontWeight; };
+    const sigs = [...byLabel].map(([l, e]) => [l, sig(e), e]);
+    const count = new Map();
+    for (const [, g] of sigs) count.set(g, (count.get(g) || 0) + 1);
+    const marked = sigs.find(([, , e]) => [e, e.parentElement].some(x => x && (x.getAttribute('aria-current') && x.getAttribute('aria-current') !== 'false' || x.getAttribute('aria-selected') === 'true')));
+    const odd = sigs.filter(([, g]) => count.get(g) === 1);
+    const active = marked ? marked[0] : odd.length === 1 && sigs.length > 3 ? odd[0][0] : '';
     return { byLabel, active, box };
   }
 
@@ -521,10 +576,10 @@
     if (!appSections.length) scroll.append(h('div', { class: 'sh-group' }, 'Lab'));
     if (!appSections.length) for (const sc of lab) {
       const v = resolve(sc, d.views);
-      const row = h('div', { class: 'sh-sc' + (v ? '' : ' unset') },
+      const row = h('div', { class: 'sh-sc' + (v || sc.path ? '' : ' unset') },
         h('button', { type: 'button', class: 'sh-row' + (page === 'pick' && pickFor === sc.id ? ' on' : ''), title: v ? `${sc.label}: ${v.key}` : `Choose the Seal view for ${sc.label}`, onclick: () => openShortcut(sc) },
           icon(sc.icon || 'view'), h('span', { class: 'sh-t' }, sc.label),
-          v ? (v.group ? h('span', { class: 'sh-chev' + (labOpen === sc.id && v.open ? ' open' : ''), 'aria-hidden': 'true', html: ICON.chev }) : null) : h('span', { class: 'sh-set' }, 'Choose')),
+          v ? (v.group ? h('span', { class: 'sh-chev' + (labOpen === sc.id && v.open ? ' open' : ''), 'aria-hidden': 'true', html: ICON.chev }) : null) : sc.path ? null : h('span', { class: 'sh-set' }, 'Choose')),
         h('button', { type: 'button', class: 'sh-edit', title: `Change what ${sc.label} opens`, onclick: () => { pickFor = sc.id; openPage('pick'); } }, icon('pen')));
       scroll.append(row);
       if (v && v.group && v.open && labOpen === sc.id) {
@@ -634,7 +689,7 @@
     for (let i = 0; i < 7; i++) {
       const d = new Date(monday); d.setDate(monday.getDate() + i);
       const n = counts.get(d.toDateString()) || 0;
-      days.push(h('div', { class: 'sh-day' + (d.getTime() === now.getTime() ? ' today' : '') + (n ? ' busy' : ''), title: n ? `${n} change${n > 1 ? 's' : ''}` : 'No change' },
+      days.push(h('div', { class: 'sh-wday' + (d.getTime() === now.getTime() ? ' today' : '') + (n ? ' busy' : ''), title: n ? `${n} change${n > 1 ? 's' : ''}` : 'No change' },
         h('small', {}, d.toLocaleDateString('en-NZ', { weekday: 'short' })),
         h('b', {}, String(d.getDate())),
         h('span', { class: 'sh-dots' }, Array.from({ length: Math.min(n, 4) }, () => h('i', {})))));
@@ -643,6 +698,7 @@
     return { el: h('div', { class: 'sh-week' }, days), week };
   }
 
+  const eyebrow = (d, what) => (d.lab ? d.lab.charAt(0) + d.lab.slice(1).toLowerCase() + ' lab' : 'Lab') + ' · ' + what;
   function stat(label, value, caption, onclick, accent) {
     return h('button', { type: 'button', class: 'sh-stat' + (accent ? ' ' + accent : ''), onclick },
       h('small', {}, label), h('b', {}, String(value)), h('span', {}, caption));
@@ -690,7 +746,7 @@
       h('span', { class: 'sh-lt' }, h('b', {}, r.title, r.n > 1 ? h('span', { class: 'sh-x' }, '×' + r.n) : null), h('small', {}, r.type[0])),
       pill(r.status)));
 
-    const sections = appSections.filter(l => !/how|faq|feedback|help/i.test(l));
+    const sections = appSections.filter(l => !/how|faq|feedback|help|overview|start/i.test(l)).slice(0, 6);
     const notebook = sections.length ? h('section', { class: 'sh-panel' },
       h('header', {}, h('h3', {}, 'Lab notebook'), h('span', { class: 'sh-sub' }, 'Open a section')),
       h('div', { class: 'sh-tiles' }, sections.map(l => h('button', { type: 'button', class: 'sh-tile', onclick: () => openAppSection(l) },
@@ -781,12 +837,12 @@
     const table = h('table', { class: 'sh-table' },
       h('thead', {}, h('tr', {}, h('th', {}, 'Name'), h('th', {}, 'Type'), h('th', {}, 'Status'), h('th', {}, ''))),
       h('tbody', {}, rows.map(r => h('tr', { onclick: () => go(r.el), tabindex: '0', onkeydown: e => e.key === 'Enter' && go(r.el) },
-        h('td', {}, h('span', { class: 'sh-cell' }, icon(r.type[1]), h('b', {}, r.title), r.n > 1 ? h('span', { class: 'sh-x', title: `${r.n} records with this name` }, '×' + r.n) : null)),
+        h('td', {}, h('span', { class: 'sh-cell' }, h('span', { class: 'sh-ti sm ' + tint(r.type[1]) }, icon(r.type[1])), h('b', {}, r.title), r.n > 1 ? h('span', { class: 'sh-x', title: `${r.n} records with this name` }, '×' + r.n) : null)),
         h('td', { class: 'sh-muted' }, r.type[0]), h('td', {}, pill(r.status)), h('td', { class: 'sh-go' }, 'Open ›')))));
     return h('div', { class: 'sh-wrap' },
-      h('div', { class: 'sh-hello' }, h('div', {}, h('h1', {}, 'My work'), h('p', {}, 'Records you opened recently or created, same names grouped together.')), input),
+      h('div', { class: 'sh-hello' }, h('div', {}, h('div', { class: 'sh-eyebrow' }, eyebrow(d, 'My work')), h('h1', {}, 'My work'), h('p', {}, 'Records you opened recently or created, same names grouped together.')), input),
       chips,
-      rows.length ? table : h('p', { class: 'sh-empty' }, 'No record matches.'));
+      h('section', { class: 'sh-panel' }, rows.length ? table : h('p', { class: 'sh-empty' }, 'No record matches.')));
   }
 
   let showEmpty = false;
@@ -804,12 +860,12 @@
     }
     return h('div', { class: 'sh-wrap' },
       h('div', { class: 'sh-hello' },
-        h('div', {}, h('h1', {}, 'To publish'), h('p', {}, 'Changes you started and have not published yet. The lab sees them only once they are published.')),
+        h('div', {}, h('div', { class: 'sh-eyebrow' }, eyebrow(d, 'To publish')), h('h1', {}, 'To publish'), h('p', {}, 'Changes you started and have not published yet. The lab sees them only once they are published.')),
         emptyCount > 0 ? h('button', { type: 'button', class: 'sh-btn ghost', onclick: () => { showEmpty = !showEmpty; render(true); } },
           showEmpty ? 'Hide empty changes' : `Show ${emptyCount} empty`) : null),
-      list.length ? h('table', { class: 'sh-table' },
+      h('section', { class: 'sh-panel' }, list.length ? h('table', { class: 'sh-table' },
         h('thead', {}, h('tr', {}, h('th', {}, 'Change'), h('th', {}, 'What'), h('th', { class: 'sh-num' }, 'Records'), h('th', { class: 'sh-num' }, 'Last edit'), h('th', {}, ''))), body)
-        : h('p', { class: 'sh-empty' }, 'Nothing waiting. Everything you changed is published.'));
+        : h('p', { class: 'sh-empty' }, 'Nothing waiting. Everything you changed is published.')));
   }
 
   // ------------------------------------------------ fiche : proprietes et plan
@@ -1008,7 +1064,7 @@
       if (isOn('doc')) markRules(document.body);
       if (isOn('quiet')) markFaded(document.body);
       closeInfoOnArrival();
-      if (isOn('side')) readApp();
+      if (isOn('side')) { readApp(); ensurePanes(); }
       else { const doc = appDoc(); const hid = doc && $('[data-sh-hidden]', doc); if (hid) hid.removeAttribute('data-sh-hidden'); }
       // Le labo a sa propre page d accueil : on la laisse a l arrivee au lieu de Today.
       if (page === 'home' && autoHome && $('iframe[title="Custom Content"]')) { page = null; autoHome = false; }
