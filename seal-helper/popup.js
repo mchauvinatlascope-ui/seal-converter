@@ -45,6 +45,11 @@ chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
     else if (!r.workspace) showState('ok', 'Active on this tab · v' + r.v, 'The new layout shows on lab pages and records.');
     else if (!r.shown) showState('warn', 'Running but hidden · v' + r.v, 'Reload the tab; if it stays hidden, send a screenshot.',
       { label: 'Reload the tab', run: () => { chrome.tabs.reload(tab.id); window.close(); } });
-    else showState('ok', 'Active on this tab · v' + r.v, 'Sidebar, Today, New menu and navigation arrows are on.');
+    else showState('ok', 'Active on this tab · v' + r.v, 'Sidebar, Today, New menu and navigation arrows are on.',
+      { label: 'Diagnostic', run: () => chrome.tabs.sendMessage(tab.id, { sh: 'diag' }, d => {
+        const ta = document.getElementById('diag'); ta.value = (d && d.text) || 'No answer from the page.'; ta.classList.add('show'); ta.select();
+        try { navigator.clipboard.writeText(ta.value); } catch (e) {}
+        state.querySelector('span').textContent = 'Diagnostic copied: paste it to me. Structure only, no record content.';
+      }) });
   });
 });

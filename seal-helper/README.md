@@ -4,7 +4,7 @@ A Chrome extension that makes Seal calmer and easier to read. It only changes ho
 
 ## Install (2 minutes)
 
-1. Download `seal-helper-1.0.0.zip` and unzip it.
+1. Download `seal-helper-1.0.1.zip` and unzip it.
 2. Open `chrome://extensions` and switch on **Developer mode** (top right).
 3. Click **Load unpacked** and pick the unzipped `seal-helper` folder.
 4. Open Seal. Click the extension icon (puzzle piece, then pin Seal Helper) to switch each setting on or off.
@@ -13,7 +13,12 @@ To update: replace the folder with the new one, then click the reload arrow on t
 
 ## If you see no change
 
-Click the extension icon on a Seal tab: the first card says whether Seal Helper is **active on this tab**, **paused**, or whether the tab **needs a reload** after an update (one button does it). After replacing the folder, always press the reload arrow on the Seal Helper card in `chrome://extensions`, then reload Seal. The sidebar shows its version (v1.0.0) at the bottom.
+Click the extension icon on a Seal tab: the first card says whether Seal Helper is **active on this tab**, **paused**, or whether the tab **needs a reload** after an update (one button does it). After replacing the folder, always press the reload arrow on the Seal Helper card in `chrome://extensions`, then reload Seal. The sidebar shows its version (v1.0.1) at the bottom.
+
+## 1.0.1 fixes
+
+- A notebook section that showed nothing (Experiments) while the menu was hidden: the extension now checks, after hiding the menu, that the notebook content fills the frame; if not it hides the menu more gently, and as a last resort keeps the menu and says so.
+- The popup has a **Diagnostic** button: it copies the structure of the page (no record content) to paste when something looks wrong.
 
 ## What 1.0 changes: the sidebar, reorganised
 

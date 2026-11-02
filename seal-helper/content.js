@@ -14,7 +14,7 @@
   const isMac = /Mac/.test(navigator.platform);
   let opts = { ...DEFAULTS };
   const isOn = k => opts.on && opts[k];
-  const VERSION = '1.0.0';
+  const VERSION = '1.0.1';
 
   // ---------------------------------------------------------------- outils
   function h(tag, attrs, ...kids) {
@@ -547,9 +547,9 @@
     const want = isOn('side') && isOn('appmenu');
     const prev = $('[data-sh-hidden]', doc);
     if (!want) { if (prev) prev.removeAttribute('data-sh-hidden'); $('#sh-app-style', doc)?.remove(); return; }
-    if (prev) return;
+    if (prev) { verifyHide(doc); return; }
     const rail = box.closest('aside.rail, aside');
-    if (rail) { ensureHideStyle(doc, rail); rail.setAttribute('data-sh-hidden', ''); return; }
+    if (rail) { ensureHideStyle(doc, rail); rail.setAttribute('data-sh-hidden', ''); setTimeout(() => { try { verifyHide(doc); } catch (e) {} }, 250); return; }
     const W = doc.documentElement.clientWidth, H = doc.documentElement.clientHeight;
     let col = box;
     while (col.parentElement && col.parentElement !== doc.body && col.parentElement.getBoundingClientRect().width < W * 0.45) col = col.parentElement;
@@ -559,20 +559,81 @@
     col.setAttribute('data-sh-hidden', '');
   }
   const selOf = el => el.tagName.toLowerCase() + [...el.classList].filter(c => /^[\w-]+$/.test(c)).map(c => '.' + c).join('');
+  // Trois facons de masquer le menu, de la plus propre a la plus prudente. Chacune est verifiee
+  // apres coup : si le contenu du cahier n est plus a l ecran, on passe a la suivante.
+  const HIDE_WAYS = ['out', 'thin', 'plain', 'none'];
+  const ZERO = 'width:0!important;height:0!important;min-width:0!important;min-height:0!important;flex:0 0 0!important;padding:0!important;margin:0!important;border:0!important;overflow:hidden!important;visibility:hidden!important;pointer-events:none!important';
+  const GRID = '*:has(>X){grid-template-columns:minmax(0,1fr)!important}X~*{grid-column:1/-1!important;min-width:0}';
+  const HIDE_CSS = {
+    out: 'X{position:absolute!important;left:-9999px!important;top:0!important;' + ZERO + '}' + GRID,
+    thin: 'X{' + ZERO + '}' + GRID,
+    plain: 'X{visibility:hidden!important;pointer-events:none!important;overflow:hidden!important}',
+    none: '',
+  };
+  const hideWay = doc => doc.documentElement.getAttribute('data-sh-way') || 'out';
   function ensureHideStyle(doc, el) {
-    // Hors du flux (position absolue, taille nulle) : ni colonne ni ligne reservee dans une grille ou un flex.
-    const css = '[data-sh-hidden]{position:absolute!important;left:-9999px!important;top:0!important;width:0!important;height:0!important;min-width:0!important;min-height:0!important;flex:0 0 0!important;padding:0!important;margin:0!important;border:0!important;overflow:hidden!important;visibility:hidden!important;pointer-events:none!important}'
-      + '*:has(>[data-sh-hidden]){grid-template-columns:minmax(0,1fr)!important}'
-      + '[data-sh-hidden]~*{grid-column:1/-1!important;min-width:0}';
+    const way = hideWay(doc);
     // Le rail connu (aside.rail) est vise par sa structure : s il est recree par l appli, il reste cache.
     const sel = el && /^aside/.test(selOf(el)) ? selOf(el) : '';
-    const full = sel ? css.split('[data-sh-hidden]').join(':is([data-sh-hidden],' + sel + ')') : css;
+    const X = sel ? ':is([data-sh-hidden],' + sel + ')' : '[data-sh-hidden]';
+    const full = (HIDE_CSS[way] || '').split('X').join(X);
     let st = $('#sh-app-style', doc);
     if (st) { if (st.textContent !== full) st.textContent = full; return; }
     st = doc.createElement('style');
     st.id = 'sh-app-style';
     st.textContent = full;
     doc.head.append(st);
+  }
+  // Le contenu du cahier (hors menu) occupe-t-il bien l ecran du cadre ?
+  function contentVisible(doc) {
+    const hid = $('[data-sh-hidden]', doc);
+    const W = doc.documentElement.clientWidth, H = doc.documentElement.clientHeight;
+    if (!W || !H) return true;
+    // On compte les elements qui portent du texte : combien sont a l ecran ?
+    let total = 0, visible = 0, n = 0;
+    const walk = el => {
+      if (!el || el === hid || n++ > 1500) return;
+      if ([...el.childNodes].some(c => c.nodeType === 3 && c.textContent.trim().length > 1)) {
+        total++;
+        const r = el.getBoundingClientRect();
+        if (r.width > 0 && r.height > 0 && r.right > 0 && r.bottom > 0 && r.left < W && r.top < H) visible++;
+      }
+      for (const c of el.children) walk(c);
+    };
+    walk(doc.body);
+    return total < 5 || visible / total >= 0.3;
+  }
+  const badSince = new WeakMap();
+  function verifyHide(doc) {
+    const hid = $('[data-sh-hidden]', doc);
+    if (!hid || hideWay(doc) === 'none') return;
+    if (doc.body.querySelectorAll('*').length < 30) return; // l appli n a encore rien affiche
+    if (contentVisible(doc)) { badSince.delete(doc); return; }
+    const t = badSince.get(doc) || Date.now();
+    badSince.set(doc, t);
+    if (Date.now() - t < 700) { setTimeout(() => { try { verifyHide(doc); } catch (e) {} }, 400); return; }
+    const next = HIDE_WAYS[Math.min(HIDE_WAYS.indexOf(hideWay(doc)) + 1, HIDE_WAYS.length - 1)];
+    doc.documentElement.setAttribute('data-sh-way', next);
+    badSince.delete(doc);
+    console.warn('[Seal Helper] notebook content hidden by the menu rule, switching to', next);
+    ensureHideStyle(doc, hid);
+    if (next === 'none') { hid.removeAttribute('data-sh-hidden'); toast('The notebook menu is kept: hiding it hid the page.', 'warn', 5000); }
+    else setTimeout(() => { try { verifyHide(doc); } catch (e) {} }, 400);
+  }
+  // Etat de la page pour la fenetre de l extension : structure seulement, jamais de contenu.
+  function diagnose() {
+    const lines = ['Seal Helper ' + VERSION, 'path ' + location.pathname.replace(/[0-9a-f-]{20,}/g, 'ID'), 'side ' + !!$('#sh-side') + ' page ' + page + ' sections ' + appSections.length];
+    const doc = appDoc();
+    if (!doc) { lines.push('no notebook frame'); return lines.join('\n'); }
+    const nav = appNav(doc);
+    const hid = $('[data-sh-hidden]', doc);
+    lines.push('way ' + hideWay(doc) + ' hidden ' + (hid ? selOf(hid) : 'none') + ' nav ' + (nav ? nav.byLabel.size : 0) + ' visible ' + contentVisible(doc));
+    const rect = el => { const r = el.getBoundingClientRect(); return Math.round(r.left) + ',' + Math.round(r.top) + ' ' + Math.round(r.width) + 'x' + Math.round(r.height); };
+    const cs = el => { const c = doc.defaultView.getComputedStyle(el); return c.display + (c.display.includes('grid') ? ' cols[' + c.gridTemplateColumns + '] rows[' + c.gridTemplateRows + ']' : '') + (c.position !== 'static' ? ' ' + c.position : ''); };
+    lines.push('frame ' + doc.documentElement.clientWidth + 'x' + doc.documentElement.clientHeight);
+    const dump = (el, depth) => { if (!el || depth > 3) return; lines.push('  '.repeat(depth) + selOf(el) + (el === hid ? ' [HIDDEN]' : '') + ' ' + rect(el) + ' ' + cs(el)); if (el !== hid) for (const c of [...el.children].slice(0, 8)) dump(c, depth + 1); };
+    dump(doc.body, 0);
+    return lines.join('\n');
   }
 
   // Type de la fiche ouverte (icone de l en-tete) -> section du cahier qui la contient.
@@ -590,8 +651,10 @@
   function watchApp(doc) {
     if (watched.has(doc)) return;
     watched.add(doc);
+    let vt = 0;
     new MutationObserver(() => {
       if (isOn('side') && isOn('appmenu') && !$('[data-sh-hidden]', doc)) { try { const nav = appNav(doc); if (nav) hideAppMenu(doc, nav.box); } catch (e) {} }
+      clearTimeout(vt); vt = setTimeout(() => { try { verifyHide(doc); } catch (e) {} }, 300);
       schedule();
     }).observe(doc.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'aria-current', 'aria-selected'] });
   }
@@ -1531,7 +1594,8 @@
     else document.addEventListener('DOMContentLoaded', schedule, { once: true });
   });
   try { chrome.runtime.onMessage.addListener((m, sender, reply) => {
-    if (!m || m.sh !== 'status') return;
+    if (!m || !/^(status|diag)$/.test(m.sh)) return;
+    if (m.sh === 'diag') { let text = ''; try { text = diagnose(); } catch (e) { text = 'diag failed: ' + e; } reply({ text }); return; }
     reply({ v: VERSION, on: !!opts.on, side: !!isOn('side'), workspace: !!$('[data-testid="platform-layout"]'), shown: !!$('#sh-side') });
   }); } catch (e) {}
   chrome.storage.onChanged.addListener((changes, area) => {
