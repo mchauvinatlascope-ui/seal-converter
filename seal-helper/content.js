@@ -14,7 +14,7 @@
   const isMac = /Mac/.test(navigator.platform);
   let opts = { ...DEFAULTS };
   const isOn = k => opts.on && opts[k];
-  const VERSION = '0.9.2';
+  const VERSION = '1.0.0';
 
   // ---------------------------------------------------------------- outils
   function h(tag, attrs, ...kids) {
@@ -753,6 +753,10 @@
     return m && m.n ? h('span', { class: 'sh-n', title: m.label }, String(m.n)) : null;
   }
 
+  const HELP_RE = /how to|faq|feedback|help|lab tree|guide/i;
+  let helpOpen = false;
+  document.addEventListener('click', e => { if (helpOpen && !(e.target.closest && e.target.closest('.sh-help'))) { helpOpen = false; render(true); } }, true);
+
   function buildSide(d) {
     const side = h('aside', { id: 'sh-side', class: 'sh', 'aria-label': 'Seal navigation' });
     const sw = $('[data-testid="system-switcher"]');
@@ -788,14 +792,15 @@
           icon('plus'), h('span', { class: 'sh-t' }, 'New'), h('span', { class: 'sh-chev' + (newOpen ? ' open' : ''), 'aria-hidden': 'true', html: ICON.chev })),
         menu));
     } else if (d.newBtn) top.append(sideItem('plus', 'New', { onclick: () => press(d.newBtn) }));
-    top.append(sideItem('today', 'Today', { on: page === 'home', onclick: () => openPage('home') }));
-    top.append(sideItem('work', 'My work', { on: page === 'work', count: group(d.mine).length || '', onclick: () => openPage('work') }));
-    top.append(sideItem('pub', 'To publish', { on: page === 'pub', count: d.pending.length || '', hot: d.pending.length > 0, onclick: () => openPage('pub') }));
-    const inbox = $('[data-testid="nav-panel-inbox-button"]');
-    if (inbox) top.append(sideItem('inbox', 'Inbox', { onclick: () => press(inbox) }));
     side.append(top);
 
     const scroll = h('div', { class: 'sh-scroll' });
+    const you = () => {
+      scroll.append(h('div', { class: 'sh-group' }, 'You'));
+      scroll.append(sideItem('today', 'Today', { on: page === 'home', onclick: () => openPage('home') }));
+      scroll.append(sideItem('work', 'My work', { on: page === 'work', count: group(d.mine).length || '', onclick: () => openPage('work') }));
+      scroll.append(sideItem('pub', 'To publish', { on: page === 'pub', count: d.pending.length || '', hot: d.pending.length > 0, onclick: () => openPage('pub'), title: 'Changes to publish, and your inbox' }));
+    };
 
     const cs = d.changeset;
     if (cs && cs.rows.length) {
@@ -812,8 +817,8 @@
     if (appSections.length) {
       const here = atNotebook() && !page;
       const inSec = recordSection();
-      scroll.append(h('div', { class: 'sh-group' }, d.lab ? (d.lab.charAt(0) + d.lab.slice(1).toLowerCase() + ' lab') : 'Lab'));
-      for (const l of appSections) {
+      scroll.append(h('div', { class: 'sh-group sh-first' }, 'Lab notebook'));
+      for (const l of appSections.filter(l => !HELP_RE.test(l))) {
         const create = appCreates.find(c => CREATE_SECTION[c.key] && CREATE_SECTION[c.key].test(l) && !/panel|antibodies/.test(c.key));
         scroll.append(h('div', { class: 'sh-sc' },
           h('button', { type: 'button', class: 'sh-row sh-app' + ((here && appActive === l) || inSec === l ? ' on' : ''), title: `Open ${l} in the lab notebook`, onclick: () => openAppSection(l) },
@@ -821,7 +826,7 @@
           create ? h('button', { type: 'button', class: 'sh-edit', title: create.label, 'aria-label': create.label, onclick: () => openCreate(create.key) }, icon('plus')) : null));
       }
     }
-    if (!appSections.length) scroll.append(h('div', { class: 'sh-group' }, 'Lab'));
+    if (!appSections.length) scroll.append(h('div', { class: 'sh-group sh-first' }, 'Lab'));
     if (!appSections.length) for (const sc of lab) {
       const v = resolve(sc, d.views);
       const row = h('div', { class: 'sh-sc' + (v || sc.path ? '' : ' unset') },
@@ -842,9 +847,24 @@
     }
     if (!appSections.length) scroll.append(h('button', { type: 'button', class: 'sh-row sh-add', onclick: () => { pickFor = 'new'; openPage('pick'); } }, icon('plus'), h('span', { class: 'sh-t' }, 'Add a shortcut')));
 
+    you();
+
+    // Recent : les 5 dernieres fiches ouvertes (liste Seal « Recent activity »), point de statut.
+    const recent = group(d.recent).filter(r => r.type[0] !== 'Page').slice(0, 5);
+    if (recent.length) {
+      scroll.append(h('div', { class: 'sh-group' }, 'Recent'));
+      for (const r of recent) scroll.append(h('button', { type: 'button', class: 'sh-row sh-recent' + (r.current ? ' on' : ''), title: r.title + (r.status ? ' · ' + r.status : ''), onclick: () => go(r.el) },
+        h('span', { class: 'sh-dot ' + (r.status ? statusClass(r.status) : '') }), h('span', { class: 'sh-t' }, r.title)));
+    }
+
+    if (d.favourites.length) {
+      scroll.append(h('div', { class: 'sh-group' }, 'Favourites'));
+      for (const f of d.favourites) scroll.append(rowButton(f, { showTag: false }));
+    }
+
     if (d.views.length) {
       scroll.append(h('button', { type: 'button', class: 'sh-group sh-toggle', 'aria-expanded': String(allViewsOpen), onclick: () => { allViewsOpen = !allViewsOpen; try { localStorage.setItem('sh-allviews', allViewsOpen ? '1' : '0'); } catch (e) {} render(true); } },
-        h('span', { class: 'sh-chev' + (allViewsOpen ? ' open' : ''), 'aria-hidden': 'true', html: ICON.chev }), 'All views'));
+        h('span', { class: 'sh-chev' + (allViewsOpen ? ' open' : ''), 'aria-hidden': 'true', html: ICON.chev }), 'Seal views', h('span', { class: 'sh-act' }, String(d.views.filter(v => !v.group).length))));
       if (allViewsOpen) for (const v of d.views) {
         scroll.append(h('button', {
           type: 'button', class: 'sh-row sh-view' + (v.group ? ' grp' : ''), title: v.title,
@@ -856,19 +876,29 @@
       }
     }
 
-    if (d.favourites.length) {
-      scroll.append(h('div', { class: 'sh-group' }, 'Favourites'));
-      for (const f of d.favourites) scroll.append(rowButton(f, { showTag: false }));
-    }
     side.append(scroll);
 
     const set = $('[data-testid="nav-panel-settings-button"]');
     const help = $('[data-testid="nav-panel-help-menu"]');
+    const inbox = $('[data-testid="nav-panel-inbox-button"]');
+    const helpSections = appSections.filter(l => HELP_RE.test(l));
+    const helpMenu = h('div', { class: 'sh-helpmenu', role: 'menu', hidden: !helpOpen },
+      helpSections.length ? h('div', { class: 'sh-newhead' }, 'Lab notebook') : null,
+      helpSections.map(l => h('button', { type: 'button', role: 'menuitem', class: 'sh-newitem', onclick: () => { helpOpen = false; openAppSection(l); } },
+        h('span', { class: 'sh-ti sm tint-grey' }, icon(appIcon(l))), h('span', { class: 'sh-nt' }, h('span', { class: 'sh-t' }, l), h('small', {}, sectionText(l))))),
+      help ? h('div', { class: 'sh-newhead' }, 'Seal') : null,
+      help ? h('button', { type: 'button', role: 'menuitem', class: 'sh-newitem', onclick: () => { helpOpen = false; press(help); } },
+        h('span', { class: 'sh-ti sm tint-grey' }, icon('help')), h('span', { class: 'sh-nt' }, h('span', { class: 'sh-t' }, 'Seal help and more'), h('small', {}, 'Documentation, keyboard shortcuts, support'))) : null,
+      h('button', { type: 'button', role: 'menuitem', class: 'sh-newitem', onclick: () => { helpOpen = false; tipsDone = false; try { localStorage.removeItem('sh-tips'); } catch (e) {} openPage('home'); } },
+        h('span', { class: 'sh-ti sm tint-grey' }, icon('today')), h('span', { class: 'sh-nt' }, h('span', { class: 'sh-t' }, 'Getting around Seal Helper'), h('small', {}, 'The four moves, on Today'))));
     side.append(h('div', { class: 'sh-foot' },
       set ? h('button', { type: 'button', class: 'sh-iconbtn', title: 'Settings', onclick: () => press(set) }, icon('gear')) : null,
-      help ? h('button', { type: 'button', class: 'sh-iconbtn', title: 'Help and more', onclick: () => press(help) }, icon('help')) : null,
+      h('div', { class: 'sh-help' },
+        h('button', { type: 'button', class: 'sh-iconbtn', title: 'Help', 'aria-haspopup': 'menu', 'aria-expanded': String(helpOpen), onclick: () => { helpOpen = !helpOpen; render(true); } }, icon('help')),
+        helpMenu),
+      inbox ? h('button', { type: 'button', class: 'sh-iconbtn', title: 'Inbox', onclick: () => press(inbox) }, icon('inbox')) : null,
       h('span', { class: 'sh-ver', title: 'Seal Helper ' + VERSION }, 'v' + VERSION),
-      h('button', { type: 'button', class: 'sh-classic', title: 'Show Seal without the new layout', onclick: () => save({ side: false }) }, icon('classic'), 'Classic Seal')));
+      h('button', { type: 'button', class: 'sh-classic', title: 'Classic Seal: show Seal without the new layout', 'aria-label': 'Classic Seal', onclick: () => save({ side: false }) }, icon('classic'), h('span', { class: 'sh-classic-t' }, 'Classic'))));
     return side;
   }
 
@@ -1038,7 +1068,7 @@
         h('span', { class: 'sh-ti tint-teal' }, icon('proto')),
         h('span', { class: 'sh-lt' }, h('b', {}, x.title), h('small', {}, x.sub || 'Protocol template'))))) : null;
 
-    const sections = appSections.filter(l => !/how|faq|feedback|help|overview|start/i.test(l)).slice(0, 6);
+    const sections = appSections.filter(l => !HELP_RE.test(l) && !/overview|start/i.test(l)).slice(0, 6);
     const notebook = sections.length ? h('section', { class: 'sh-panel' },
       h('header', {}, h('h3', {}, 'Lab notebook'), h('span', { class: 'sh-sub' }, 'Open a section')),
       h('div', { class: 'sh-tiles' }, sections.map(l => {
@@ -1210,11 +1240,16 @@
         h('td', {}, h('span', { class: 'sh-cell' }, h('b', {}, c.title), c.n > 1 ? h('span', { class: 'sh-x' }, '×' + c.n) : null)),
         h('td', { class: 'sh-num' }, c.open), h('td', { class: 'sh-num sh-muted' }, c.time), h('td', { class: 'sh-go' }, 'Review ›')));
     }
+    const inbox = $('[data-testid="nav-panel-inbox-button"]');
+    const tabs = inbox ? h('div', { class: 'sh-chips sh-src', role: 'tablist' },
+      h('button', { type: 'button', role: 'tab', class: 'sh-chip on', 'aria-selected': 'true' }, 'To publish', d.pending.length ? h('span', { class: 'sh-x' }, String(d.pending.length)) : null),
+      h('button', { type: 'button', role: 'tab', class: 'sh-chip', 'aria-selected': 'false', title: 'Open your Seal inbox: mentions, requests, reviews', onclick: () => press(inbox) }, 'Inbox', icon('chev'))) : null;
     return h('div', { class: 'sh-wrap' },
       h('div', { class: 'sh-hello' },
-        h('div', {}, h('div', { class: 'sh-eyebrow' }, eyebrow(d, 'To publish')), h('h1', {}, 'To publish'), h('p', {}, 'Changes you started and have not published yet. The lab sees them only once they are published.')),
+        h('div', {}, h('div', { class: 'sh-eyebrow' }, eyebrow(d, 'To publish')), h('h1', {}, 'To publish'), h('p', {}, 'Changes you started and have not published yet. The lab sees them only once they are published. Inbox holds what others sent you.')),
         emptyCount > 0 ? h('button', { type: 'button', class: 'sh-btn ghost', onclick: () => { showEmpty = !showEmpty; render(true); } },
           showEmpty ? 'Hide empty changes' : `Show ${emptyCount} empty`) : null),
+      tabs,
       h('section', { class: 'sh-panel' }, list.length ? h('table', { class: 'sh-table' },
         h('thead', {}, h('tr', {}, h('th', {}, 'Change'), h('th', {}, 'What'), h('th', { class: 'sh-num' }, 'Records'), h('th', { class: 'sh-num' }, 'Last edit'), h('th', {}, ''))), body)
         : h('p', { class: 'sh-empty' }, 'Nothing waiting. Everything you changed is published.')));
@@ -1307,7 +1342,7 @@
     const d = data();
     const sig = JSON.stringify([page, d.lab, d.favourites.map(r => r.title + r.status + r.current), d.recent.map(r => r.title + r.status + r.current),
       d.mine.map(r => r.title + r.status), d.changes.map(c => c.hash + c.open + c.title + c.day + c.time), d.views.map(v => v.title + v.depth + v.open),
-      d.changeset && [d.changeset.hash, d.changeset.name, d.changeset.rows.map(r => r.title + r.current)], !!d.newBtn, showEmpty, workFilter, workType, workSrc, workStatus, tipsDone, lab, labOpen, pickFor, allViewsOpen, appSections, appActive, atNotebook(), recordSection(), location.pathname, newOpen, appCreates, appData && appData.at]);
+      d.changeset && [d.changeset.hash, d.changeset.name, d.changeset.rows.map(r => r.title + r.current)], !!d.newBtn, showEmpty, workFilter, workType, workSrc, workStatus, tipsDone, helpOpen, lab, labOpen, pickFor, allViewsOpen, appSections, appActive, atNotebook(), recordSection(), location.pathname, newOpen, appCreates, appData && appData.at]);
     if (!force && sig === sideSig && $('#sh-side')) return;
     sideSig = sig;
     $('#sh-side')?.remove();

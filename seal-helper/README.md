@@ -4,7 +4,7 @@ A Chrome extension that makes Seal calmer and easier to read. It only changes ho
 
 ## Install (2 minutes)
 
-1. Download `seal-helper-0.9.2.zip` and unzip it.
+1. Download `seal-helper-1.0.0.zip` and unzip it.
 2. Open `chrome://extensions` and switch on **Developer mode** (top right).
 3. Click **Load unpacked** and pick the unzipped `seal-helper` folder.
 4. Open Seal. Click the extension icon (puzzle piece, then pin Seal Helper) to switch each setting on or off.
@@ -13,7 +13,15 @@ To update: replace the folder with the new one, then click the reload arrow on t
 
 ## If you see no change
 
-Click the extension icon on a Seal tab: the first card says whether Seal Helper is **active on this tab**, **paused**, or whether the tab **needs a reload** after an update (one button does it). After replacing the folder, always press the reload arrow on the Seal Helper card in `chrome://extensions`, then reload Seal. The sidebar shows its version (v0.9.2) at the bottom.
+Click the extension icon on a Seal tab: the first card says whether Seal Helper is **active on this tab**, **paused**, or whether the tab **needs a reload** after an update (one button does it). After replacing the folder, always press the reload arrow on the Seal Helper card in `chrome://extensions`, then reload Seal. The sidebar shows its version (v1.0.0) at the bottom.
+
+## What 1.0 changes: the sidebar, reorganised
+
+- **Lab notebook first**: Overview, Projects, Experiments, Protocols, Inventory, Calculators & files, with their counts.
+- **You**: Today, My work, To publish. Inbox lives on the To publish page (a tab opens your Seal inbox) and as an icon at the bottom.
+- **Recent**: the five records you opened last, a coloured dot for their status.
+- **Favourites**, then **Seal views**, folded by default with their count.
+- **Help moved to the « ? » at the bottom**: How to, Lab tree, Seal FAQs, Give feedback, Seal's own help, and the Getting around card.
 
 ## 0.9.2 fixes
 
