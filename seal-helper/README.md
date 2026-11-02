@@ -4,7 +4,7 @@ A Chrome extension that makes Seal calmer and easier to read. It only changes ho
 
 ## Install (2 minutes)
 
-1. Download `seal-helper-0.8.0.zip` and unzip it.
+1. Download `seal-helper-0.8.1.zip` and unzip it.
 2. Open `chrome://extensions` and switch on **Developer mode** (top right).
 3. Click **Load unpacked** and pick the unzipped `seal-helper` folder.
 4. Open Seal. Click the extension icon (puzzle piece, then pin Seal Helper) to switch each setting on or off.
@@ -13,7 +13,16 @@ To update: replace the folder with the new one, then click the reload arrow on t
 
 ## If you see no change
 
-Click the extension icon on a Seal tab: the first card says whether Seal Helper is **active on this tab**, **paused**, or whether the tab **needs a reload** after an update (one button does it). After replacing the folder, always press the reload arrow on the Seal Helper card in `chrome://extensions`, then reload Seal. The sidebar shows its version (v0.8.0) at the bottom.
+Click the extension icon on a Seal tab: the first card says whether Seal Helper is **active on this tab**, **paused**, or whether the tab **needs a reload** after an update (one button does it). After replacing the folder, always press the reload arrow on the Seal Helper card in `chrome://extensions`, then reload Seal. The sidebar shows its version (v0.8.1) at the bottom.
+
+## 0.8.1 fixes
+
+- The notebook page was squeezed into the width of its hidden menu: the menu column is now collapsed to zero width and the page takes the whole space.
+- The sidebar could follow a sideways scroll of the page: it is now anchored to the window and the page no longer scrolls sideways.
+- Seal's « Start Here » record (the page that holds the notebook) is recognised as the notebook: the sidebar says *Notebook / Overview*, the sections highlight, no record header is added there.
+- **Open on Today** now does what it says on any lab: Today first when you arrive, one click to the notebook. Switch it off in the popup to land on the notebook page.
+- Views kept in folded groups are found (the groups are unfolded once in the hidden Seal panel), so *from template* finds Protocols or Projects wherever they are; without such a view it falls back to Seal's own **+ New** list.
+- Experiments in progress and projects counted next to their section in the sidebar.
 
 ## What 0.8 adds
 

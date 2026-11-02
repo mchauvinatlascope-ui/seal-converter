@@ -14,7 +14,7 @@
   const isMac = /Mac/.test(navigator.platform);
   let opts = { ...DEFAULTS };
   const isOn = k => opts.on && opts[k];
-  const VERSION = '0.8.0';
+  const VERSION = '0.8.1';
 
   // ---------------------------------------------------------------- outils
   function h(tag, attrs, ...kids) {
@@ -239,6 +239,19 @@
     step();
   }
 
+  // Les Views rangees dans des groupes replies sont invisibles : on deplie les groupes une fois (volet cache).
+  let expandRounds = 0;
+  function expandViews() {
+    if (expandRounds >= 3) return;
+    const views = readViews();
+    if (!views || !views.length) return;
+    const closed = views.filter(v => v.group && !v.open);
+    if (!closed.length) { expandRounds = 3; return; }
+    expandRounds++;
+    closed.forEach((v, i) => setTimeout(() => press(v.el), i * 120));
+    setTimeout(() => { sideSig = ''; schedule(); }, closed.length * 120 + 400);
+  }
+
   function saveLab() {
     chrome.storage.sync.set({ [LAB_KEY]: lab.map(({ id, label, icon, match, path }) => ({ id, label, icon, match, path })) });
   }
@@ -386,9 +399,9 @@
       if (el) { pressIn(el); if (after) after(); hideToast(); render(true); return true; }
       return false;
     };
-    if (isWorkspaceRoot() && tryIt()) return;
+    if (atNotebook() && tryIt()) return;
     if (what) toast(`Opening ${what}…`);
-    if (!isWorkspaceRoot()) {
+    if (!atNotebook()) {
       const d = data();
       const home = [...d.favourites, ...d.recent].find(r => r.type && r.type[0] === 'Page');
       if (home) press(home.el);
@@ -426,7 +439,7 @@
   function toast(msg, kind = 'info', ms = 4000) {
     if (!document.body) return;
     let el = $('#sh-toast');
-    if (!el) { el = h('div', { id: 'sh-toast', class: 'sh', role: 'status', 'aria-live': 'polite' }); document.body.append(el); }
+    if (!el) { el = h('div', { id: 'sh-toast', class: 'sh', role: 'status', 'aria-live': 'polite' }); root.append(el); }
     el.replaceChildren(icon(kind === 'warn' ? 'warn' : kind === 'ok' ? 'check' : 'today'), h('span', {}, msg));
     el.className = 'sh show ' + kind;
     clearTimeout(toastTimer);
@@ -448,7 +461,12 @@
     const views = readViews() || [];
     if (!views.length && tries < 4) { panesTried = 0; ensurePanes(); setTimeout(() => openFromTemplate(key, tries + 1), 700); return; }
     const v = templateView(key, views);
-    if (!v) { toast(`Seal has no “${key}s” view yet, so there is no template list to open.`, 'warn', 6000); return; }
+    if (!v) {
+      const nb = $('[data-testid="navbar-new-entity-button"]');
+      if (nb) { page = null; press(nb); toast(`Choose the ${key} template in Seal’s list.`, 'ok', 5000); render(true); }
+      else toast(`Seal has no “${key}s” view yet, so there is no template list to open.`, 'warn', 6000);
+      return;
+    }
     toast(`Opening ${v.title}: pick a template…`);
     go(v.el);
     const until = Date.now() + 8000;
@@ -504,17 +522,21 @@
     col.setAttribute('data-sh-hidden', '');
   }
   function ensureHideStyle(doc) {
-    if ($('#sh-app-style', doc)) return;
-    const st = doc.createElement('style');
+    const css = '[data-sh-hidden]{width:0!important;min-width:0!important;flex:0 0 0!important;padding:0!important;margin:0!important;border:0!important;overflow:hidden!important;visibility:hidden!important}'
+      + '*:has(>[data-sh-hidden]){grid-template-columns:minmax(0,1fr)!important}'
+      + '[data-sh-hidden]~*{grid-column:1/-1!important;min-width:0}';
+    let st = $('#sh-app-style', doc);
+    if (st) { if (st.textContent !== css) st.textContent = css; return; }
+    st = doc.createElement('style');
     st.id = 'sh-app-style';
-    st.textContent = '[data-sh-hidden]{display:none!important}';
+    st.textContent = css;
     doc.head.append(st);
   }
 
   // Type de la fiche ouverte (icone de l en-tete) -> section du cahier qui la contient.
   const KIND = { 'lab-test': /experiment|manip/i, box: /project/i };
   function recordSection() {
-    if (isWorkspaceRoot() || page) return '';
+    if (atNotebook() || page) return '';
     const header = $('[data-testid="changeset-top-navbar"], [data-testid="entity-top-navbar"]');
     const ic = header && $('[data-title-heading] [data-icon], [data-icon]', header);
     const re = ic && KIND[ic.getAttribute('data-icon')];
@@ -594,15 +616,23 @@
   let page = null;
   let lastRoute = '';
   let guideOpened = false;
-  let autoHome = false;
   const isWorkspaceRoot = () => /^\/o\/[^/]+\/s\/[^/]+\/?$/.test(location.pathname);
+  // La page d accueil du labo (« Start Here ») est une fiche Seal qui contient l appli : c est le cahier.
+  const atNotebook = () => isWorkspaceRoot() || !!$('iframe[title="Custom Content"]');
 
   function onRoute() {
     if (location.pathname === lastRoute) return;
     lastRoute = location.pathname;
     closeUntil = Date.now() + 4000;
-    page = isOn('home') && isWorkspaceRoot() && !guideOpened && !appSections.length ? 'home' : null;
-    autoHome = page === 'home';
+    page = null;
+  }
+  let arrived = false;
+  function arriveOnToday() {
+    if (arrived || !isOn('home') || !isOn('side') || page || guideOpened) return;
+    if (!atNotebook() || !$('[data-testid="platform-layout"]')) return;
+    arrived = true;
+    page = 'home';
+    try { history.replaceState({ ...(history.state || {}), sh: 'home' }, '', location.href); } catch (e) {}
   }
 
   function go(el) {
@@ -617,7 +647,7 @@
   const PAGE_NAME = { home: 'Today', work: 'My work', pub: 'To publish', pick: 'Shortcut' };
   function whereAmI(d) {
     if (page) return [PAGE_NAME[page] || ''];
-    if (isWorkspaceRoot()) return appActive ? ['Notebook', appActive] : ['Notebook'];
+    if (atNotebook()) return appActive ? ['Notebook', appActive] : ['Notebook'];
     const sec = recordSection();
     const cur = d.views.find(v => v.current && !v.group);
     if (cur && !sec && !$('[data-testid="entity-top-navbar"]')) return ['View', cur.title];
@@ -639,7 +669,7 @@
   function openGuide(d) {
     guideOpened = true;
     page = null;
-    if (!isWorkspaceRoot()) {
+    if (!atNotebook()) {
       const app = d.favourites.find(f => f.type[0] === 'Page') || d.favourites[0];
       if (app) press(app.el);
     }
@@ -671,6 +701,13 @@
     return 'draft';
   }
 
+  // Nombre affiche a droite d une section : experiences en cours, projets, modeles de protocoles.
+  function sectionCount(label) {
+    if (!appData) return null;
+    const m = appData.metrics.find(x => new RegExp(x.view || x.label.split(' ')[0], 'i').test(label) || new RegExp(label.split(/\W/)[0], 'i').test(x.label));
+    return m && m.n ? h('span', { class: 'sh-n', title: m.label }, String(m.n)) : null;
+  }
+
   function buildSide(d) {
     const side = h('aside', { id: 'sh-side', class: 'sh', 'aria-label': 'Seal navigation' });
     const sw = $('[data-testid="system-switcher"]');
@@ -690,7 +727,7 @@
 
     const top = h('div', { class: 'sh-block' });
     if (appCreates.length) {
-      const tpls = Object.keys(TEMPLATE_VIEW).filter(k => templateView(k, d.views));
+      const tpls = Object.keys(TEMPLATE_VIEW).filter(k => templateView(k, d.views) || (d.newBtn && appCreates.some(c => c.key === k)));
       const item = (cls, ico, tintKey, label, hint, onclick) => h('button', { type: 'button', role: 'menuitem', class: 'sh-newitem ' + cls, onclick },
         h('span', { class: 'sh-ti sm ' + tint(tintKey) }, icon(ico)),
         h('span', { class: 'sh-nt' }, h('span', { class: 'sh-t' }, label), hint ? h('small', {}, hint) : null));
@@ -698,7 +735,7 @@
         h('div', { class: 'sh-newhead' }, 'In the lab notebook'),
         appCreates.map(c => item('', CREATE_ICON[c.key] || 'doc', CREATE_ICON[c.key] || 'doc', c.label, CREATE_HINT[c.key], () => { newOpen = false; openCreate(c.key); })),
         tpls.length ? h('div', { class: 'sh-newhead' }, 'From a Seal template') : null,
-        tpls.map(k => item('tpl', 'tpl', CREATE_ICON[k] || 'doc', (CREATE_LABEL[k] || 'New ' + k) + ' from template', 'Choose among the templates of ' + templateView(k, d.views).title, () => { newOpen = false; openFromTemplate(k); })),
+        tpls.map(k => item('tpl', 'tpl', CREATE_ICON[k] || 'doc', (CREATE_LABEL[k] || 'New ' + k) + ' from template', templateView(k, d.views) ? 'Choose among the templates of ' + templateView(k, d.views).title : 'Choose the template in Seal’s New list', () => { newOpen = false; openFromTemplate(k); })),
         d.newBtn ? item('other', 'plus', 'grey', 'Other Seal record…', 'Any record type Seal knows', () => { newOpen = false; press(d.newBtn); }) : null);
       top.append(h('div', { class: 'sh-new' },
         h('button', { type: 'button', class: 'sh-newbtn', 'aria-expanded': String(newOpen), 'aria-haspopup': 'menu', onclick: () => { newOpen = !newOpen; render(true); } },
@@ -727,14 +764,14 @@
     }
 
     if (appSections.length) {
-      const here = isWorkspaceRoot() && !page;
+      const here = atNotebook() && !page;
       const inSec = recordSection();
       scroll.append(h('div', { class: 'sh-group' }, d.lab ? (d.lab.charAt(0) + d.lab.slice(1).toLowerCase() + ' lab') : 'Lab'));
       for (const l of appSections) {
         const create = appCreates.find(c => CREATE_SECTION[c.key] && CREATE_SECTION[c.key].test(l) && !/panel|antibodies/.test(c.key));
         scroll.append(h('div', { class: 'sh-sc' },
           h('button', { type: 'button', class: 'sh-row sh-app' + ((here && appActive === l) || inSec === l ? ' on' : ''), title: `Open ${l} in the lab notebook`, onclick: () => openAppSection(l) },
-            icon(appIcon(l)), h('span', { class: 'sh-t' }, l)),
+            icon(appIcon(l)), h('span', { class: 'sh-t' }, l), sectionCount(l)),
           create ? h('button', { type: 'button', class: 'sh-edit', title: create.label, 'aria-label': create.label, onclick: () => openCreate(create.key) }, icon('plus')) : null));
       }
     }
@@ -1110,7 +1147,7 @@
 
   let propsSig = '';
   function renderProps() {
-    const header = $('[data-testid="changeset-top-navbar"], [data-testid="entity-top-navbar"]');
+    const header = atNotebook() ? null : $('[data-testid="changeset-top-navbar"], [data-testid="entity-top-navbar"]');
     const old = $('#sh-props');
     const props = isOn('props') && header ? readProps() : [];
     const sec = isOn('props') && header && isOn('side') ? recordSection() : '';
@@ -1173,16 +1210,16 @@
     const d = data();
     const sig = JSON.stringify([page, d.lab, d.favourites.map(r => r.title + r.status + r.current), d.recent.map(r => r.title + r.status + r.current),
       d.mine.map(r => r.title + r.status), d.changes.map(c => c.hash + c.open + c.title + c.day + c.time), d.views.map(v => v.title + v.depth + v.open),
-      d.changeset && [d.changeset.hash, d.changeset.name, d.changeset.rows.map(r => r.title + r.current)], !!d.newBtn, showEmpty, workFilter, workType, lab, labOpen, pickFor, allViewsOpen, appSections, appActive, isWorkspaceRoot(), recordSection(), location.pathname, newOpen, appCreates, appData && appData.at]);
+      d.changeset && [d.changeset.hash, d.changeset.name, d.changeset.rows.map(r => r.title + r.current)], !!d.newBtn, showEmpty, workFilter, workType, lab, labOpen, pickFor, allViewsOpen, appSections, appActive, atNotebook(), recordSection(), location.pathname, newOpen, appCreates, appData && appData.at]);
     if (!force && sig === sideSig && $('#sh-side')) return;
     sideSig = sig;
     $('#sh-side')?.remove();
-    document.body.append(buildSide(d));
+    root.append(buildSide(d));
     const old = $('#sh-page');
     if (page) {
       const pg = h('main', { id: 'sh-page', class: 'sh', 'aria-label': page }, page === 'home' ? buildHome(d) : page === 'work' ? buildWork(d) : page === 'pick' ? buildPick(d) : buildPub(d));
       const top = old ? old.scrollTop : 0;
-      if (old) old.replaceWith(pg); else document.body.append(pg);
+      if (old) old.replaceWith(pg); else root.append(pg);
       pg.scrollTop = top;
     } else if (old) old.remove();
     root.classList.toggle('sh-page-open', !!page);
@@ -1283,10 +1320,9 @@
     if (isOn('doc')) step('doc', () => markRules(document.body));
     if (isOn('quiet')) step('quiet', () => markFaded(document.body));
     step('info', closeInfoOnArrival);
-    if (isOn('side')) { step('app', readApp); step('panes', ensurePanes); step('resume', resumePending); }
+    if (isOn('side')) { step('app', readApp); step('panes', ensurePanes); step('views', expandViews); step('resume', resumePending); }
     else step('unhide', () => { const doc = appDoc(); const hid = doc && $('[data-sh-hidden]', doc); if (hid) hid.removeAttribute('data-sh-hidden'); });
-    // Le labo a sa propre page d accueil : on la laisse a l arrivee au lieu de Today.
-    if (page === 'home' && autoHome && $('iframe[title="Custom Content"]')) { page = null; autoHome = false; }
+    if (isOn('side')) step('arrive', arriveOnToday);
     step('side', () => render(false));
     if (isOn('props')) { step('props', renderProps); step('outline', renderOutline); }
     else { $('#sh-props')?.remove(); $('#sh-outline')?.remove(); root.classList.remove('sh-has-outline'); }
