@@ -14,7 +14,7 @@
   const isMac = /Mac/.test(navigator.platform);
   let opts = { ...DEFAULTS };
   const isOn = k => opts.on && opts[k];
-  const VERSION = '1.0.2';
+  const VERSION = '1.0.3';
 
   // ---------------------------------------------------------------- outils
   function h(tag, attrs, ...kids) {
@@ -591,19 +591,25 @@
     const hid = $('[data-sh-hidden]', doc);
     const W = doc.documentElement.clientWidth, H = doc.documentElement.clientHeight;
     if (!W || !H) return true;
-    // On compte les elements qui portent du texte : combien sont a l ecran ?
-    let total = 0, visible = 0, n = 0;
+    // Elements porteurs de texte : ils doivent etre dans la largeur du cadre (la page peut
+    // defiler en hauteur, donc ce qui est sous la ligne de flottaison compte comme visible),
+    // et le debut du contenu doit etre a l ecran.
+    let total = 0, across = 0, n = 0, firstTop = null;
     const walk = el => {
       if (!el || el === hid || n++ > 1500) return;
       if ([...el.childNodes].some(c => c.nodeType === 3 && c.textContent.trim().length > 1)) {
-        total++;
         const r = el.getBoundingClientRect();
-        if (r.width > 0 && r.height > 0 && r.right > 0 && r.bottom > 0 && r.left < W && r.top < H) visible++;
+        total++;
+        if (r.width > 0 && r.height > 0) {
+          if (r.right > 0 && r.left < W) across++;
+          if (firstTop === null) firstTop = r.top;
+        }
       }
       for (const c of el.children) walk(c);
     };
     walk(doc.body);
-    return total < 5 || visible / total >= 0.3;
+    if (total < 5) return true;
+    return across / total >= 0.3 && firstTop !== null && firstTop < H;
   }
   const badSince = new WeakMap();
   function verifyHide(doc) {
@@ -633,7 +639,7 @@
     lines.push('way ' + hideWay(doc) + ' hidden ' + (hid ? selOf(hid) : 'none') + ' nav ' + (nav ? nav.byLabel.size : 0) + ' visible ' + contentVisible(doc));
     const rect = el => { const r = el.getBoundingClientRect(); return Math.round(r.left) + ',' + Math.round(r.top) + ' ' + Math.round(r.width) + 'x' + Math.round(r.height); };
     const cs = el => { const c = doc.defaultView.getComputedStyle(el); return c.display + (c.display.includes('grid') ? ' cols[' + c.gridTemplateColumns + '] rows[' + c.gridTemplateRows + ']' : '') + (c.position !== 'static' ? ' ' + c.position : ''); };
-    lines.push('frame ' + doc.documentElement.clientWidth + 'x' + doc.documentElement.clientHeight);
+    lines.push('frame ' + doc.documentElement.clientWidth + 'x' + doc.documentElement.clientHeight + ' scroll ' + doc.documentElement.scrollWidth + 'x' + doc.documentElement.scrollHeight + ' learned ' + (learnedWay || '-'));
     const dump = (el, depth) => { if (!el || depth > 3) return; lines.push('  '.repeat(depth) + selOf(el) + (el === hid ? ' [HIDDEN]' : '') + ' ' + rect(el) + ' ' + cs(el)); if (el !== hid) for (const c of [...el.children].slice(0, 8)) dump(c, depth + 1); };
     dump(doc.body, 0);
     return lines.join('\n');
