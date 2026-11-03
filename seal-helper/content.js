@@ -14,7 +14,7 @@
   const isMac = /Mac/.test(navigator.platform);
   let opts = { ...DEFAULTS };
   const isOn = k => opts.on && opts[k];
-  const VERSION = '1.8.0';
+  const VERSION = '1.8.1';
 
   // Ecran de passage : quand on doit recharger la page (fiche -> cahier, cahier -> fiche), un ecran
   // calme au nom de la destination couvre le depart, le rechargement et les sauts de l appli,
@@ -500,7 +500,7 @@
         const link = cellEl ? $('a[href], [data-record], [data-native], button', cellEl) : null;
         const href = link && link.getAttribute('href') || '';
         const m = href.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
-        return { title: cell('title') || cell('id'), id: cell('id'), project: cell('project'), status: cell('status'), updated: cell('updated'), owner: cell('owner'),
+        return { title: cell('title') || cell('id'), id: cell('id'), project: cell('project'), status: cell('status'), updated: cell('updated'), owner: cell('owner'), folder: cell('folder'),
           record: (link && (link.getAttribute('data-record') || link.getAttribute('data-native'))) || (m ? m[0] : ''), href };
       }).filter(r => r.title);
       if (rows.length) return { at: Date.now(), rows };
@@ -1446,39 +1446,43 @@
 
   let workFilter = '';
   let listSec = '', listFilter = '', listStatus = '';
+  // Meme allure que les pages du cahier (Back, titre, phrase, bouton bleu, tableau dans une carte).
   function buildList(d) {
     const t = appTables[listSec] || { rows: [], at: 0 };
     const all = t.rows;
     const f = listFilter.toLowerCase();
     const has = k => all.some(r => r[k] && r[k] !== r.title);
-    const cols = ['id', 'project', 'status', 'updated'].filter(has);
-    const NAME = { id: 'ID', project: 'Project', status: 'Status', updated: 'Updated' };
+    const cols = ['id', 'project', 'status', 'folder', 'updated'].filter(has);
+    const NAME = { id: 'ID', project: 'Project', status: 'Status', folder: 'Folder', updated: 'Updated' };
     const rows = all.filter(r => !f || [r.title, r.id, r.project, r.owner].join(' ').toLowerCase().includes(f))
       .filter(r => !listStatus || statusClass(r.status || '') === listStatus);
-    const statuses = [...new Set(all.map(r => r.status).filter(Boolean))];
-    const stChips = statuses.length > 1 ? h('div', { class: 'sh-chips', role: 'group', 'aria-label': 'Status' },
-      [['', 'All'], ...statuses.map(st => [statusClass(st), st])].filter((x, i, a) => a.findIndex(y => y[0] === x[0]) === i)
-        .map(([k, l]) => h('button', { type: 'button', class: 'sh-chip' + (listStatus === k ? ' on' : ''), 'aria-pressed': String(listStatus === k), onclick: () => { listStatus = k; render(true); } }, l))) : null;
-    const input = h('input', { type: 'search', id: 'sh-lfilter', class: 'sh-input', placeholder: 'Filter by name, ID or project', value: listFilter,
-      oninput: e => { listFilter = e.target.value; render(true); const i = $('#sh-lfilter'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } } });
     const create = appCreates.find(c => CREATE_SECTION[c.key] && CREATE_SECTION[c.key].test(listSec) && !/panel|antibodies/.test(c.key));
+    const word = listSec.toLowerCase();
     const seen = t.at ? new Date(t.at).toLocaleString('en-NZ', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : '';
-    const table = h('table', { class: 'sh-table' },
-      h('thead', {}, h('tr', {}, h('th', {}, listSec.replace(/s$/, '')), cols.map(k => h('th', {}, NAME[k])), h('th', {}, ''))),
-      h('tbody', {}, rows.map(r => h('tr', { newtab: recUrl(r), onclick: () => openTableRow(listSec, r), tabindex: '0', onkeydown: e => e.key === 'Enter' && openTableRow(listSec, r) },
-        h('td', {}, h('span', { class: 'sh-cell' }, h('span', { class: 'sh-ti sm' }, icon(appIcon(listSec))), h('b', {}, r.title))),
-        cols.map(k => h('td', { class: k === 'status' ? '' : 'sh-muted' }, k === 'status' ? pill(r.status) : r[k] || '')),
-        h('td', { class: 'sh-go' }, 'Open ›')))));
-    return h('div', { class: 'sh-wrap' },
-      h('div', { class: 'sh-hello' },
-        h('div', {}, h('div', { class: 'sh-eyebrow' }, 'Lab notebook'), h('h1', {}, listSec),
-          h('p', {}, all.length + ' in the notebook' + (seen ? ', as seen there ' + seen : '') + '. Ctrl+click opens a record in a new tab.')),
-        h('div', { class: 'sh-actions' },
-          create ? h('button', { type: 'button', class: 'sh-btn', onclick: () => openCreate(create.key) }, icon('plus'), ' ' + create.label) : null,
-          h('button', { type: 'button', class: 'sh-btn ghost', title: 'Opens this section in the notebook itself, with its latest content', onclick: () => openAppSection(listSec, true) }, 'Open in the notebook'))),
-      h('div', { class: 'sh-hello' }, input, stChips),
-      h('section', { class: 'sh-panel' }, rows.length ? table : h('p', { class: 'sh-empty' }, all.length ? 'Nothing matches.' : 'Nothing in this list yet.')));
+    const input = h('input', { type: 'search', id: 'sh-lfilter', class: 'sh-nbl-filter', placeholder: 'Filter', value: listFilter, 'aria-label': 'Filter by name, ID or project',
+      oninput: e => { listFilter = e.target.value; render(true); const i = $('#sh-lfilter'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } } });
+    const open = r => openTableRow(listSec, r);
+    const simple = !cols.some(k => k !== 'id');
+    const body = simple
+      ? h('div', { class: 'sh-nbl-rows' }, rows.map(r => h('button', { type: 'button', class: 'sh-nbl-row', newtab: recUrl(r), onclick: () => open(r) },
+          h('span', { class: 'sh-nbl-rt' }, h('b', {}, r.title), r.id ? h('small', {}, r.id) : null), h('span', { class: 'sh-nbl-chev', 'aria-hidden': 'true' }, '›'))))
+      : h('table', { class: 'sh-nbl-table' },
+          h('thead', {}, h('tr', {}, h('th', {}, listSec.replace(/s$/, '')), cols.map(k => h('th', {}, NAME[k])))),
+          h('tbody', {}, rows.map(r => h('tr', { newtab: recUrl(r), onclick: () => open(r), tabindex: '0', onkeydown: e => e.key === 'Enter' && open(r) },
+            h('td', {}, h('span', { class: 'sh-nbl-link' }, r.title)),
+            cols.map(k => h('td', {}, k === 'status' ? (r.status ? pill(r.status) : h('span', { class: 'sh-nbl-dash' }, '–')) : r[k] || ''))))));
+    return h('div', { class: 'sh-nbl' },
+      h('button', { type: 'button', class: 'sh-nbl-back', onclick: () => history.back() }, '← Back'),
+      h('div', { class: 'sh-nbl-head' },
+        h('div', {}, h('h1', {}, listSec), h('p', {}, all.length + ' ' + (all.length === 1 ? word.replace(/s$/, '') : word) + ' across the team.')),
+        create ? h('button', { type: 'button', class: 'sh-nbl-new', onclick: () => openCreate(create.key) }, '+ ' + create.label) : null),
+      h('section', { class: 'sh-nbl-card' },
+        h('div', { class: 'sh-nbl-bar' }, h('span', {}, 'All team records, newest first'), input),
+        rows.length ? body : h('p', { class: 'sh-nbl-empty' }, all.length ? 'Nothing matches.' : 'Nothing in this list yet.')),
+      h('p', { class: 'sh-nbl-note' }, (seen ? 'As last seen in the notebook, ' + seen + '. ' : '') + 'Ctrl+click opens a record in a new tab. ',
+        h('button', { type: 'button', class: 'sh-nbl-live', onclick: () => openAppSection(listSec, true) }, 'Open in the notebook')));
   }
+
   let workType = '';
   let workSrc = ''; // '' = cahier si disponible, 'seal' = fiches recentes de Seal
   let workStatus = '';
