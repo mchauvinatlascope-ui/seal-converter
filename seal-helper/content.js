@@ -14,7 +14,7 @@
   const isMac = /Mac/.test(navigator.platform);
   let opts = { ...DEFAULTS };
   const isOn = k => opts.on && opts[k];
-  const VERSION = '1.4.1';
+  const VERSION = '1.4.2';
 
   // ---------------------------------------------------------------- outils
   function h(tag, attrs, ...kids) {
@@ -413,7 +413,7 @@
     };
     const tick = () => {
       if (done() || Date.now() > until) { setTimeout(() => veil(false), 150); render(true); return; }
-      if (find && presses < 6 && Date.now() - lastPress > 600) {
+      if (find && presses < 6 && Date.now() - lastPress > 400) {
         const doc = appDoc(); const el = doc && find(doc);
         if (el) { pressIn(el); presses++; lastPress = Date.now(); }
       }
@@ -432,7 +432,7 @@
       const el = doc && find(doc);
       if (el) { pressIn(el); if (after) after(); hideToast(); render(true); settle(resume, from, find); return true; }
       // Le bouton n est pas dans la vue courante de l appli : on repasse par son accueil, une fois.
-      if (doc && !homeTried && Date.now() - started > 600) { const nav = appNav(doc); const first = nav && nav.byLabel.values().next().value; if (first) { homeTried = 1; pressIn(first); } }
+      if (doc && !homeTried && Date.now() - started > 400) { const nav = appNav(doc); const first = nav && nav.byLabel.values().next().value; if (first) { homeTried = 1; pressIn(first); } }
       return false;
     };
     const started = Date.now();
@@ -442,7 +442,10 @@
     if (!atNotebook()) {
       const d = data();
       const home = [...d.favourites, ...d.recent].find(r => r.type && r.type[0] === 'Page');
-      if (home) press(home.el);
+      const header = $('[data-testid="entity-top-navbar"]');
+      const onHome = home && header && txt($('[data-title-text]', header)) === home.title;
+      if (onHome) { /* deja sur la page du cahier, son menu n est pas encore la : la boucle attend */ }
+      else if (home) press(home.el);
       else {
         const m = location.pathname.match(/^\/o\/[^/]+\/s\/[^/]+/);
         if (m) { try { if (resume) sessionStorage.setItem(PENDING, JSON.stringify({ ...resume, at: Date.now() })); } catch (e) {} location.assign(m[0]); }
@@ -453,10 +456,10 @@
     const until = Date.now() + 12000;
     const loop = () => {
       if (tryIt()) return;
-      if (Date.now() < until) appWait = setTimeout(loop, 250);
+      if (Date.now() < until) appWait = setTimeout(loop, 120);
       else { veil(false); if (what) toast(`Couldn’t find “${what}” in the notebook. Open it from the notebook page.`, 'warn', 6000); }
     };
-    appWait = setTimeout(loop, 250);
+    appWait = setTimeout(loop, 120);
   }
   // Dernier choix du menu New : il remonte en tete de son groupe la fois suivante.
   let lastNew = (() => { try { return JSON.parse(localStorage.getItem('sh-lastnew') || 'null'); } catch (e) { return null; } })();
@@ -750,7 +753,19 @@
   let guideOpened = false;
   const isWorkspaceRoot = () => /^\/o\/[^/]+\/s\/[^/]+\/?$/.test(location.pathname);
   // La page d accueil du labo (« Start Here ») est une fiche Seal qui contient l appli : c est le cahier.
-  const atNotebook = () => isWorkspaceRoot() || !!$('iframe[title="Custom Content"]');
+  // Une manip peut aussi contenir un cadre (modeles de protocoles) : seul un cadre qui porte le menu du labo compte.
+  const navCache = new WeakMap();
+  function notebookDoc() {
+    const doc = appDoc();
+    if (!doc) return null;
+    const c = navCache.get(doc);
+    if (c && Date.now() - c.at < 800) return c.nav ? doc : null;
+    let nav = null;
+    try { nav = appNav(doc); } catch (e) {}
+    navCache.set(doc, { at: Date.now(), nav: !!nav });
+    return nav ? doc : null;
+  }
+  const atNotebook = () => isWorkspaceRoot() || !!notebookDoc();
 
   function onRoute() {
     if (location.pathname === lastRoute) return;
