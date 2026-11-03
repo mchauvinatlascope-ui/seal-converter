@@ -485,3 +485,14 @@ html.sh-side, html.sh-side body { overflow-x: hidden !important; }
 #sh-page .sh-loading::before { content: ""; display: inline-block; width: 10px; height: 10px; margin-right: 8px; border: 2px solid var(--sh-line); border-top-color: var(--sh-ink3); border-radius: 50%; vertical-align: -1px; animation: sh-spin .9s linear infinite; }
 @keyframes sh-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { #sh-page .sh-loading::before { animation: none; } }
+
+/* 1.2 : actions de la fiche (statut, version, Edit, changements, publication) a droite du bandeau */
+#sh-props { align-items: center; }
+#sh-props .sh-acts { margin-left: auto; display: flex; align-items: center; gap: 6px; align-self: center; }
+#sh-props .sh-act { display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 10px; border: 1px solid var(--sh-line); border-radius: 7px; background: var(--sh-bg); font-size: 12.5px; font-weight: 550; color: var(--sh-ink); white-space: nowrap; }
+#sh-props .sh-act:hover { background: var(--sh-side); border-color: #cfcfca; }
+#sh-props .sh-act.aspill { padding: 0 6px 0 4px; }
+#sh-props .sh-act.primary { background: var(--sh-ink); color: #fff; border-color: var(--sh-ink); }
+#sh-props .sh-act.primary:hover { background: #2b2e34; }
+#sh-props .sh-act .sh-chev { width: 12px; height: 12px; color: var(--sh-ink3); }
+#sh-props .sh-act .sh-chev svg { transform: rotate(90deg); }

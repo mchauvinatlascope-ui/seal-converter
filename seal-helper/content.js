@@ -14,7 +14,7 @@
   const isMac = /Mac/.test(navigator.platform);
   let opts = { ...DEFAULTS };
   const isOn = k => opts.on && opts[k];
-  const VERSION = '1.1.0';
+  const VERSION = '1.2.0';
 
   // ---------------------------------------------------------------- outils
   function h(tag, attrs, ...kids) {
@@ -1356,13 +1356,29 @@
   }
 
   let propsSig = '';
+  // Boutons de l en-tete Seal qu on relaie : trouves par leur role, jamais recrees.
+  function headerActions(header) {
+    const btns = $$('button, a', header).filter(b => !b.closest('.sh'));
+    const byText = re => btns.find(b => re.test(txt(b)) || re.test(b.getAttribute('aria-label') || ''));
+    const out = [];
+    const status = $('[data-seal-header-badge] button, [data-seal-header-badge] [role="button"]', header) || byText(/^select status$/i);
+    if (status) { const t = txt(status); out.push({ key: 'status', label: /select status/i.test(t) ? 'Set status' : t, el: status, pill: !/select status/i.test(t), title: 'Change the status' }); }
+    const ver = $('[data-seal-version-and-badge] [role="button"], [data-seal-version-and-badge] button', header);
+    if (ver) out.push({ key: 'version', label: txt(ver).replace(/\s+/g, ' '), el: ver, pill: true, title: 'Versions' });
+    const edit = byText(/^edit$/i); if (edit) out.push({ key: 'edit', label: 'Edit', el: edit, title: 'Edit this record' });
+    const changes = byText(/show changes|^changes\b/i); if (changes) out.push({ key: 'changes', label: txt(changes).replace(/^show /i, '') || 'Changes', el: changes, title: 'What changed in this version' });
+    const cs = byText(/changeset\s*#\d+/i); if (cs) out.push({ key: 'cs', label: txt(cs), el: cs, title: 'Open this change set' });
+    const pub = byText(/publish|submit for review|review and publish|approve/i); if (pub) out.push({ key: 'pub', label: txt(pub), el: pub, primary: true, title: 'Publish this change' });
+    return out;
+  }
   function renderProps() {
     const header = atNotebook() ? null : $('[data-testid="changeset-top-navbar"], [data-testid="entity-top-navbar"]');
     const old = $('#sh-props');
     const props = isOn('props') && header ? readProps() : [];
     const sec = isOn('props') && header && isOn('side') ? recordSection() : '';
-    const sig = sec + '#' + props.map(p => p.label + '=' + p.value).join('|');
-    if (!props.length && !sec) { if (old) old.remove(); propsSig = ''; return; }
+    const acts = isOn('props') && header ? headerActions(header) : [];
+    const sig = sec + '#' + props.map(p => p.label + '=' + p.value).join('|') + '#' + acts.map(a => a.key + a.label).join('|');
+    if (!props.length && !sec && !acts.length) { if (old) old.remove(); propsSig = ''; return; }
     if (old && sig === propsSig && old.previousElementSibling === header) return;
     propsSig = sig;
     const bar = h('div', { id: 'sh-props', class: 'sh' },
@@ -1376,7 +1392,10 @@
           h('span', { class: 'sh-sep' }, '›')] : []),
         h('span', { class: 'sh-crumb-here' }, (txt($('[data-title-text]', header)) || '').split(/\s+[-–—]\s+/)[0].slice(0, 32))) : null,
       props.map(p => h('button', { type: 'button', class: 'sh-prop', title: 'Go to ' + p.label, onclick: () => p.card.scrollIntoView({ behavior: 'smooth', block: 'center' }) },
-        h('small', {}, p.label), /status/i.test(p.label) ? pill(p.value) : h('span', {}, p.value))));
+        h('small', {}, p.label), /status/i.test(p.label) ? pill(p.value) : h('span', {}, p.value))),
+      acts.length ? h('div', { class: 'sh-acts', role: 'group', 'aria-label': 'Record actions' },
+        acts.map(a => h('button', { type: 'button', class: 'sh-act' + (a.primary ? ' primary' : '') + (a.pill ? ' aspill' : ''), title: a.title, onclick: () => press(a.el) },
+          a.pill ? h('span', { class: 'sh-pill ' + statusClass(a.label) }, a.label) : a.label, a.key === 'status' || a.key === 'version' ? h('span', { class: 'sh-chev', 'aria-hidden': 'true', html: ICON.chev }) : null))) : null);
     if (old) old.remove();
     header.after(bar);
   }
