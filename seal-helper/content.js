@@ -8,13 +8,13 @@
 // reste comme d habitude.
 (() => {
   const KEY = 'sealHelper';
-  const DEFAULTS = { on: true, side: true, home: true, appmenu: true, props: true, doc: true, dates: true, info: true, quiet: true };
+  const DEFAULTS = { on: true, side: true, home: true, appmenu: false, props: true, doc: true, dates: true, info: true, quiet: true };
   const CLASSES = ['side', 'props', 'doc', 'dates', 'info', 'quiet'];
   const root = document.documentElement;
   const isMac = /Mac/.test(navigator.platform);
   let opts = { ...DEFAULTS };
   const isOn = k => opts.on && opts[k];
-  const VERSION = '1.5.4';
+  const VERSION = '1.5.5';
 
   // ---------------------------------------------------------------- outils
   function h(tag, attrs, ...kids) {
@@ -1773,8 +1773,9 @@
     if (r[APPDATA_KEY] && r[APPDATA_KEY].metrics) appData = r[APPDATA_KEY];
     schedule();
   }); } catch (e) {}
-  chrome.storage.sync.get([KEY, LAB_KEY], r => {
+  chrome.storage.sync.get([KEY, LAB_KEY, 'sealHelperMigr155'], r => {
     opts = { ...DEFAULTS, ...(r[KEY] || {}) };
+    if (!r.sealHelperMigr155) { opts = { ...opts, appmenu: false }; try { chrome.storage.sync.set({ [KEY]: opts, sealHelperMigr155: true }); } catch (e) {} }
     if (Array.isArray(r[LAB_KEY]) && r[LAB_KEY].length) lab = r[LAB_KEY];
     applyClasses();
     if (document.body) schedule();
