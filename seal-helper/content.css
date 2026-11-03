@@ -45,9 +45,9 @@
 /* ======================================================================
    Nouvelle barre de gauche : elle se pose sur l emplacement de la barre Seal
    ====================================================================== */
-html.sh-side [data-testid="fixed-nav-header"] { visibility: hidden !important; }
-html.sh-side [data-testid="nav-panel-layout-slot"] { width: 248px !important; transition: none !important; }
-html.sh-side [data-testid="nav-panel-resize-handle"] { display: none !important; }
+html.sh-side.sh-slot [data-testid="fixed-nav-header"] { visibility: hidden !important; }
+html.sh-side.sh-slot [data-testid="nav-panel-layout-slot"] { width: 248px !important; transition: none !important; }
+html.sh-side.sh-slot [data-testid="nav-panel-resize-handle"] { display: none !important; }
 
 #sh-side {
   position: fixed; left: 0; top: 0; bottom: 0; width: 248px; z-index: 1450;
@@ -443,7 +443,7 @@ html.sh-quiet [data-sh-faded]:hover, html.sh-quiet [data-sh-faded]:focus-within 
 html.sh-page-open #sh-toast { left: calc(50% + 124px); }
 
 /* 0.8.1 : la page ne defile plus de cote (la barre restait accrochee au defilement), compteurs des sections */
-html.sh-side, html.sh-side body { overflow-x: hidden !important; }
+html.sh-side.sh-slot, html.sh-side.sh-slot body { overflow-x: hidden !important; }
 #sh-side .sh-app .sh-n { font-size: 11.5px; color: var(--sh-ink3); font-variant-numeric: tabular-nums; }
 
 /* ======================================================================

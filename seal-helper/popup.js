@@ -1,5 +1,5 @@
 const KEY = 'sealHelper';
-const DEFAULTS = { on: true, side: true, home: true, appmenu: false, props: true, doc: true, dates: true, info: true, quiet: true };
+const DEFAULTS = { on: true, side: true, home: true, appmenu: false, props: true, doc: true, dates: true, info: true, quiet: true, slot: true, readnb: true };
 const IDS = Object.keys(DEFAULTS);
 
 function paint(opts) {

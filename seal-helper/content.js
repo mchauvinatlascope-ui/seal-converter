@@ -8,13 +8,13 @@
 // reste comme d habitude.
 (() => {
   const KEY = 'sealHelper';
-  const DEFAULTS = { on: true, side: true, home: true, appmenu: false, props: true, doc: true, dates: true, info: true, quiet: true };
-  const CLASSES = ['side', 'props', 'doc', 'dates', 'info', 'quiet'];
+  const DEFAULTS = { on: true, side: true, home: true, appmenu: false, props: true, doc: true, dates: true, info: true, quiet: true, slot: true, readnb: true };
+  const CLASSES = ['side', 'props', 'doc', 'dates', 'info', 'quiet', 'slot'];
   const root = document.documentElement;
   const isMac = /Mac/.test(navigator.platform);
   let opts = { ...DEFAULTS };
   const isOn = k => opts.on && opts[k];
-  const VERSION = '1.5.6';
+  const VERSION = '1.5.7';
 
   // ---------------------------------------------------------------- outils
   function h(tag, attrs, ...kids) {
@@ -695,6 +695,7 @@
     const hid = hiddenEl(doc);
     lines.push('shift ' + ((appFrame() && appFrame().dataset.shShift) || 'none') + ' rail ' + (hid ? selOf(hid) : 'none') + ' nav ' + (nav ? nav.byLabel.size : 0) + ' active [' + (nav ? nav.active : '') + '] visible ' + contentVisible(doc));
     const now = Date.now();
+    lines.push('opts slot ' + isOn('slot') + ' readnb ' + isOn('readnb') + ' home ' + isOn('home') + ' appmenu ' + isOn('appmenu'));
     lines.push('quiet on notebook ' + atNotebook() + ' · panes views ' + paneLoaded('views') + ' changes ' + paneLoaded('changes'));
     lines.push('frame loads last 10 s ' + frameLoads.filter(t => now - t < 10000).length + ' · last 60 s ' + frameLoads.filter(t => now - t < 60000).length + ' · src ' + (appFrame() ? (appFrame().getAttribute('src') || '').replace(/\?.*$/, '?…').replace(/[0-9a-f-]{20,}/g, 'ID').slice(0, 80) : '-'));
     if (nav) { const marks = [...nav.byLabel.values()].slice(0, 3).map(b => [...b.attributes].map(a => a.name).filter(n => /aria-|class|data-/.test(n)).join(',')); lines.push('rail attrs ' + marks.join(' | ')); }
@@ -801,6 +802,7 @@
   // Une manip peut aussi contenir un cadre (modeles de protocoles) : seul un cadre qui porte le menu du labo compte.
   const navCache = new WeakMap();
   function notebookDoc() {
+    if (!isOn('readnb')) return null;
     const doc = appDoc();
     if (!doc) return null;
     const c = navCache.get(doc);
@@ -810,7 +812,7 @@
     navCache.set(doc, { at: Date.now(), nav: !!nav });
     return nav ? doc : null;
   }
-  const atNotebook = () => isWorkspaceRoot() || !!notebookDoc();
+  const atNotebook = () => isWorkspaceRoot() || !!notebookDoc() || (!isOn('readnb') && (() => { const f = $('iframe[title="Custom Content"]'); return !!f && f.getBoundingClientRect().height > 200; })());
 
   function onRoute() {
     if (location.pathname === lastRoute) return;
@@ -1648,7 +1650,7 @@
     if (isOn('quiet')) step('quiet', () => markFaded(document.body));
     step('info', closeInfoOnArrival);
     if (isOn('side')) {
-      step('app', readApp);
+      if (isOn('readnb')) step('app', readApp);
       if (!atNotebook()) { if (page && !paneLoaded('changes') && Date.now() - panesTried > 3000) panesTried = 0; step('panes', ensurePanes); step('views', expandViews); }
       step('resume', resumePending);
     }

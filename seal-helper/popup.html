@@ -38,7 +38,7 @@
 </style>
 </head>
 <body>
-  <header><b>Seal Helper</b><span>v1.5.6</span><input type="checkbox" id="on" aria-label="Seal Helper on"></header>
+  <header><b>Seal Helper</b><span>v1.5.7</span><input type="checkbox" id="on" aria-label="Seal Helper on"></header>
   <div id="state" hidden><i></i><div><b></b><span></span></div></div>
   <textarea id="diag" readonly aria-label="Diagnostic"></textarea>
   <div id="tools" hidden></div>
@@ -53,6 +53,9 @@
     <label class="row" for="dates"><div>Short dates and titles<small>No time zone on every date, no repeated change number.</small></div><input type="checkbox" id="dates"></label>
     <label class="row" for="info"><div>Info panel closed<small>Closed when you open a record; open it whenever you need it.</small></div><input type="checkbox" id="info"></label>
     <label class="row" for="quiet"><div>Quieter lists<small>Empty changes and Untitled or test drafts dimmed, never hidden.</small></div><input type="checkbox" id="quiet"></label>
+    <h2>Troubleshooting</h2>
+    <label class="row" for="slot"><div>Fit Seal's panel to the sidebar<small>Narrows Seal's own left panel under the sidebar. Turn off to test if the notebook page then loads.</small></div><input type="checkbox" id="slot"></label>
+    <label class="row" for="readnb"><div>Read the notebook page<small>Reads the notebook menu, counts and tables. Turn off to test if the notebook page then loads.</small></div><input type="checkbox" id="readnb"></label>
   </div>
   <footer>Only changes how Seal looks in this browser. Nothing is written to Seal or sent anywhere.</footer>
   <script src="popup.js"></script>
