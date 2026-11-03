@@ -14,7 +14,7 @@
   const isMac = /Mac/.test(navigator.platform);
   let opts = { ...DEFAULTS };
   const isOn = k => opts.on && opts[k];
-  const VERSION = '1.0.3';
+  const VERSION = '1.1.0';
 
   // ---------------------------------------------------------------- outils
   function h(tag, attrs, ...kids) {
@@ -1340,11 +1340,14 @@
       const input = $('input, textarea, select', valEl);
       let value = input && input.value ? input.value : txt(valEl);
       if (!value || value.length > 60) continue;
-      out.push({ label, value, card });
+      // Une valeur qui est une reference (un projet, un protocole) : l element qui l ouvre.
+      const link = $('a[href], [role="link"], [data-list-item-content], button', valEl);
+      out.push({ label, value, card, link: link && txt(link) === value ? link : null });
       if (out.length >= 6) break;
     }
     return out;
   }
+  const projectProp = props => props.find(p => /project/i.test(p.label) && !/template/i.test(p.label));
 
   function readHeadings() {
     return $$('[data-native-block-type="h2"], [data-native-block-type="h3"]')
@@ -1368,6 +1371,9 @@
         h('span', { class: 'sh-sep' }, '›'),
         h('button', { type: 'button', class: 'sh-crumb', title: `Back to ${sec}`, onclick: () => openAppSection(sec) }, sec),
         h('span', { class: 'sh-sep' }, '›'),
+        ...(projectProp(props) && !/project/i.test(sec) ? [
+          h('button', { type: 'button', class: 'sh-crumb', title: 'Open the project: ' + projectProp(props).value, onclick: () => { const p = projectProp(props); if (p.link) go(p.link); else p.card.scrollIntoView({ behavior: 'smooth', block: 'center' }); } }, projectProp(props).value.split(/\s+[-–—]\s+/)[0].slice(0, 24)),
+          h('span', { class: 'sh-sep' }, '›')] : []),
         h('span', { class: 'sh-crumb-here' }, (txt($('[data-title-text]', header)) || '').split(/\s+[-–—]\s+/)[0].slice(0, 32))) : null,
       props.map(p => h('button', { type: 'button', class: 'sh-prop', title: 'Go to ' + p.label, onclick: () => p.card.scrollIntoView({ behavior: 'smooth', block: 'center' }) },
         h('small', {}, p.label), /status/i.test(p.label) ? pill(p.value) : h('span', {}, p.value))));
@@ -1607,8 +1613,15 @@
     else document.addEventListener('DOMContentLoaded', schedule, { once: true });
   });
   try { chrome.runtime.onMessage.addListener((m, sender, reply) => {
-    if (!m || !/^(status|diag)$/.test(m.sh)) return;
+    if (!m || !/^(status|diag|forget)$/.test(m.sh)) return;
     if (m.sh === 'diag') { let text = ''; try { text = diagnose(); } catch (e) { text = 'diag failed: ' + e; } reply({ text }); return; }
+    if (m.sh === 'forget') {
+      learnedWay = '';
+      try { chrome.storage.local.remove(WAY_KEY); } catch (e) {}
+      const doc = appDoc();
+      if (doc) { doc.documentElement.removeAttribute('data-sh-way'); const hid = $('[data-sh-hidden]', doc); if (hid) ensureHideStyle(doc, hid); }
+      reply({ ok: true }); return;
+    }
     reply({ v: VERSION, on: !!opts.on, side: !!isOn('side'), workspace: !!$('[data-testid="platform-layout"]'), shown: !!$('#sh-side') });
   }); } catch (e) {}
   chrome.storage.onChanged.addListener((changes, area) => {

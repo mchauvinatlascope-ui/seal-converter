@@ -32,12 +32,16 @@
   #state[hidden] { display: none; }
   #diag { display: none; margin: 8px 14px 0; width: calc(100% - 28px); height: 150px; font: 10.5px ui-monospace, Menlo, Consolas, monospace; border: 1px solid var(--line); border-radius: 6px; padding: 6px; color: var(--fg); background: var(--bg); resize: vertical; }
   #diag.show { display: block; }
+  #tools { display: flex; align-items: center; gap: 10px; margin: 8px 14px 0; font-size: 11.5px; color: var(--fg2); }
+  #tools[hidden] { display: none; }
+  #tools button { flex: none; font: inherit; font-size: 12px; font-weight: 600; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 3px 9px; cursor: pointer; }
 </style>
 </head>
 <body>
-  <header><b>Seal Helper</b><span>v1.0.3</span><input type="checkbox" id="on" aria-label="Seal Helper on"></header>
+  <header><b>Seal Helper</b><span>v1.1.0</span><input type="checkbox" id="on" aria-label="Seal Helper on"></header>
   <div id="state" hidden><i></i><div><b></b><span></span></div></div>
   <textarea id="diag" readonly aria-label="Diagnostic"></textarea>
+  <div id="tools" hidden><button type="button" id="forget">Reset menu hiding</button><small>If an empty column stays on the left of the notebook, press this once, then reload Seal.</small></div>
   <div id="all">
     <h2>Layout</h2>
     <label class="row" for="side"><div>New sidebar<small>The lab notebook sections first (Projects, Experiments, Protocols, Inventory), then Today, My work, To publish, your recent records and favourites. Ctrl K searches.</small></div><input type="checkbox" id="side"></label>

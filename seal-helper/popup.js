@@ -51,5 +51,9 @@ chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
         try { navigator.clipboard.writeText(ta.value); } catch (e) {}
         state.querySelector('span').textContent = 'Diagnostic copied: paste it to me. Structure only, no record content.';
       }) });
+    if (r.on && r.side) {
+      const tools = document.getElementById('tools'); tools.hidden = false;
+      document.getElementById('forget').onclick = () => chrome.tabs.sendMessage(tab.id, { sh: 'forget' }, () => { state.querySelector('span').textContent = 'Menu hiding reset. Reload the Seal tab.'; });
+    }
   });
 });
