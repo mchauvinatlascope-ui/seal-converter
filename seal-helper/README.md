@@ -4,7 +4,7 @@ A Chrome extension that makes Seal calmer and easier to read. It only changes ho
 
 ## Install (2 minutes)
 
-1. Download `seal-helper-1.7.0.zip` and unzip it.
+1. Download `seal-helper-1.8.0.zip` and unzip it.
 2. Open `chrome://extensions` and switch on **Developer mode** (top right).
 3. Click **Load unpacked** and pick the unzipped `seal-helper` folder.
 4. Open Seal. Click the extension icon (puzzle piece, then pin Seal Helper) to switch each setting on or off.
@@ -13,7 +13,12 @@ To update: replace the folder with the new one, then click the reload arrow on t
 
 ## If you see no change
 
-Click the extension icon on a Seal tab: the first card says whether Seal Helper is **active on this tab**, **paused**, or whether the tab **needs a reload** after an update (one button does it). After replacing the folder, always press the reload arrow on the Seal Helper card in `chrome://extensions`, then reload Seal. The sidebar shows its version (v1.7.0) at the bottom.
+Click the extension icon on a Seal tab: the first card says whether Seal Helper is **active on this tab**, **paused**, or whether the tab **needs a reload** after an update (one button does it). After replacing the folder, always press the reload arrow on the Seal Helper card in `chrome://extensions`, then reload Seal. The sidebar shows its version (v1.8.0) at the bottom.
+
+## 1.8
+
+- **Find in the notebook**: the search box at the top of the sidebar filters your notebook lists as you type (name, ID or project); arrows and Enter open, Ctrl+click opens in a new tab, and “Search all of Seal” (Ctrl K) is still one step away. Press / to jump to it.
+- **Back to the list**: a record opened from a list or from My work shows a “‹ Experiments” button that brings the list back at once, with its filter.
 
 ## 1.7
 

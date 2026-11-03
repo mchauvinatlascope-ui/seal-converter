@@ -14,7 +14,7 @@
   const isMac = /Mac/.test(navigator.platform);
   let opts = { ...DEFAULTS };
   const isOn = k => opts.on && opts[k];
-  const VERSION = '1.7.0';
+  const VERSION = '1.8.0';
 
   // Ecran de passage : quand on doit recharger la page (fiche -> cahier, cahier -> fiche), un ecran
   // calme au nom de la destination couvre le depart, le rechargement et les sauts de l appli,
@@ -507,7 +507,24 @@
     }
     return null;
   }
+  // D ou on ouvre une fiche (notre liste ou My work) : la fiche propose d y revenir, filtre compris.
+  const FROM = 'sh-from';
+  function noteFrom() {
+    let f = null;
+    if (page === 'list') f = { page: 'list', sec: listSec, filter: listFilter, status: listStatus };
+    else if (page === 'work') f = { page: 'work' };
+    try { if (f) sessionStorage.setItem(FROM, JSON.stringify({ ...f, at: Date.now() })); } catch (e) {}
+  }
+  function readFrom() {
+    try { const f = JSON.parse(sessionStorage.getItem(FROM) || 'null'); return f && Date.now() - f.at < 3 * 3600e3 ? f : null; } catch (e) { return null; }
+  }
+  function backTo(f) {
+    if (f.page === 'list' && appTables[f.sec]) { listSec = f.sec; listFilter = f.filter || ''; listStatus = f.status || ''; openPage('list'); }
+    else if (f.page === 'work') openPage('work');
+    else openAppSection(f.sec);
+  }
   function openTableRow(section, r) {
+    noteFrom();
     if (UUID.test(r.record || '')) { openRecord({ id: r.record, title: r.title }); return; }
     // Pas d identifiant : on ouvre la section puis on clique la ligne par son titre.
     appAct(doc => { const nav = appNav(doc); if (!nav || nav.active !== section) return null; return $$('table tbody tr', doc).map(tr => $('a[href], [data-record], button', tr)).find(a => a && txt(a) === r.title) || null; }, null, r.title, { section });
@@ -590,6 +607,7 @@
   const firstLast = (list, kind, keyOf) => { const i = lastNew && lastNew.kind === kind ? list.findIndex(x => keyOf(x) === lastNew.key) : -1; return i > 0 ? [list[i], ...list.slice(0, i), ...list.slice(i + 1)] : list; };
   const openCreate = key => { rememberNew('create', key); appAct(doc => $(`[data-create="${key}"]`, doc), null, CREATE_LABEL[key] || 'the notebook', { create: key }); };
   const openRecord = r => {
+    noteFrom();
     // Un identifiant Seal : la fiche s ouvre par son adresse, sans repasser par l accueil du cahier.
     const id = UUID.test(r.id || '') ? r.id : UUID.test(r.native || '') ? r.native : '';
     const base = location.pathname.match(/^\/o\/[^/]+\/s\/[^/]+/);
@@ -1033,8 +1051,7 @@
       h('span', { class: 'sh-here', title: 'Where you are' }, ...whereAmI(d).flatMap((c, i) => i ? [h('span', { class: 'sh-sep' }, '/'), h('span', {}, c)] : [h('span', {}, c)]))));
 
     const q = $('[data-testid="nav-panel-query-button"]');
-    if (q) side.append(h('button', { type: 'button', class: 'sh-search', onclick: () => press(q) },
-      icon('search'), h('span', {}, 'Search'), h('kbd', {}, isMac ? '⌘K' : 'Ctrl K')));
+    side.append(buildFind(q));
 
     const top = h('div', { class: 'sh-block' });
     if (appCreates.length) {
@@ -1611,12 +1628,15 @@
     const props = isOn('props') && header ? readProps() : [];
     const sec = isOn('props') && header && isOn('side') ? recordSection() : '';
     const acts = isOn('props') && header ? headerActions(header) : [];
-    const sig = sec + '#' + props.map(p => p.label + '=' + p.value).join('|') + '#' + acts.map(a => a.key + a.label).join('|');
+    const sig = JSON.stringify(readFrom()) + sec + '#' + props.map(p => p.label + '=' + p.value).join('|') + '#' + acts.map(a => a.key + a.label).join('|');
     if (!props.length && !sec && !acts.length) { if (old) old.remove(); propsSig = ''; return; }
     if (old && sig === propsSig && old.previousElementSibling === header) return;
     propsSig = sig;
-    const bar = h('div', { id: 'sh-props', class: 'sh' },
-      sec ? h('nav', { class: 'sh-crumbs', 'aria-label': 'You are here' },
+    const from = readFrom();
+    const back = from && isOn('side') ? h('button', { type: 'button', class: 'sh-back', title: 'Back to the list you came from', onclick: () => backTo(from) },
+      h('span', { 'aria-hidden': 'true' }, '‹'), ' ' + (from.page === 'work' ? 'My work' : from.sec) + (from.filter ? ' · “' + from.filter + '”' : '')) : null;
+    const bar = h('div', { id: 'sh-props', class: 'sh' }, sec ? null : back,
+      sec ? h('nav', { class: 'sh-crumbs', 'aria-label': 'You are here' }, back,
         h('button', { type: 'button', class: 'sh-crumb', title: 'Lab notebook', onclick: () => openAppSection(appSections[0]) }, 'Notebook'),
         h('span', { class: 'sh-sep' }, '›'),
         h('button', { type: 'button', class: 'sh-crumb', title: `Back to ${sec}`, onclick: () => openAppSection(sec) }, sec),
@@ -1664,6 +1684,47 @@
   document.addEventListener('scroll', () => requestAnimationFrame(markActive), { capture: true, passive: true });
 
   // ------------------------------------------------------------- rendu
+  // Recherche rapide : tes listes du cahier deja lues, filtrees a la frappe, sans attendre Seal.
+  let findQ = '', findSel = 0;
+  function findHits() {
+    const f = findQ.trim().toLowerCase();
+    if (!f) return [];
+    const hits = [];
+    for (const [sec, t] of Object.entries(appTables)) for (const r of t.rows || []) {
+      const hay = [r.title, r.id, r.project, r.owner].join(' ').toLowerCase();
+      const i = hay.indexOf(f);
+      if (i < 0) continue;
+      hits.push({ sec, r, score: (r.title.toLowerCase().startsWith(f) || (r.id || '').toLowerCase().startsWith(f) ? 0 : 1) + (/experiment/i.test(sec) ? 0 : 0.5) });
+    }
+    return hits.sort((a, b) => a.score - b.score).slice(0, 8);
+  }
+  function buildFind(q) {
+    const hits = findHits();
+    const sealSearch = () => { findQ = ''; render(true); if (q) press(q); };
+    const pick = x => { findQ = ''; render(true); openTableRow(x.sec, x.r); };
+    const input = h('input', { type: 'search', id: 'sh-find', class: 'sh-findin', placeholder: 'Find in the notebook', autocomplete: 'off', spellcheck: 'false', value: findQ, 'aria-label': 'Find an experiment, project or protocol',
+      oninput: e => { findQ = e.target.value; findSel = 0; render(true); refocusFind(); },
+      onkeydown: e => {
+        const n = hits.length + (q ? 1 : 0);
+        if (e.key === 'ArrowDown') { e.preventDefault(); findSel = n ? (findSel + 1) % n : 0; render(true); refocusFind(); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); findSel = n ? (findSel - 1 + n) % n : 0; render(true); refocusFind(); }
+        else if (e.key === 'Enter') { e.preventDefault(); if (hits[findSel]) pick(hits[findSel]); else if (findQ.trim()) sealSearch(); }
+        else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); findQ = ''; render(true); }
+      },
+      onblur: () => setTimeout(() => { if (document.activeElement && document.activeElement.id === 'sh-find') return; if (findQ) { findQ = ''; render(true); } }, 150) });
+    const box = h('div', { class: 'sh-search sh-find' }, icon('search'), input,
+      q ? h('button', { type: 'button', class: 'sh-kbd', title: 'Search all of Seal', onmousedown: e => e.preventDefault(), onclick: sealSearch }, h('kbd', {}, isMac ? '⌘K' : 'Ctrl K')) : null);
+    if (!findQ.trim()) return box;
+    const none = !Object.keys(appTables).length;
+    const menu = h('div', { class: 'sh-findmenu', role: 'listbox' },
+      hits.map((x, i) => h('button', { type: 'button', role: 'option', class: 'sh-newitem' + (i === findSel ? ' on' : ''), 'aria-selected': String(i === findSel), newtab: recUrl(x.r), onmousedown: e => e.preventDefault(), onclick: () => pick(x) },
+        icon(appIcon(x.sec)), h('span', { class: 'sh-nt' }, h('b', {}, x.r.title), h('small', {}, [x.sec.replace(/s$/, ''), x.r.project, x.r.status].filter(Boolean).join(' · '))))),
+      !hits.length ? h('p', { class: 'sh-findnone' }, none ? 'Open Experiments, Projects or Protocols in the notebook once to find them here.' : 'Nothing in your notebook lists.') : null,
+      q ? h('button', { type: 'button', role: 'option', class: 'sh-newitem sh-findall' + (findSel === hits.length ? ' on' : ''), onmousedown: e => e.preventDefault(), onclick: sealSearch },
+        icon('search'), h('span', { class: 'sh-nt' }, h('b', {}, 'Search all of Seal'), h('small', {}, 'Records, samples, everything'))) : null);
+    return h('div', { class: 'sh-findwrap' }, box, menu);
+  }
+  function refocusFind() { const i = $('#sh-find'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }
   let sideSig = '';
   let renderTimes = [], renderCooldown = 0, lastError = '';
   function render(force) {
@@ -1677,7 +1738,7 @@
     const d = data();
     const sig = JSON.stringify([page, d.lab, d.favourites.map(r => r.title + r.status + r.current), d.recent.map(r => r.title + r.status + r.current),
       d.mine.map(r => r.title + r.status), d.changes.map(c => c.hash + c.open + c.title + c.day + c.time), d.views.map(v => v.title + v.depth + v.open),
-      d.changeset && [d.changeset.hash, d.changeset.name, d.changeset.rows.map(r => r.title + r.current)], !!d.newBtn, d.changesLoaded, showEmpty, workFilter, listSec, listFilter, listStatus, page, workType, workSrc, workStatus, tipsDone, helpOpen, Object.values(appTables).map(t => t.rows.length), lab, labOpen, pickFor, allViewsOpen, appSections, appActive, atNotebook(), recordSection(), location.pathname, newOpen, appCreates, appData && appData.at]);
+      d.changeset && [d.changeset.hash, d.changeset.name, d.changeset.rows.map(r => r.title + r.current)], !!d.newBtn, d.changesLoaded, showEmpty, workFilter, findQ, findSel, listSec, listFilter, listStatus, page, workType, workSrc, workStatus, tipsDone, helpOpen, Object.values(appTables).map(t => t.rows.length), lab, labOpen, pickFor, allViewsOpen, appSections, appActive, atNotebook(), recordSection(), location.pathname, newOpen, appCreates, appData && appData.at]);
     if (!force && sig === sideSig && $('#sh-side')) return;
     // Garde-fou : plus de 40 rendus en 5 s, c est une boucle ; on souffle 3 s et on le note.
     const now = Date.now();
@@ -1687,7 +1748,9 @@
     let side;
     try { side = buildSide(d); } catch (e) { lastError = 'side: ' + (e && e.message); console.warn('[Seal Helper] side', e); return; }
     const oldSide = $('#sh-side');
+    const hadFind = document.activeElement && document.activeElement.id === 'sh-find';
     if (oldSide) oldSide.replaceWith(side); else root.append(side);
+    if (hadFind) refocusFind();
     const old = $('#sh-page');
     if (page) {
       let body;
@@ -1839,7 +1902,7 @@
   // Raccourcis : Ctrl/Cmd K = recherche de Seal, Echap = fermer nos pages ; lettres seules hors saisie.
   let keysOpen = false;
   let goPending = 0;
-  const KEYS = [['N', 'New record'], ['T', 'Today'], ['W', 'My work'], ['P', 'To publish'], ['G then a letter', 'Go to a notebook section (its first letter)'], ['/', 'Search in Seal'], ['Alt ← / Alt →', 'Back / forward'], ['Esc', 'Close Today, My work or To publish'], [(isMac ? '⌘' : 'Ctrl') + '+click or middle click', 'Open a record in a new tab'], ['?', 'This list']];
+  const KEYS = [['N', 'New record'], ['T', 'Today'], ['W', 'My work'], ['P', 'To publish'], ['G then a letter', 'Go to a notebook section (its first letter)'], ['/', 'Find in your notebook lists'], [isMac ? '⌘K' : 'Ctrl K', 'Search all of Seal'], ['Alt ← / Alt →', 'Back / forward'], ['Esc', 'Close Today, My work or To publish'], [(isMac ? '⌘' : 'Ctrl') + '+click or middle click', 'Open a record in a new tab'], ['?', 'This list']];
   // Une lettre par section : la premiere lettre libre de son nom (Projects P, Protocols R).
   function sectionKeys() {
     const used = new Set(['n', 't', 'w', 'p', 'g']); const out = [];
@@ -1882,7 +1945,7 @@
       return;
     }
     if (k === '?') { e.preventDefault(); keysOpen = !keysOpen; renderKeys(); return; }
-    if (k === '/') { const q = $('[data-testid="nav-panel-query-button"]'); if (q) { e.preventDefault(); press(q); } return; }
+    if (k === '/') { e.preventDefault(); if ($('#sh-find')) refocusFind(); else { const q = $('[data-testid="nav-panel-query-button"]'); if (q) press(q); } return; }
     if (e.shiftKey) return;
     const act = { n: () => { if (appCreates.length) { newOpen = true; render(true); } else { const nb = $('[data-testid="navbar-new-entity-button"]'); if (nb) press(nb); } },
       t: () => openPage('home'), w: () => openPage('work'), p: () => openPage('pub'), g: () => { goPending = Date.now(); } }[k.toLowerCase()];
