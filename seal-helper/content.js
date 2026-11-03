@@ -14,7 +14,7 @@
   const isMac = /Mac/.test(navigator.platform);
   let opts = { ...DEFAULTS };
   const isOn = k => opts.on && opts[k];
-  const VERSION = '1.6.0';
+  const VERSION = '1.6.1';
 
   // Ecran de passage : quand on doit recharger la page (fiche -> cahier, cahier -> fiche), un ecran
   // calme au nom de la destination couvre le depart, le rechargement et les sauts de l appli,
@@ -55,12 +55,35 @@
   }
 
   // ---------------------------------------------------------------- outils
+  // Ctrl/Cmd/Maj + clic ou clic molette : la fiche s ouvre dans un nouvel onglet, la liste reste la.
+  function addNewTab(el, url) {
+    const open = e => { e.preventDefault(); e.stopImmediatePropagation(); window.open(url, '_blank', 'noopener'); };
+    el.addEventListener('click', e => { if (e.ctrlKey || e.metaKey || e.shiftKey) open(e); }, true);
+    el.addEventListener('mousedown', e => { if (e.button === 1) e.preventDefault(); });
+    el.addEventListener('auxclick', e => { if (e.button === 1) open(e); });
+    el.setAttribute('data-sh-href', url);
+    if (!el.title) el.title = (isMac ? '⌘' : 'Ctrl') + '+click opens in a new tab';
+  }
+  // Adresse d une fiche : son identifiant Seal, ou le lien que porte la ligne Seal.
+  function recUrl(r) {
+    if (!r) return null;
+    const id = [r.record, r.id, r.native].find(x => UUID.test(x || ''));
+    const base = location.pathname.match(/^\/o\/[^/]+\/s\/[^/]+/);
+    return id && base ? location.origin + base[0] + '/' + id : null;
+  }
+  function elUrl(el) {
+    const a = el && (el.closest('a[href]') || el.querySelector('a[href]'));
+    const href = a && a.getAttribute('href');
+    if (!href || /^(#|javascript:)/i.test(href)) return null;
+    try { const u = new URL(href, location.href); return u.origin === location.origin ? u.href : null; } catch (e) { return null; }
+  }
   function h(tag, attrs, ...kids) {
     const el = document.createElement(tag);
     for (const [k, v] of Object.entries(attrs || {})) {
       if (v == null || v === false) continue;
       if (k === 'class') el.className = v;
       else if (k === 'html') el.innerHTML = v; // seulement nos constantes d icones
+      else if (k === 'newtab') addNewTab(el, v);
       else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
       else el.setAttribute(k, v === true ? '' : v);
     }
@@ -964,7 +987,7 @@
   }
 
   function rowButton(r, { cls = 'sh-row', showTag = true } = {}) {
-    return h('button', { type: 'button', class: cls + (r.current ? ' on' : ''), title: r.title, onclick: () => go(r.el) },
+    return h('button', { type: 'button', class: cls + (r.current ? ' on' : ''), title: r.title, newtab: elUrl(r.el), onclick: () => go(r.el) },
       icon(r.type[1]), h('span', { class: 'sh-t' }, r.title),
       r.n > 1 ? h('span', { class: 'sh-x' }, '×' + r.n) : null,
       showTag && r.status ? h('span', { class: 'sh-dot ' + statusClass(r.status), title: r.status }) : null);
@@ -1087,7 +1110,7 @@
     const recent = group(d.recent).filter(r => r.type[0] !== 'Page').slice(0, 5);
     if (recent.length) {
       scroll.append(h('div', { class: 'sh-group' }, 'Recent'));
-      for (const r of recent) scroll.append(h('button', { type: 'button', class: 'sh-row sh-recent' + (r.current ? ' on' : ''), title: r.title + (r.status ? ' · ' + r.status : ''), onclick: () => go(r.el) },
+      for (const r of recent) scroll.append(h('button', { type: 'button', class: 'sh-row sh-recent' + (r.current ? ' on' : ''), title: r.title + (r.status ? ' · ' + r.status : ''), newtab: elUrl(r.el), onclick: () => go(r.el) },
         h('span', { class: 'sh-dot ' + (r.status ? statusClass(r.status) : '') }), h('span', { class: 'sh-t' }, r.title)));
     }
 
@@ -1151,14 +1174,14 @@
   }
 
   function entityLine(r) {
-    return h('button', { type: 'button', class: 'sh-line', onclick: () => go(r.el) },
+    return h('button', { type: 'button', class: 'sh-line', newtab: elUrl(r.el), onclick: () => go(r.el) },
       h('span', { class: 'sh-ti' }, icon(r.type[1])),
       h('span', { class: 'sh-lt' }, h('b', {}, r.title, r.n > 1 ? h('span', { class: 'sh-x' }, '×' + r.n) : null), h('small', {}, r.type[0])),
       pill(r.status));
   }
 
   function changeLine(c) {
-    return h('button', { type: 'button', class: 'sh-line', onclick: () => go(c.el) },
+    return h('button', { type: 'button', class: 'sh-line', newtab: elUrl(c.el), onclick: () => go(c.el) },
       h('span', { class: 'sh-ti v' }, icon('pub')),
       h('span', { class: 'sh-lt' }, h('b', {}, c.title),
         h('small', {}, [c.hash, c.open + (c.open === 1 ? ' record' : ' records'), [c.day, c.time].filter(Boolean).join(' ')].filter(Boolean).join(' · '))),
@@ -1257,7 +1280,7 @@
         : stat('Last 7 days', weekCount, weekCount === 1 ? 'change made' : 'changes made', () => openPage('pub')));
 
     const ah = ad && ad.hero;
-    const heroCard = ah ? h('button', { type: 'button', class: 'sh-hero', onclick: () => openRecord(ah) },
+    const heroCard = ah ? h('button', { type: 'button', class: 'sh-hero', newtab: recUrl(ah), onclick: () => openRecord(ah) },
       h('span', { class: 'sh-ti big tint-blue' }, icon('flask')),
       h('span', { class: 'sh-hero-t' },
         h('small', {}, 'Continue an experiment'),
@@ -1273,11 +1296,11 @@
       h('span', { class: 'sh-open' }, 'Open', icon('chev'))) : null;
 
     const appExps = ad ? ad.experiments.filter(x => !ah || x.id !== ah.id).slice(0, 5) : [];
-    const next = appExps.length ? appExps.map(x => h('button', { type: 'button', class: 'sh-line', onclick: () => openRecord(x) },
+    const next = appExps.length ? appExps.map(x => h('button', { type: 'button', class: 'sh-line', newtab: recUrl(x), onclick: () => openRecord(x) },
       h('span', { class: 'sh-ti tint-blue' }, icon('flask')),
       h('span', { class: 'sh-lt' }, h('b', {}, x.title), h('small', {}, x.sub)),
       pill(x.status)))
-    : recent.slice(1, 6).map(r => h('button', { type: 'button', class: 'sh-line', onclick: () => go(r.el) },
+    : recent.slice(1, 6).map(r => h('button', { type: 'button', class: 'sh-line', newtab: elUrl(r.el), onclick: () => go(r.el) },
       h('span', { class: 'sh-ti ' + tint(r.type[1]) }, icon(r.type[1])),
       h('span', { class: 'sh-lt' }, h('b', {}, r.title, r.n > 1 ? h('span', { class: 'sh-x' }, '×' + r.n) : null), h('small', {}, r.type[0])),
       pill(r.status)));
@@ -1290,7 +1313,7 @@
       h('header', {}, h('h3', {}, 'Projects'), h('span', { class: 'sh-hdr-actions' },
         newProj ? h('button', { type: 'button', class: 'sh-more sh-plus', onclick: () => openCreate('project') }, icon('plus'), newProj.label) : null,
         h('button', { type: 'button', class: 'sh-more', onclick: () => openAppSection(secFor(/project/i) || 'Projects') }, 'All ›'))),
-      h('div', { class: 'sh-projects' }, ad.cards.slice(0, 6).map(c => h('button', { type: 'button', class: 'sh-project', onclick: () => openRecord(c) },
+      h('div', { class: 'sh-projects' }, ad.cards.slice(0, 6).map(c => h('button', { type: 'button', class: 'sh-project', newtab: recUrl(c), onclick: () => openRecord(c) },
         h('span', { class: 'sh-project-top' }, pill(c.status), h('small', {}, c.updated ? 'Updated ' + c.updated : '')),
         h('b', {}, c.title),
         h('span', { class: 'sh-project-n' }, h('strong', {}, String(c.n)), c.n === 1 ? ' experiment' : ' experiments'))))) : null;
@@ -1300,7 +1323,7 @@
       h('header', {}, h('h3', {}, 'Protocols'), h('span', { class: 'sh-hdr-actions' },
         newProt ? h('button', { type: 'button', class: 'sh-more sh-plus', onclick: () => openCreate('protocol') }, icon('plus'), newProt.label) : null,
         h('button', { type: 'button', class: 'sh-more', onclick: () => openAppSection(secFor(/protocol/i) || 'Protocols') }, 'All ›'))),
-      ad.protocols.slice(0, 5).map(x => h('button', { type: 'button', class: 'sh-line', onclick: () => openRecord(x) },
+      ad.protocols.slice(0, 5).map(x => h('button', { type: 'button', class: 'sh-line', newtab: recUrl(x), onclick: () => openRecord(x) },
         h('span', { class: 'sh-ti tint-teal' }, icon('proto')),
         h('span', { class: 'sh-lt' }, h('b', {}, x.title), h('small', {}, x.sub || 'Protocol template'))))) : null;
 
@@ -1318,7 +1341,7 @@
 
     const toPublish = h('section', { class: 'sh-panel' },
       h('header', {}, h('h3', {}, 'To publish'), pend.length ? h('button', { type: 'button', class: 'sh-more', onclick: () => openPage('pub') }, `All ${d.pending.length} ›`) : null),
-      pend.length ? pend.slice(0, 5).map(c => h('button', { type: 'button', class: 'sh-check', onclick: () => go(c.el) },
+      pend.length ? pend.slice(0, 5).map(c => h('button', { type: 'button', class: 'sh-check', newtab: elUrl(c.el), onclick: () => go(c.el) },
         h('span', { class: 'sh-box' }), h('span', { class: 'sh-lt' }, h('b', {}, c.title), h('small', {}, [c.hash, c.day, c.time].filter(Boolean).join(' · '))),
         c.n > 1 ? h('span', { class: 'sh-x' }, '×' + c.n) : null))
         : h('p', { class: 'sh-empty' + (d.changesLoaded || atNotebook() ? '' : ' sh-loading') }, d.changesLoaded ? 'Nothing waiting. Everything you changed is published.' : atNotebook() ? 'Seal fills this list once you open a record or a Seal view.' : 'Loading your changes from Seal…'));
@@ -1328,7 +1351,7 @@
     let day = null;
     for (const c of groupChanges(d.changes).slice(0, 8)) {
       if (c.day !== day) { day = c.day; feed.append(h('div', { class: 'sh-feed-day' }, day || 'Earlier')); }
-      feed.append(h('button', { type: 'button', class: 'sh-feed-item' + (c.open ? '' : ' faint'), onclick: () => go(c.el) },
+      feed.append(h('button', { type: 'button', class: 'sh-feed-item' + (c.open ? '' : ' faint'), newtab: elUrl(c.el), onclick: () => go(c.el) },
         h('span', { class: 'sh-feed-dot' }), h('span', { class: 'sh-feed-time' }, c.time),
         h('span', { class: 'sh-lt' }, h('b', {}, c.title), h('small', {}, c.hash + (c.open ? ` · ${c.open} record${c.open > 1 ? 's' : ''}` : ' · empty')))));
     }
@@ -1346,7 +1369,7 @@
         h('li', {}, h('span', { class: 'sh-ti sm tint-grey' }, h('kbd', {}, '?')), h('span', {}, h('b', {}, 'Keys'), ': N new, T today, W my work, P to publish, G then a letter for a section. Press ? for the list.'))));
     const favs = d.favourites.length ? h('section', { class: 'sh-panel' },
       h('header', {}, h('h3', {}, 'Favourites')),
-      d.favourites.map(r => h('button', { type: 'button', class: 'sh-line', onclick: () => go(r.el) },
+      d.favourites.map(r => h('button', { type: 'button', class: 'sh-line', newtab: elUrl(r.el), onclick: () => go(r.el) },
         h('span', { class: 'sh-ti ' + tint(r.type[1]) }, icon('star')), h('span', { class: 'sh-lt' }, h('b', {}, r.title), h('small', {}, r.type[0]))))) : null;
 
     return h('div', { class: 'sh-wrap sh-dash' },
@@ -1420,7 +1443,7 @@
       oninput: e => { workFilter = e.target.value; render(true); const i = $('#sh-filter'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } } });
     const table = h('table', { class: 'sh-table' },
       h('thead', {}, h('tr', {}, h('th', {}, 'Name'), h('th', {}, 'Type'), h('th', {}, 'Status'), h('th', {}, ''))),
-      h('tbody', {}, rows.map(r => h('tr', { onclick: () => go(r.el), tabindex: '0', onkeydown: e => e.key === 'Enter' && go(r.el) },
+      h('tbody', {}, rows.map(r => h('tr', { newtab: elUrl(r.el), onclick: () => go(r.el), tabindex: '0', onkeydown: e => e.key === 'Enter' && go(r.el) },
         h('td', {}, h('span', { class: 'sh-cell' }, h('span', { class: 'sh-ti sm ' + tint(r.type[1]) }, icon(r.type[1])), h('b', {}, r.title), r.n > 1 ? h('span', { class: 'sh-x', title: `${r.n} records with this name` }, '×' + r.n) : null)),
         h('td', { class: 'sh-muted' }, r.type[0]), h('td', {}, pill(r.status)), h('td', { class: 'sh-go' }, 'Open ›')))));
     return h('div', { class: 'sh-wrap' },
@@ -1453,12 +1476,12 @@
     const secFor = re => appSections.find(l => re.test(l));
     const expTable = h('table', { class: 'sh-table' },
       h('thead', {}, h('tr', {}, h('th', {}, 'Experiment'), h('th', {}, 'Project'), h('th', {}, 'Status'), h('th', {}, ''))),
-      h('tbody', {}, exps.map(r => h('tr', { onclick: () => openRow(r), tabindex: '0', onkeydown: e => e.key === 'Enter' && openRow(r) },
+      h('tbody', {}, exps.map(r => h('tr', { newtab: recUrl(r), onclick: () => openRow(r), tabindex: '0', onkeydown: e => e.key === 'Enter' && openRow(r) },
         h('td', {}, h('span', { class: 'sh-cell' }, h('span', { class: 'sh-ti sm tint-blue' }, icon('flask')), h('b', {}, r.title))),
         h('td', { class: 'sh-muted' }, r.project || (r.sub || '').split(' · ').pop()), h('td', {}, pill(r.status)), h('td', { class: 'sh-go' }, 'Open ›')))));
     const projTable = h('table', { class: 'sh-table' },
       h('thead', {}, h('tr', {}, h('th', {}, 'Project'), h('th', { class: 'sh-num' }, 'Experiments'), h('th', {}, 'Status'), h('th', {}, ''))),
-      h('tbody', {}, projs.map(r => h('tr', { onclick: () => openRow(r), tabindex: '0', onkeydown: e => e.key === 'Enter' && openRow(r) },
+      h('tbody', {}, projs.map(r => h('tr', { newtab: recUrl(r), onclick: () => openRow(r), tabindex: '0', onkeydown: e => e.key === 'Enter' && openRow(r) },
         h('td', {}, h('span', { class: 'sh-cell' }, h('span', { class: 'sh-ti sm tint-violet' }, icon('folder')), h('b', {}, r.title))),
         h('td', { class: 'sh-num sh-muted' }, r.n != null ? String(r.n) : ''), h('td', {}, pill(r.status)), h('td', { class: 'sh-go' }, 'Open ›')))));
     const panel = (title, re, n, table, empty, full) => h('section', { class: 'sh-panel' },
@@ -1480,7 +1503,7 @@
     let day = null;
     for (const c of list) {
       if (c.day !== day) { day = c.day; body.append(h('tr', { class: 'sh-day' }, h('td', { colspan: '5' }, day || 'Earlier'))); }
-      body.append(h('tr', { class: c.open ? '' : 'sh-faint', onclick: () => go(c.el), tabindex: '0', onkeydown: e => e.key === 'Enter' && go(c.el) },
+      body.append(h('tr', { class: c.open ? '' : 'sh-faint', newtab: elUrl(c.el), onclick: () => go(c.el), tabindex: '0', onkeydown: e => e.key === 'Enter' && go(c.el) },
         h('td', { class: 'sh-hashcell' }, c.hash),
         h('td', {}, h('span', { class: 'sh-cell' }, h('b', {}, c.title), c.n > 1 ? h('span', { class: 'sh-x' }, '×' + c.n) : null)),
         h('td', { class: 'sh-num' }, c.open), h('td', { class: 'sh-num sh-muted' }, c.time), h('td', { class: 'sh-go' }, 'Review ›')));
@@ -1777,7 +1800,7 @@
   // Raccourcis : Ctrl/Cmd K = recherche de Seal, Echap = fermer nos pages ; lettres seules hors saisie.
   let keysOpen = false;
   let goPending = 0;
-  const KEYS = [['N', 'New record'], ['T', 'Today'], ['W', 'My work'], ['P', 'To publish'], ['G then a letter', 'Go to a notebook section (its first letter)'], ['/', 'Search in Seal'], ['Alt ← / Alt →', 'Back / forward'], ['Esc', 'Close Today, My work or To publish'], ['?', 'This list']];
+  const KEYS = [['N', 'New record'], ['T', 'Today'], ['W', 'My work'], ['P', 'To publish'], ['G then a letter', 'Go to a notebook section (its first letter)'], ['/', 'Search in Seal'], ['Alt ← / Alt →', 'Back / forward'], ['Esc', 'Close Today, My work or To publish'], [(isMac ? '⌘' : 'Ctrl') + '+click or middle click', 'Open a record in a new tab'], ['?', 'This list']];
   // Une lettre par section : la premiere lettre libre de son nom (Projects P, Protocols R).
   function sectionKeys() {
     const used = new Set(['n', 't', 'w', 'p', 'g']); const out = [];
