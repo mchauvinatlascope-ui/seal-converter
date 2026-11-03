@@ -514,3 +514,44 @@ html.sh-side, html.sh-side body { overflow-x: hidden !important; }
   html.sh-doc #sh-props .sh-crumb { border: 0; padding-left: 0; }
   html.sh-doc body { background: #fff !important; }
 }
+
+/* ======================================================================
+   1.4 : raccourcis clavier (liste), mode sombre qui suit Seal
+   ====================================================================== */
+#sh-keys { position: fixed; inset: 0; z-index: 1700; background: rgba(20,20,20,.35); display: grid; place-items: center; }
+#sh-keys .sh-keys-box { width: 420px; max-width: calc(100vw - 32px); background: var(--sh-bg); color: var(--sh-ink); border: 1px solid var(--sh-line); border-radius: 12px; box-shadow: 0 20px 60px -20px rgba(20,20,20,.5); padding: 14px 18px 16px; }
+#sh-keys header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+#sh-keys h3 { margin: 0; font-size: 14px; font-weight: 650; }
+#sh-keys dl { display: grid; grid-template-columns: max-content 1fr; gap: 7px 14px; margin: 0; align-items: center; }
+#sh-keys dt kbd { font-size: 11px; padding: 1px 6px; }
+#sh-keys dd { margin: 0; font-size: 13px; color: var(--sh-ink2); }
+#sh-keys .sh-keys-secs { margin: 12px 0 0; font-size: 12.5px; color: var(--sh-ink2); line-height: 1.8; }
+#sh-keys .sh-more { font-size: 12.5px; color: var(--sh-ink3); }
+
+/* Sombre : memes jetons, valeurs inversees ; les blancs en dur suivent. */
+html.sh-dark .sh {
+  --sh-bg: #1c1e22; --sh-side: #202328; --sh-line: #30333a; --sh-line2: #2a2d33; --sh-hover: #2b2e34;
+  --sh-ink: #eceef1; --sh-ink2: #a9afb9; --sh-ink3: #7d8592; --sh-greybg: #2a2d33;
+  --sh-greenbg: #173626; --sh-green: #6fd39a; --sh-amberbg: #3a2a08; --sh-amber: #f0b64a; --sh-amberfg: #f0b64a;
+  --sh-bluebg: #1b2a44; --sh-blue: #8fb4f0; --sh-tealbg: #12332e; --sh-teal: #5fc2b1; --sh-violetbg: #2a2347; --sh-violet: #b9a3f5;
+  --sh-canvas: #16181b; --sh-focus: #7aa7ea;
+}
+html.sh-dark #sh-side { background: #1e2024; }
+html.sh-dark #sh-side .sh-item.on, html.sh-dark #sh-side .sh-row.on { background: #2b2e34; box-shadow: 0 0 0 1px #363940; }
+html.sh-dark #sh-side .sh-item.on::before, html.sh-dark #sh-side .sh-row.on::before { background: var(--sh-ink); }
+html.sh-dark #sh-side .sh-newbtn, html.sh-dark #sh-page .sh-btn.primary, html.sh-dark #sh-props .sh-act.primary, html.sh-dark #sh-page .sh-wday.today, html.sh-dark #sh-page .sh-chip.on { background: #eceef1; color: #1c1e22; border-color: #eceef1; }
+html.sh-dark #sh-side .sh-newbtn .sh-i, html.sh-dark #sh-side .sh-newbtn .sh-chev, html.sh-dark #sh-page .sh-btn.primary .sh-i { color: #1c1e22; }
+html.sh-dark #sh-side .sh-newbtn:hover, html.sh-dark #sh-props .sh-act.primary:hover, html.sh-dark #sh-page .sh-btn.primary:hover { background: #d9dce2; }
+html.sh-dark #sh-side .sh-newmenu, html.sh-dark #sh-side .sh-helpmenu, html.sh-dark #sh-page .sh-tileplus { background: #25282e; border-color: var(--sh-line); }
+html.sh-dark #sh-page .sh-hero { background: linear-gradient(180deg, #24272c, #1f2226) !important; }
+html.sh-dark #sh-page .sh-panel > .sh-table th { background: #202328; }
+html.sh-dark #sh-page .sh-table tbody tr:hover td { background: #24272c; }
+html.sh-dark #sh-page .sh-stat, html.sh-dark #sh-page .sh-bigsearch, html.sh-dark #sh-page .sh-dash .sh-btn:not(.primary) { background: var(--sh-bg) !important; }
+html.sh-dark #sh-page .sh-dash .sh-btn.primary { background: #eceef1 !important; color: #1c1e22; }
+html.sh-dark #sh-page .sh-wday.today small { color: rgba(28,30,34,.7); }
+html.sh-dark #sh-page .sh-wday.today .sh-dots i { background: #1c1e22; }
+html.sh-dark #sh-toast { background: #eceef1; color: #1c1e22; } html.sh-dark #sh-toast .sh-i { color: #1c1e22; }
+html.sh-dark #sh-veil { background: #16181b; }
+html.sh-dark #sh-side .sh-arrow { background: var(--sh-bg) !important; border-color: var(--sh-line) !important; }
+html.sh-dark #sh-side .sh-sep { color: #4a4e56; }
+html.sh-dark #sh-page .sh-box { border-color: #4a4e56; }

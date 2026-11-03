@@ -14,7 +14,7 @@
   const isMac = /Mac/.test(navigator.platform);
   let opts = { ...DEFAULTS };
   const isOn = k => opts.on && opts[k];
-  const VERSION = '1.3.0';
+  const VERSION = '1.4.0';
 
   // ---------------------------------------------------------------- outils
   function h(tag, attrs, ...kids) {
@@ -971,7 +971,9 @@
       help ? h('button', { type: 'button', role: 'menuitem', class: 'sh-newitem', onclick: () => { helpOpen = false; press(help); } },
         h('span', { class: 'sh-ti sm tint-grey' }, icon('help')), h('span', { class: 'sh-nt' }, h('span', { class: 'sh-t' }, 'Seal help and more'), h('small', {}, 'Documentation, keyboard shortcuts, support'))) : null,
       h('button', { type: 'button', role: 'menuitem', class: 'sh-newitem', onclick: () => { helpOpen = false; tipsDone = false; try { localStorage.removeItem('sh-tips'); } catch (e) {} openPage('home'); } },
-        h('span', { class: 'sh-ti sm tint-grey' }, icon('today')), h('span', { class: 'sh-nt' }, h('span', { class: 'sh-t' }, 'Getting around Seal Helper'), h('small', {}, 'The four moves, on Today'))));
+        h('span', { class: 'sh-ti sm tint-grey' }, icon('today')), h('span', { class: 'sh-nt' }, h('span', { class: 'sh-t' }, 'Getting around Seal Helper'), h('small', {}, 'The four moves, on Today'))),
+      h('button', { type: 'button', role: 'menuitem', class: 'sh-newitem', onclick: () => { helpOpen = false; keysOpen = true; renderKeys(); render(true); } },
+        h('span', { class: 'sh-ti sm tint-grey' }, h('kbd', {}, '?')), h('span', { class: 'sh-nt' }, h('span', { class: 'sh-t' }, 'Keyboard shortcuts'), h('small', {}, 'N, T, W, P, G then a letter, ? for the list'))));
     side.append(h('div', { class: 'sh-foot' },
       set ? h('button', { type: 'button', class: 'sh-iconbtn', title: 'Settings', onclick: () => press(set) }, icon('gear')) : null,
       h('div', { class: 'sh-help' },
@@ -1187,7 +1189,8 @@
         h('li', {}, h('span', { class: 'sh-ti sm tint-grey' }, icon('plus')), h('span', {}, h('b', {}, 'New'), ' at the top of the sidebar creates an experiment, project or protocol, or starts one from a Seal template.')),
         h('li', {}, h('span', { class: 'sh-ti sm tint-grey' }, icon('search')), h('span', {}, h('b', {}, isMac ? '⌘K' : 'Ctrl K'), ' searches all of Seal from anywhere.')),
         h('li', {}, h('span', { class: 'sh-ti sm tint-grey' }, icon('back')), h('span', {}, h('b', {}, 'Back and forward'), ' arrows above the search, or Alt ← and Alt →. The line next to them says where you are.')),
-        h('li', {}, h('span', { class: 'sh-ti sm tint-grey' }, icon('classic')), h('span', {}, h('b', {}, 'Classic Seal'), ' at the bottom brings the usual Seal panel back whenever you need it.'))));
+        h('li', {}, h('span', { class: 'sh-ti sm tint-grey' }, icon('classic')), h('span', {}, h('b', {}, 'Classic Seal'), ' at the bottom brings the usual Seal panel back whenever you need it.')),
+        h('li', {}, h('span', { class: 'sh-ti sm tint-grey' }, h('kbd', {}, '?')), h('span', {}, h('b', {}, 'Keys'), ': N new, T today, W my work, P to publish, G then a letter for a section. Press ? for the list.'))));
     const favs = d.favourites.length ? h('section', { class: 'sh-panel' },
       h('header', {}, h('h3', {}, 'Favourites')),
       d.favourites.map(r => h('button', { type: 'button', class: 'sh-line', onclick: () => go(r.el) },
@@ -1556,6 +1559,7 @@
     // Chaque etape a part : une lecture qui casse n empeche jamais la barre de s afficher.
     const step = (name, fn) => { try { fn(); } catch (e) { console.warn('[Seal Helper] ' + name, e); } };
     step('route', onRoute);
+    step('theme', followTheme);
     if (isOn('dates')) step('dates', () => shortenTexts(document.body));
     if (isOn('doc')) step('doc', () => markRules(document.body));
     if (isOn('quiet')) step('quiet', () => markFaded(document.body));
@@ -1593,20 +1597,73 @@
     if (e.key === 'ArrowRight') { e.preventDefault(); history.forward(); }
   }, true);
 
-  // Raccourcis : Ctrl/Cmd K = recherche de Seal, Echap = fermer nos pages.
+  // Raccourcis : Ctrl/Cmd K = recherche de Seal, Echap = fermer nos pages ; lettres seules hors saisie.
+  let keysOpen = false;
+  let goPending = 0;
+  const KEYS = [['N', 'New record'], ['T', 'Today'], ['W', 'My work'], ['P', 'To publish'], ['G then a letter', 'Go to a notebook section (its first letter)'], ['/', 'Search in Seal'], ['Alt ← / Alt →', 'Back / forward'], ['Esc', 'Close Today, My work or To publish'], ['?', 'This list']];
+  // Une lettre par section : la premiere lettre libre de son nom (Projects P, Protocols R).
+  function sectionKeys() {
+    const used = new Set(['n', 't', 'w', 'p', 'g']); const out = [];
+    for (const l of appSections.filter(l => !HELP_RE.test(l))) {
+      const k = [...l.toLowerCase()].find(ch => /[a-z]/.test(ch) && !out.some(o => o.key === ch));
+      if (k) out.push({ key: k, label: l });
+    }
+    return out;
+  }
+  function renderKeys() {
+    $('#sh-keys')?.remove();
+    if (!keysOpen) return;
+    const secs = sectionKeys();
+    root.append(h('div', { id: 'sh-keys', class: 'sh', role: 'dialog', 'aria-label': 'Keyboard shortcuts', onclick: e => { if (e.target.id === 'sh-keys') { keysOpen = false; renderKeys(); } } },
+      h('div', { class: 'sh-keys-box' },
+        h('header', {}, h('h3', {}, 'Keyboard shortcuts'), h('button', { type: 'button', class: 'sh-more', onclick: () => { keysOpen = false; renderKeys(); } }, 'Close')),
+        h('dl', {}, KEYS.flatMap(([k, l]) => [h('dt', {}, h('kbd', {}, k)), h('dd', {}, l)])),
+        secs.length ? h('p', { class: 'sh-keys-secs' }, 'G then: ', secs.map((o, i) => h('span', {}, h('kbd', {}, o.key.toUpperCase()), ' ' + o.label + (i < secs.length - 1 ? ' · ' : '')))) : null)));
+  }
   document.addEventListener('keydown', e => {
     if (!isOn('side')) return;
     const inText = e.target && (e.target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName));
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'k' && !inText) {
       const q = $('[data-testid="nav-panel-query-button"]');
       if (q) { e.preventDefault(); press(q); }
-    } else if (e.key === 'Escape' && page && !inText) {
-      page = null; render(true);
+      return;
     }
+    if (e.key === 'Escape' && !inText) {
+      if (keysOpen) { keysOpen = false; renderKeys(); e.preventDefault(); return; }
+      if (page) { page = null; render(true); }
+      return;
+    }
+    if (inText || e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+    if ($('[role="dialog"]:not(.sh), [role="menu"]:not(.sh):not(.sh *)')) return; // une fenetre de Seal est ouverte
+    const k = e.key;
+    if (goPending && Date.now() - goPending < 1500) {
+      goPending = 0;
+      const sec = sectionKeys().find(o => o.key === k.toLowerCase());
+      if (sec) { e.preventDefault(); openAppSection(sec.label); }
+      return;
+    }
+    if (k === '?') { e.preventDefault(); keysOpen = !keysOpen; renderKeys(); return; }
+    if (k === '/') { const q = $('[data-testid="nav-panel-query-button"]'); if (q) { e.preventDefault(); press(q); } return; }
+    if (e.shiftKey) return;
+    const act = { n: () => { if (appCreates.length) { newOpen = true; render(true); } else { const nb = $('[data-testid="navbar-new-entity-button"]'); if (nb) press(nb); } },
+      t: () => openPage('home'), w: () => openPage('work'), p: () => openPage('pub'), g: () => { goPending = Date.now(); } }[k.toLowerCase()];
+    if (act) { e.preventDefault(); act(); }
   }, true);
 
   function applyClasses() {
     for (const k of CLASSES) root.classList.toggle('sh-' + k, !!isOn(k));
+  }
+  // Seal en sombre (ses variables --color-bg0) : nos elements suivent.
+  function followTheme() {
+    if (!document.body) return;
+    let c = getComputedStyle(document.body).getPropertyValue('--color-bg0').trim();
+    if (!c) { c = getComputedStyle(document.body).backgroundColor; if (/rgba\([^)]*,\s*0\)$/.test(c) || c === 'transparent') c = getComputedStyle(root).backgroundColor; }
+    if (/rgba\([^)]*,\s*0\)$/.test(c) || c === 'transparent') c = '#ffffff';
+    const m = c.match(/^#([0-9a-f]{3,8})$/i) || c.match(/rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/i);
+    let lum = 1;
+    if (m && m[3] !== undefined) lum = (0.2126 * m[1] + 0.7152 * m[2] + 0.0722 * m[3]) / 255;
+    else if (m) { const hex = m[1].length < 6 ? m[1].split('').map(x => x + x).join('') : m[1]; lum = (0.2126 * parseInt(hex.slice(0, 2), 16) + 0.7152 * parseInt(hex.slice(2, 4), 16) + 0.0722 * parseInt(hex.slice(4, 6), 16)) / 255; }
+    root.classList.toggle('sh-dark', lum < 0.4);
   }
   function refresh() {
     applyClasses();
