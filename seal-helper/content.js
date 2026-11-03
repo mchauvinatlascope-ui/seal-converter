@@ -14,7 +14,7 @@
   const isMac = /Mac/.test(navigator.platform);
   let opts = { ...DEFAULTS };
   const isOn = k => opts.on && opts[k];
-  const VERSION = '1.5.0';
+  const VERSION = '1.5.1';
 
   // ---------------------------------------------------------------- outils
   function h(tag, attrs, ...kids) {
@@ -393,6 +393,9 @@
   let appTables = {}; // { 'Experiments': { at, rows: [{ title, id, project, status, updated, record }] } }
   function readAppTable(doc, section) {
     if (!section) return null;
+    try { return readAppTableUnsafe(doc, section); } catch (e) { lastError = 'table: ' + (e && e.message); return null; }
+  }
+  function readAppTableUnsafe(doc, section) {
     for (const table of $$('table', doc)) {
       const heads = $$('thead th, thead td, tr:first-child th', table).map(th => txt(th));
       if (heads.length < 2) continue;
@@ -402,7 +405,8 @@
       const rows = $$('tbody tr', table).filter(tr => tr.children.length >= 2).map(tr => {
         const cells = [...tr.children].map(td => txt(td));
         const cell = k => (col[k] !== undefined ? cells[col[k]] || '' : '');
-        const link = $('a[href], [data-record], [data-native], button', tr.children[col.title !== undefined ? col.title : 0]);
+        const cellEl = tr.children[col.title !== undefined ? col.title : 0] || tr.children[0];
+        const link = cellEl ? $('a[href], [data-record], [data-native], button', cellEl) : null;
         const href = link && link.getAttribute('href') || '';
         const m = href.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
         return { title: cell('title') || cell('id'), id: cell('id'), project: cell('project'), status: cell('status'), updated: cell('updated'), owner: cell('owner'),
@@ -445,7 +449,7 @@
     };
     const tick = () => {
       if (done() || Date.now() > until) { setTimeout(() => veil(false), 150); render(true); return; }
-      if (find && presses < 6 && Date.now() - lastPress > 400) {
+      if (find && presses < 4 && Date.now() - lastPress > 500) {
         const doc = appDoc(); const el = doc && find(doc);
         if (el) { pressIn(el); presses++; lastPress = Date.now(); }
       }
@@ -574,10 +578,13 @@
     appActive = nav.active;
     const creates = readCreates(doc);
     if (creates.length && JSON.stringify(creates) !== JSON.stringify(appCreates)) { appCreates = creates; try { chrome.storage.local.set({ sealHelperAppCreates: creates }); } catch (e) {} }
-    const tbl = readAppTable(doc, nav.active);
-    if (tbl && (!appTables[nav.active] || JSON.stringify(appTables[nav.active].rows) !== JSON.stringify(tbl.rows))) {
-      appTables = { ...appTables, [nav.active]: tbl };
-      try { chrome.storage.local.set({ [TABLES_KEY]: appTables }); } catch (e) {}
+    const prevT = appTables[nav.active];
+    if (!prevT || Date.now() - prevT.at > 5000) {
+      const tbl = readAppTable(doc, nav.active);
+      if (tbl && (!prevT || JSON.stringify(prevT.rows) !== JSON.stringify(tbl.rows))) {
+        appTables = { ...appTables, [nav.active]: tbl };
+        try { chrome.storage.local.set({ [TABLES_KEY]: appTables }); } catch (e) {}
+      } else if (tbl && prevT) prevT.at = Date.now();
     }
     const ad = readAppData(doc);
     if (ad.metrics.length || ad.experiments.length) {
@@ -683,7 +690,8 @@
   }
   // Etat de la page pour la fenetre de l extension : structure seulement, jamais de contenu.
   function diagnose() {
-    const lines = ['Seal Helper ' + VERSION, 'path ' + location.pathname.replace(/[0-9a-f-]{20,}/g, 'ID'), 'side ' + !!$('#sh-side') + ' page ' + page + ' sections ' + appSections.length];
+    const lines = ['Seal Helper ' + VERSION, 'path ' + location.pathname.replace(/[0-9a-f-]{20,}/g, 'ID'), 'side ' + !!$('#sh-side') + ' page ' + page + ' sections ' + appSections.length,
+      'renders last 5 s ' + renderTimes.filter(t => Date.now() - t < 5000).length + ' · last error ' + (lastError || 'none') + ' · tables ' + Object.keys(appTables).join(',')];
     const doc = appDoc();
     if (!doc) { lines.push('no notebook frame'); return lines.join('\n'); }
     const nav = appNav(doc);
@@ -1507,6 +1515,7 @@
 
   // ------------------------------------------------------------- rendu
   let sideSig = '';
+  let renderTimes = [], renderCooldown = 0, lastError = '';
   function render(force) {
     if (!document.body) return;
     if (!isOn('side')) {
@@ -1518,14 +1527,23 @@
     const d = data();
     const sig = JSON.stringify([page, d.lab, d.favourites.map(r => r.title + r.status + r.current), d.recent.map(r => r.title + r.status + r.current),
       d.mine.map(r => r.title + r.status), d.changes.map(c => c.hash + c.open + c.title + c.day + c.time), d.views.map(v => v.title + v.depth + v.open),
-      d.changeset && [d.changeset.hash, d.changeset.name, d.changeset.rows.map(r => r.title + r.current)], !!d.newBtn, d.changesLoaded, showEmpty, workFilter, workType, workSrc, workStatus, tipsDone, helpOpen, Object.values(appTables).map(t => t.at), lab, labOpen, pickFor, allViewsOpen, appSections, appActive, atNotebook(), recordSection(), location.pathname, newOpen, appCreates, appData && appData.at]);
+      d.changeset && [d.changeset.hash, d.changeset.name, d.changeset.rows.map(r => r.title + r.current)], !!d.newBtn, d.changesLoaded, showEmpty, workFilter, workType, workSrc, workStatus, tipsDone, helpOpen, Object.values(appTables).map(t => t.rows.length), lab, labOpen, pickFor, allViewsOpen, appSections, appActive, atNotebook(), recordSection(), location.pathname, newOpen, appCreates, appData && appData.at]);
     if (!force && sig === sideSig && $('#sh-side')) return;
+    // Garde-fou : plus de 40 rendus en 5 s, c est une boucle ; on souffle 3 s et on le note.
+    const now = Date.now();
+    renderTimes = renderTimes.filter(t => now - t < 5000); renderTimes.push(now);
+    if (renderTimes.length > 40) { if (!renderCooldown) { renderCooldown = now; lastError = 'render loop: ' + renderTimes.length + ' renders in 5 s (sig ' + sig.length + ')'; console.warn('[Seal Helper] ' + lastError); } if (now - renderCooldown < 3000) return; renderCooldown = 0; renderTimes = []; }
     sideSig = sig;
-    $('#sh-side')?.remove();
-    root.append(buildSide(d));
+    let side;
+    try { side = buildSide(d); } catch (e) { lastError = 'side: ' + (e && e.message); console.warn('[Seal Helper] side', e); return; }
+    const oldSide = $('#sh-side');
+    if (oldSide) oldSide.replaceWith(side); else root.append(side);
     const old = $('#sh-page');
     if (page) {
-      const pg = h('main', { id: 'sh-page', class: 'sh', 'aria-label': page }, page === 'home' ? buildHome(d) : page === 'work' ? buildWork(d) : page === 'pick' ? buildPick(d) : buildPub(d));
+      let body;
+      try { body = page === 'home' ? buildHome(d) : page === 'work' ? buildWork(d) : page === 'pick' ? buildPick(d) : buildPub(d); }
+      catch (e) { lastError = 'page ' + page + ': ' + (e && e.message); console.warn('[Seal Helper] page', e); return; }
+      const pg = h('main', { id: 'sh-page', class: 'sh', 'aria-label': page }, body);
       const top = old ? old.scrollTop : 0;
       if (old) old.replaceWith(pg); else root.append(pg);
       pg.scrollTop = top;
@@ -1622,7 +1640,7 @@
     if (!document.body) return;
     observer.disconnect();
     // Chaque etape a part : une lecture qui casse n empeche jamais la barre de s afficher.
-    const step = (name, fn) => { try { fn(); } catch (e) { console.warn('[Seal Helper] ' + name, e); } };
+    const step = (name, fn) => { try { fn(); } catch (e) { lastError = name + ': ' + (e && e.message); console.warn('[Seal Helper] ' + name, e); } };
     step('route', onRoute);
     step('theme', followTheme);
     if (isOn('dates')) step('dates', () => shortenTexts(document.body));
