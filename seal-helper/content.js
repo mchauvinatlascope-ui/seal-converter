@@ -14,7 +14,7 @@
   const isMac = /Mac/.test(navigator.platform);
   let opts = { ...DEFAULTS };
   const isOn = k => opts.on && opts[k];
-  const VERSION = '1.6.1';
+  const VERSION = '1.7.0';
 
   // Ecran de passage : quand on doit recharger la page (fiche -> cahier, cahier -> fiche), un ecran
   // calme au nom de la destination couvre le depart, le rechargement et les sauts de l appli,
@@ -828,7 +828,11 @@
     el.click();
   }
 
-  function openAppSection(label) {
+  // Depuis une fiche, une section deja lue s ouvre tout de suite dans notre page (sans recharger) ;
+  // « Open in the notebook » ou live = true passe par le cahier.
+  function openAppSection(label, live) {
+    const t = appTables[label];
+    if (!live && !atNotebook() && t && t.rows.length) { listSec = label; listFilter = ''; listStatus = ''; openPage('list'); return; }
     appAct(doc => { const nav = appNav(doc); return nav && nav.byLabel.get(label); }, () => { appActive = label; }, label, { section: label });
   }
 
@@ -928,6 +932,7 @@
 
   const PAGE_NAME = { home: 'Today', work: 'My work', pub: 'To publish', pick: 'Shortcut' };
   function whereAmI(d) {
+    if (page === 'list') return ['Notebook', listSec];
     if (page) return [PAGE_NAME[page] || ''];
     if (atNotebook()) return appActive ? ['Notebook', appActive] : ['Notebook'];
     const sec = recordSection();
@@ -1078,7 +1083,7 @@
       for (const l of appSections.filter(l => !HELP_RE.test(l))) {
         const create = appCreates.find(c => CREATE_SECTION[c.key] && CREATE_SECTION[c.key].test(l) && !/panel|antibodies/.test(c.key));
         scroll.append(h('div', { class: 'sh-sc' },
-          h('button', { type: 'button', class: 'sh-row sh-app' + ((here && appActive === l) || inSec === l ? ' on' : ''), title: `Open ${l} in the lab notebook`, onclick: () => openAppSection(l) },
+          h('button', { type: 'button', class: 'sh-row sh-app' + ((here && appActive === l) || (page === 'list' ? listSec === l : inSec === l) ? ' on' : ''), title: `Open ${l} in the lab notebook`, onclick: () => openAppSection(l) },
             icon(appIcon(l)), h('span', { class: 'sh-t' }, l), sectionCount(l)),
           create ? h('button', { type: 'button', class: 'sh-edit', title: create.label, 'aria-label': create.label, onclick: () => openCreate(create.key) }, icon('plus')) : null));
       }
@@ -1423,6 +1428,40 @@
   }
 
   let workFilter = '';
+  let listSec = '', listFilter = '', listStatus = '';
+  function buildList(d) {
+    const t = appTables[listSec] || { rows: [], at: 0 };
+    const all = t.rows;
+    const f = listFilter.toLowerCase();
+    const has = k => all.some(r => r[k] && r[k] !== r.title);
+    const cols = ['id', 'project', 'status', 'updated'].filter(has);
+    const NAME = { id: 'ID', project: 'Project', status: 'Status', updated: 'Updated' };
+    const rows = all.filter(r => !f || [r.title, r.id, r.project, r.owner].join(' ').toLowerCase().includes(f))
+      .filter(r => !listStatus || statusClass(r.status || '') === listStatus);
+    const statuses = [...new Set(all.map(r => r.status).filter(Boolean))];
+    const stChips = statuses.length > 1 ? h('div', { class: 'sh-chips', role: 'group', 'aria-label': 'Status' },
+      [['', 'All'], ...statuses.map(st => [statusClass(st), st])].filter((x, i, a) => a.findIndex(y => y[0] === x[0]) === i)
+        .map(([k, l]) => h('button', { type: 'button', class: 'sh-chip' + (listStatus === k ? ' on' : ''), 'aria-pressed': String(listStatus === k), onclick: () => { listStatus = k; render(true); } }, l))) : null;
+    const input = h('input', { type: 'search', id: 'sh-lfilter', class: 'sh-input', placeholder: 'Filter by name, ID or project', value: listFilter,
+      oninput: e => { listFilter = e.target.value; render(true); const i = $('#sh-lfilter'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } } });
+    const create = appCreates.find(c => CREATE_SECTION[c.key] && CREATE_SECTION[c.key].test(listSec) && !/panel|antibodies/.test(c.key));
+    const seen = t.at ? new Date(t.at).toLocaleString('en-NZ', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : '';
+    const table = h('table', { class: 'sh-table' },
+      h('thead', {}, h('tr', {}, h('th', {}, listSec.replace(/s$/, '')), cols.map(k => h('th', {}, NAME[k])), h('th', {}, ''))),
+      h('tbody', {}, rows.map(r => h('tr', { newtab: recUrl(r), onclick: () => openTableRow(listSec, r), tabindex: '0', onkeydown: e => e.key === 'Enter' && openTableRow(listSec, r) },
+        h('td', {}, h('span', { class: 'sh-cell' }, h('span', { class: 'sh-ti sm' }, icon(appIcon(listSec))), h('b', {}, r.title))),
+        cols.map(k => h('td', { class: k === 'status' ? '' : 'sh-muted' }, k === 'status' ? pill(r.status) : r[k] || '')),
+        h('td', { class: 'sh-go' }, 'Open ›')))));
+    return h('div', { class: 'sh-wrap' },
+      h('div', { class: 'sh-hello' },
+        h('div', {}, h('div', { class: 'sh-eyebrow' }, 'Lab notebook'), h('h1', {}, listSec),
+          h('p', {}, all.length + ' in the notebook' + (seen ? ', as seen there ' + seen : '') + '. Ctrl+click opens a record in a new tab.')),
+        h('div', { class: 'sh-actions' },
+          create ? h('button', { type: 'button', class: 'sh-btn', onclick: () => openCreate(create.key) }, icon('plus'), ' ' + create.label) : null,
+          h('button', { type: 'button', class: 'sh-btn ghost', title: 'Opens this section in the notebook itself, with its latest content', onclick: () => openAppSection(listSec, true) }, 'Open in the notebook'))),
+      h('div', { class: 'sh-hello' }, input, stChips),
+      h('section', { class: 'sh-panel' }, rows.length ? table : h('p', { class: 'sh-empty' }, all.length ? 'Nothing matches.' : 'Nothing in this list yet.')));
+  }
   let workType = '';
   let workSrc = ''; // '' = cahier si disponible, 'seal' = fiches recentes de Seal
   let workStatus = '';
@@ -1638,7 +1677,7 @@
     const d = data();
     const sig = JSON.stringify([page, d.lab, d.favourites.map(r => r.title + r.status + r.current), d.recent.map(r => r.title + r.status + r.current),
       d.mine.map(r => r.title + r.status), d.changes.map(c => c.hash + c.open + c.title + c.day + c.time), d.views.map(v => v.title + v.depth + v.open),
-      d.changeset && [d.changeset.hash, d.changeset.name, d.changeset.rows.map(r => r.title + r.current)], !!d.newBtn, d.changesLoaded, showEmpty, workFilter, workType, workSrc, workStatus, tipsDone, helpOpen, Object.values(appTables).map(t => t.rows.length), lab, labOpen, pickFor, allViewsOpen, appSections, appActive, atNotebook(), recordSection(), location.pathname, newOpen, appCreates, appData && appData.at]);
+      d.changeset && [d.changeset.hash, d.changeset.name, d.changeset.rows.map(r => r.title + r.current)], !!d.newBtn, d.changesLoaded, showEmpty, workFilter, listSec, listFilter, listStatus, page, workType, workSrc, workStatus, tipsDone, helpOpen, Object.values(appTables).map(t => t.rows.length), lab, labOpen, pickFor, allViewsOpen, appSections, appActive, atNotebook(), recordSection(), location.pathname, newOpen, appCreates, appData && appData.at]);
     if (!force && sig === sideSig && $('#sh-side')) return;
     // Garde-fou : plus de 40 rendus en 5 s, c est une boucle ; on souffle 3 s et on le note.
     const now = Date.now();
@@ -1652,7 +1691,7 @@
     const old = $('#sh-page');
     if (page) {
       let body;
-      try { body = page === 'home' ? buildHome(d) : page === 'work' ? buildWork(d) : page === 'pick' ? buildPick(d) : buildPub(d); }
+      try { body = page === 'home' ? buildHome(d) : page === 'list' ? buildList(d) : page === 'work' ? buildWork(d) : page === 'pick' ? buildPick(d) : buildPub(d); }
       catch (e) { lastError = 'page ' + page + ': ' + (e && e.message); console.warn('[Seal Helper] page', e); return; }
       const pg = h('main', { id: 'sh-page', class: 'sh', 'aria-label': page }, body);
       const top = old ? old.scrollTop : 0;
