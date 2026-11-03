@@ -14,7 +14,7 @@
   const isMac = /Mac/.test(navigator.platform);
   let opts = { ...DEFAULTS };
   const isOn = k => opts.on && opts[k];
-  const VERSION = '1.4.0';
+  const VERSION = '1.4.1';
 
   // ---------------------------------------------------------------- outils
   function h(tag, attrs, ...kids) {
@@ -399,9 +399,11 @@
     if (!v) { v = h('div', { id: 'sh-veil', class: 'sh', 'aria-hidden': 'true' }); root.append(v); }
     veilTimer = setTimeout(() => veil(false), ms);
   }
-  // Leve le voile quand l appli a fini : vue active attendue, fenetre ouverte ou fiche partie, sinon au bout de 2,5 s.
-  function settle(resume, from) {
-    const until = Date.now() + 2500;
+  // Leve le voile quand l appli a fini : vue active attendue, fenetre ouverte ou fiche partie.
+  // L appli affiche son menu avant d etre prete a reagir : tant que rien ne bouge, on reclique (5 fois au plus).
+  function settle(resume, from, find) {
+    const until = Date.now() + 4000;
+    let presses = 1, lastPress = Date.now();
     const done = () => {
       const doc = appDoc();
       if (!doc) return location.pathname !== from;
@@ -410,7 +412,11 @@
       return location.pathname !== from;
     };
     const tick = () => {
-      if (done() || Date.now() > until) { setTimeout(() => veil(false), 150); return; }
+      if (done() || Date.now() > until) { setTimeout(() => veil(false), 150); render(true); return; }
+      if (find && presses < 6 && Date.now() - lastPress > 600) {
+        const doc = appDoc(); const el = doc && find(doc);
+        if (el) { pressIn(el); presses++; lastPress = Date.now(); }
+      }
       setTimeout(tick, 60);
     };
     tick();
@@ -424,7 +430,7 @@
     const tryIt = () => {
       const doc = appDoc();
       const el = doc && find(doc);
-      if (el) { pressIn(el); if (after) after(); hideToast(); render(true); settle(resume, from); return true; }
+      if (el) { pressIn(el); if (after) after(); hideToast(); render(true); settle(resume, from, find); return true; }
       // Le bouton n est pas dans la vue courante de l appli : on repasse par son accueil, une fois.
       if (doc && !homeTried && Date.now() - started > 600) { const nav = appNav(doc); const first = nav && nav.byLabel.values().next().value; if (first) { homeTried = 1; pressIn(first); } }
       return false;
