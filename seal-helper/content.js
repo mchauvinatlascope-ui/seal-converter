@@ -14,7 +14,45 @@
   const isMac = /Mac/.test(navigator.platform);
   let opts = { ...DEFAULTS };
   const isOn = k => opts.on && opts[k];
-  const VERSION = '1.5.10';
+  const VERSION = '1.6.0';
+
+  // Ecran de passage : quand on doit recharger la page (fiche -> cahier, cahier -> fiche), un ecran
+  // calme au nom de la destination couvre le depart, le rechargement et les sauts de l appli,
+  // puis s efface en fondu quand la bonne vue est prete. Pose des le debut du chargement : rien ne clignote.
+  const COVER = 'sh-cover';
+  let cover = null; // { label, kind: 'section'|'record'|'notebook', at, path }
+  function showCover(label, kind) {
+    cover = { label: label || 'Notebook', kind, at: Date.now(), from: location.pathname };
+    try { sessionStorage.setItem(COVER, JSON.stringify({ ...cover, dark: root.classList.contains('sh-dark') })); } catch (e) {}
+    root.setAttribute('data-sh-cover', cover.label);
+    root.classList.remove('sh-cover-out');
+    root.classList.add('sh-cover');
+  }
+  function hideCover() {
+    try { sessionStorage.removeItem(COVER); } catch (e) {}
+    if (!cover) return;
+    cover = null;
+    root.classList.add('sh-cover-out');
+    setTimeout(() => { if (!cover) { root.classList.remove('sh-cover', 'sh-cover-out'); root.removeAttribute('data-sh-cover'); } }, 220);
+  }
+  (() => {
+    let c = null;
+    try { c = JSON.parse(sessionStorage.getItem(COVER) || 'null'); } catch (e) {}
+    if (!c || Date.now() - c.at > 15000) { try { sessionStorage.removeItem(COVER); } catch (e) {} return; }
+    cover = { label: c.label, kind: c.kind, at: Date.now(), from: '' };
+    if (c.dark) root.classList.add('sh-dark');
+    root.setAttribute('data-sh-cover', c.label);
+    root.classList.add('sh-cover');
+  })();
+  // A chaque passage : la vue attendue est-elle la ?
+  function checkCover() {
+    if (!cover) return;
+    if (Date.now() - cover.at > 10000 || !isOn('side')) { hideCover(); return; }
+    if (location.pathname === cover.from) return; // la page n est pas encore partie
+    if (cover.kind === 'record') { if ($('[data-testid="entity-top-navbar"], [data-testid="changeset-top-navbar"]')) setTimeout(hideCover, 250); return; }
+    if (cover.kind === 'section' && isOn('readnb')) return; // levee par la reprise de la section (settle)
+    if (atNotebook() && (frameState(appFrame()) === 'ready' || !isOn('readnb'))) setTimeout(hideCover, 300);
+  }
 
   // ---------------------------------------------------------------- outils
   function h(tag, attrs, ...kids) {
@@ -479,7 +517,7 @@
       return location.pathname !== from;
     };
     const tick = () => {
-      if (done() || Date.now() > until) { setTimeout(() => veil(false), 150); render(true); return; }
+      if (done() || Date.now() > until) { setTimeout(() => { veil(false); hideCover(); }, 150); render(true); return; }
       if (find && presses < 4 && Date.now() - lastPress > 500 && frameLoads.length === loadsBefore) {
         const doc = appDoc(); const el = doc && find(doc);
         if (el) { pressIn(el); presses++; lastPress = Date.now(); }
@@ -519,7 +557,7 @@
     const loop = () => {
       if (tryIt()) return;
       if (Date.now() < until) appWait = setTimeout(loop, 120);
-      else { veil(false); if (what) toast(`Couldn’t find “${what}” in the notebook. Open it from the notebook page.`, 'warn', 6000); }
+      else { veil(false); hideCover(); if (what) toast(`Couldn’t find “${what}” in the notebook. Open it from the notebook page.`, 'warn', 6000); }
     };
     appWait = setTimeout(loop, 120);
   }
@@ -532,7 +570,7 @@
     // Un identifiant Seal : la fiche s ouvre par son adresse, sans repasser par l accueil du cahier.
     const id = UUID.test(r.id || '') ? r.id : UUID.test(r.native || '') ? r.native : '';
     const base = location.pathname.match(/^\/o\/[^/]+\/s\/[^/]+/);
-    if (id && base) { page = null; guideOpened = true; veil(true, 4000); toast(`Opening ${r.title}…`); location.assign(base[0] + '/' + id); return; }
+    if (id && base) { page = null; guideOpened = true; showCover(r.title, 'record'); location.assign(base[0] + '/' + id); return; }
     appAct(doc => (r.id ? $(`[data-record="${r.id}"]`, doc) : $(`[data-native="${r.native}"]`, doc)), null, r.title, { record: r.id, native: r.native, title: r.title });
   };
   let resumed = false;
@@ -541,7 +579,7 @@
     resumed = true;
     let p = null;
     try { p = JSON.parse(sessionStorage.getItem(PENDING) || 'null'); sessionStorage.removeItem(PENDING); } catch (e) {}
-    if (!p || Date.now() - p.at > 60000) return;
+    if (!p || Date.now() - p.at > 60000) { if (cover && cover.kind === 'section') cover.kind = 'notebook'; return; }
     if (p.create) openCreate(p.create);
     else if (p.record || p.native) openRecord({ id: p.record, native: p.native, title: p.title });
     else if (p.section) openAppSection(p.section);
@@ -823,7 +861,7 @@
   // page = null (Seal visible) ou 'home' | 'work' | 'pub'
   let page = null;
   let lastRoute = '';
-  let guideOpened = false;
+  let guideOpened = !!cover; // arrivee par l ecran de passage : on va a la destination, pas a Today
   const isWorkspaceRoot = () => /^\/o\/[^/]+\/s\/[^/]+\/?$/.test(location.pathname);
   // La page d accueil du labo (« Start Here ») est une fiche Seal qui contient l appli : c est le cahier.
   // Une manip peut aussi contenir un cadre (modeles de protocoles) : seul un cadre qui porte le menu du labo compte.
@@ -909,7 +947,7 @@
     try { path = localStorage.getItem(NB_PATH) || ''; } catch (e) {}
     if (!path.startsWith(m[0] + '/') || path === location.pathname || /\/cs\//.test(path)) { path = m[0]; try { localStorage.removeItem(NB_PATH); } catch (e) {} }
     try { if (resume) sessionStorage.setItem(PENDING, JSON.stringify({ ...resume, at: Date.now() })); } catch (e) {}
-    veil(true, 8000);
+    showCover(resume && resume.section ? resume.section : resume && resume.create ? (CREATE_LABEL[resume.create] || 'Notebook') : 'Notebook', resume && resume.section ? 'section' : 'notebook');
     location.assign(path);
   }
   function isNotebookRow(el) {
@@ -1692,6 +1730,7 @@
     // Chaque etape a part : une lecture qui casse n empeche jamais la barre de s afficher.
     const step = (name, fn) => { try { fn(); } catch (e) { lastError = name + ': ' + (e && e.message); console.warn('[Seal Helper] ' + name, e); } };
     step('route', onRoute);
+    step('cover', checkCover);
     step('theme', followTheme);
     if (isOn('dates')) step('dates', () => shortenTexts(document.body));
     if (isOn('doc')) step('doc', () => markRules(document.body));

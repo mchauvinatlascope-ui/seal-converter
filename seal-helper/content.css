@@ -558,3 +558,35 @@ html.sh-dark #sh-page .sh-box { border-color: #4a4e56; }
 
 /* 1.5.3 : le cadre de l appli est decale a gauche de la largeur de son menu ; a l impression il reprend sa place */
 @media print { html.sh-doc iframe[title="Custom Content"][data-sh-shift] { margin-left: 0 !important; width: 100% !important; } }
+
+/* ======================================================================
+   1.6.0 : ecran de passage pendant un rechargement (fiche <-> cahier) : nom de la destination,
+   squelette de liste, fondu a la fin. La barre (z 1450) reste au-dessus des qu elle est la.
+   ====================================================================== */
+html.sh-cover::before {
+  content: ''; position: fixed; inset: 0; z-index: 1440; pointer-events: auto; cursor: progress;
+  background:
+    linear-gradient(#e8e8e3, #e8e8e3) 288px 96px / 220px 10px no-repeat,
+    linear-gradient(#ececE7, #ececE7) 288px 140px / calc(100% - 328px) 1px no-repeat,
+    repeating-linear-gradient(to bottom, transparent 0 22px, #efefea 22px 31px, transparent 31px 44px) 288px 150px / min(560px, calc(100% - 328px)) 396px no-repeat,
+    repeating-linear-gradient(to bottom, transparent 0 43px, #ececE7 43px 44px) 288px 150px / calc(100% - 328px) 396px no-repeat,
+    linear-gradient(to right, #f4f4f1 0 248px, #e6e6e1 248px 249px, #f6f6f3 249px);
+  transition: opacity .2s ease;
+}
+html.sh-cover::after {
+  content: attr(data-sh-cover); position: fixed; left: 288px; top: 44px; right: 40px; z-index: 1441; pointer-events: none;
+  font: 650 22px/1.25 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; letter-spacing: -.01em; color: #1d1d1b;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  transition: opacity .2s ease;
+}
+html.sh-cover.sh-cover-out::before, html.sh-cover.sh-cover-out::after { opacity: 0; }
+html.sh-dark.sh-cover::before {
+  background:
+    linear-gradient(#2a2d31, #2a2d31) 288px 96px / 220px 10px no-repeat,
+    linear-gradient(#2a2d31, #2a2d31) 288px 140px / calc(100% - 328px) 1px no-repeat,
+    repeating-linear-gradient(to bottom, transparent 0 22px, #23262a 22px 31px, transparent 31px 44px) 288px 150px / min(560px, calc(100% - 328px)) 396px no-repeat,
+    repeating-linear-gradient(to bottom, transparent 0 43px, #2a2d31 43px 44px) 288px 150px / calc(100% - 328px) 396px no-repeat,
+    linear-gradient(to right, #1b1d20 0 248px, #2a2d31 248px 249px, #16181b 249px);
+}
+html.sh-dark.sh-cover::after { color: #ececea; }
+@media print { html.sh-cover::before, html.sh-cover::after { display: none; } }
