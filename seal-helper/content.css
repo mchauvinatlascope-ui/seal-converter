@@ -555,3 +555,6 @@ html.sh-dark #sh-veil { background: #16181b; }
 html.sh-dark #sh-side .sh-arrow { background: var(--sh-bg) !important; border-color: var(--sh-line) !important; }
 html.sh-dark #sh-side .sh-sep { color: #4a4e56; }
 html.sh-dark #sh-page .sh-box { border-color: #4a4e56; }
+
+/* 1.5.3 : le cadre de l appli est decale a gauche de la largeur de son menu ; a l impression il reprend sa place */
+@media print { html.sh-doc iframe[title="Custom Content"][data-sh-shift] { margin-left: 0 !important; width: 100% !important; } }

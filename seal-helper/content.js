@@ -14,7 +14,7 @@
   const isMac = /Mac/.test(navigator.platform);
   let opts = { ...DEFAULTS };
   const isOn = k => opts.on && opts[k];
-  const VERSION = '1.5.2';
+  const VERSION = '1.5.3';
 
   // ---------------------------------------------------------------- outils
   function h(tag, attrs, ...kids) {
@@ -602,51 +602,43 @@
 
   // Le menu de l appli fait doublon avec la barre : on masque sa colonne (jamais supprimee,
   // on clique toujours dessus pour toi). Seulement si c est bien une colonne etroite et haute.
-  const hiddenOf = new WeakMap(); // document de l appli -> { el, sel, sheet, way }
+  // On ne touche a rien dans la page de l appli : son menu reste entier et mesurable. C est le CADRE
+  // (l iframe, dans la page Seal) qu on decale vers la gauche de la largeur du menu, qui sort ainsi de l ecran.
+  const hiddenOf = new WeakMap(); // document de l appli -> { el, w }
   const hiddenEl = doc => { const st = hiddenOf.get(doc); return st && st.el && st.el.isConnected ? st.el : null; };
+  const HIDE_WAYS = ['shift'];
+  const WAY_KEY = 'sealHelperHideWay';
+  let learnedWay = '';
+  const hideWay = () => 'shift';
+  function appFrame() { return $('iframe[title="Custom Content"]'); }
   function hideAppMenu(doc, box) {
     const want = isOn('side') && isOn('appmenu');
-    const st = hiddenOf.get(doc);
-    if (!want) { if (st) { dropHideStyle(doc); hiddenOf.delete(doc); } return; }
-    if (st && st.el && st.el.isConnected) { verifyHide(doc); return; }
-    const rail = box.closest('aside.rail, aside');
-    const sel = rail ? selOf(rail) : '';
-    if (!rail || !/^aside/.test(sel)) return; // sans structure stable, on ne masque pas
-    hiddenOf.set(doc, { el: rail, sel, way: st && st.way || '' });
-    ensureHideStyle(doc, rail);
-    setTimeout(() => { try { verifyHide(doc); } catch (e) {} }, 250);
+    const f = appFrame();
+    if (!f) return;
+    if (!want) { unshiftFrame(f); hiddenOf.delete(doc); return; }
+    const rail = box.closest('aside.rail, aside') || box;
+    const r = rail.getBoundingClientRect();
+    const W = doc.documentElement.clientWidth;
+    const w = Math.round(r.width);
+    // Seulement une colonne a gauche, etroite ; sinon on laisse le menu tel quel.
+    if (!w || r.left > 4 || w > W * 0.45 || r.height < doc.documentElement.clientHeight * 0.4) { unshiftFrame(f); hiddenOf.delete(doc); return; }
+    if (f.dataset.shShift !== String(w)) {
+      f.style.marginLeft = -w + 'px';
+      f.style.width = 'calc(100% + ' + w + 'px)';
+      f.style.maxWidth = 'none';
+      f.dataset.shShift = String(w);
+      const wrap = f.parentElement; if (wrap) wrap.style.overflow = 'hidden';
+    }
+    hiddenOf.set(doc, { el: rail, w });
+  }
+  function unshiftFrame(f) {
+    if (!f || !f.dataset.shShift) return;
+    f.style.marginLeft = ''; f.style.width = ''; f.style.maxWidth = ''; delete f.dataset.shShift;
+    const wrap = f.parentElement; if (wrap) wrap.style.overflow = '';
   }
   const selOf = el => el.tagName.toLowerCase() + [...el.classList].filter(c => /^[\w-]+$/.test(c)).map(c => '.' + c).join('');
-  // Trois facons de masquer le menu, de la plus propre a la plus prudente. Chacune est verifiee
-  // apres coup : si le contenu du cahier n est plus a l ecran, on passe a la suivante.
-  const HIDE_WAYS = ['out', 'thin', 'plain', 'none'];
-  const WAY_KEY = 'sealHelperHideWay';
-  let learnedWay = ''; // facon retenue dans ce navigateur, relue au depart
-  const ZERO = 'width:0!important;height:0!important;min-width:0!important;min-height:0!important;flex:0 0 0!important;padding:0!important;margin:0!important;border:0!important;overflow:hidden!important;visibility:hidden!important;pointer-events:none!important';
-  const GRID = '*:has(>X){grid-template-columns:minmax(0,1fr)!important}X~*{grid-column:1/-1!important;min-width:0}';
-  const HIDE_CSS = {
-    out: 'X{position:absolute!important;left:-9999px!important;top:0!important;' + ZERO + '}' + GRID,
-    thin: 'X{' + ZERO + '}' + GRID,
-    plain: 'X{visibility:hidden!important;pointer-events:none!important;overflow:hidden!important}',
-    none: '',
-  };
-  const hideWay = doc => { const st = hiddenOf.get(doc); return (st && st.way) || learnedWay || 'out'; };
-  function ensureHideStyle(doc, el) {
-    const st = hiddenOf.get(doc) || { el, sel: el ? selOf(el) : '' };
-    if (!st.sel) return;
-    const full = (HIDE_CSS[hideWay(doc)] || '').split('X').join(st.sel);
-    const win = doc.defaultView;
-    try {
-      if (!st.sheet) { st.sheet = new win.CSSStyleSheet(); }
-      st.sheet.replaceSync(full);
-      if (!doc.adoptedStyleSheets.includes(st.sheet)) doc.adoptedStyleSheets = [...doc.adoptedStyleSheets, st.sheet];
-      hiddenOf.set(doc, st);
-    } catch (e) { lastError = 'hide: ' + (e && e.message); }
-  }
-  function dropHideStyle(doc) {
-    const st = hiddenOf.get(doc);
-    if (st && st.sheet) { try { doc.adoptedStyleSheets = doc.adoptedStyleSheets.filter(x => x !== st.sheet); } catch (e) {} }
-  }
+  function ensureHideStyle() {}
+  function dropHideStyle() {}
   // Le contenu du cahier (hors menu) occupe-t-il bien l ecran du cadre ?
   function contentVisible(doc) {
     const hid = hiddenEl(doc);
@@ -674,6 +666,7 @@
   }
   const badSince = new WeakMap();
   function verifyHide(doc) {
+    return;
     const hid = hiddenEl(doc);
     if (!hid || hideWay(doc) === 'plain' || hideWay(doc) === 'none') return;
     if ($('#sh-veil') || doc.body.querySelectorAll('*').length < 30) return; // en transition, ou l appli n a encore rien affiche
@@ -698,7 +691,7 @@
     if (!doc) { lines.push('no notebook frame'); return lines.join('\n'); }
     const nav = appNav(doc);
     const hid = hiddenEl(doc);
-    lines.push('way ' + hideWay(doc) + ' hidden ' + (hid ? selOf(hid) : 'none') + ' nav ' + (nav ? nav.byLabel.size : 0) + ' visible ' + contentVisible(doc));
+    lines.push('shift ' + ((appFrame() && appFrame().dataset.shShift) || 'none') + ' rail ' + (hid ? selOf(hid) : 'none') + ' nav ' + (nav ? nav.byLabel.size : 0) + ' visible ' + contentVisible(doc));
     const rect = el => { const r = el.getBoundingClientRect(); return Math.round(r.left) + ',' + Math.round(r.top) + ' ' + Math.round(r.width) + 'x' + Math.round(r.height); };
     const cs = el => { const c = doc.defaultView.getComputedStyle(el); return c.display + (c.display.includes('grid') ? ' cols[' + c.gridTemplateColumns + '] rows[' + c.gridTemplateRows + ']' : '') + (c.position !== 'static' ? ' ' + c.position : ''); };
     lines.push('frame ' + doc.documentElement.clientWidth + 'x' + doc.documentElement.clientHeight + ' scroll ' + doc.documentElement.scrollWidth + 'x' + doc.documentElement.scrollHeight + ' learned ' + (learnedWay || '-'));
@@ -1650,7 +1643,7 @@
     if (isOn('quiet')) step('quiet', () => markFaded(document.body));
     step('info', closeInfoOnArrival);
     if (isOn('side')) { if (page && !paneLoaded('changes') && Date.now() - panesTried > 3000) panesTried = 0; step('app', readApp); step('panes', ensurePanes); step('views', expandViews); step('resume', resumePending); }
-    else step('unhide', () => { const doc = appDoc(); if (doc && hiddenOf.get(doc)) { dropHideStyle(doc); hiddenOf.delete(doc); } });
+    else step('unhide', () => { unshiftFrame(appFrame()); const doc = appDoc(); if (doc) hiddenOf.delete(doc); });
     if (isOn('side')) step('arrive', arriveOnToday);
     step('side', () => render(false));
     if (isOn('props')) { step('props', renderProps); step('outline', renderOutline); }
@@ -1789,7 +1782,7 @@
       learnedWay = '';
       try { chrome.storage.local.remove(WAY_KEY); } catch (e) {}
       const doc = appDoc();
-      if (doc) { const st = hiddenOf.get(doc); if (st) { st.way = ''; ensureHideStyle(doc, st.el); } }
+      unshiftFrame(appFrame()); if (doc) hiddenOf.delete(doc);
       reply({ ok: true }); return;
     }
     reply({ v: VERSION, on: !!opts.on, side: !!isOn('side'), workspace: !!$('[data-testid="platform-layout"]'), shown: !!$('#sh-side') });
