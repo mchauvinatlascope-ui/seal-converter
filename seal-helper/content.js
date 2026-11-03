@@ -14,7 +14,7 @@
   const isMac = /Mac/.test(navigator.platform);
   let opts = { ...DEFAULTS };
   const isOn = k => opts.on && opts[k];
-  const VERSION = '1.5.7';
+  const VERSION = '1.5.8';
 
   // ---------------------------------------------------------------- outils
   function h(tag, attrs, ...kids) {
@@ -271,8 +271,38 @@
   const appIcon = l => (APP_ICON.find(([re]) => re.test(l)) || [0, 'doc'])[1];
   const CLICKABLE = 'a,button,[role="button"],[role="tab"],[role="link"],[role="menuitem"],li';
 
-  function appDoc() {
+  // L appli du cahier n est jamais lue pendant son demarrage : on attend que son cadre ait fini
+  // de charger (evenement load, sans y toucher), puis encore un peu. Avant, on fait comme si on ne la voyait pas.
+  const hooked = new WeakSet();
+  const frameReady = new WeakMap(); // cadre -> { src, at } du dernier chargement fini
+  const hookedAt = new WeakMap();
+  let frameLoads = []; // instants des chargements du cadre de l appli
+  const READY_DELAY = 1500;
+  function hookFrame() {
     const f = $('iframe[title="Custom Content"]');
+    if (f && !hooked.has(f)) {
+      hooked.add(f); hookedAt.set(f, Date.now());
+      f.addEventListener('load', () => {
+        frameReady.set(f, { src: f.getAttribute('src'), at: Date.now() });
+        frameLoads.push(Date.now()); frameLoads = frameLoads.slice(-20);
+        setTimeout(schedule, READY_DELAY + 50);
+      });
+    }
+    return f;
+  }
+  function frameState(f) {
+    if (!f) return 'none';
+    const r = frameReady.get(f);
+    if (r && r.src === f.getAttribute('src')) return Date.now() - r.at < READY_DELAY ? 'settling' : 'ready';
+    // Load manque (cadre deja charge avant nous) : le navigateur note la fin du chargement du cadre.
+    const src = f.getAttribute('src');
+    if (src) { try { const url = new URL(src, location.href).href; if (performance.getEntriesByType('resource').some(e => e.initiatorType === 'iframe' && e.name === url && e.responseEnd > 0)) { frameReady.set(f, { src, at: Date.now() - READY_DELAY }); return 'ready'; } } catch (e) {} }
+    return Date.now() - (hookedAt.get(f) || Date.now()) > 20000 ? 'late' : 'booting';
+  }
+  function appDoc() {
+    const f = hookFrame();
+    const st = frameState(f);
+    if (st !== 'ready' && st !== 'late') return null;
     try { return f && f.contentDocument && f.contentDocument.body ? f.contentDocument : null; } catch (e) { return null; }
   }
 
@@ -569,11 +599,11 @@
     setTimeout(loop, 500);
   }
 
-  const hooked = new WeakSet();
-  let frameLoads = []; // instants des chargements du cadre de l appli
+  let lastRead = 0;
   function readApp() {
-    const f = $('iframe[title="Custom Content"]');
-    if (f && !hooked.has(f)) { hooked.add(f); f.addEventListener('load', () => { frameLoads.push(Date.now()); frameLoads = frameLoads.slice(-20); schedule(); }); }
+    // Une lecture par seconde au plus : l appli n est jamais sollicitee en continu.
+    if (Date.now() - lastRead < 1000) { setTimeout(schedule, 1050); return; }
+    lastRead = Date.now();
     const doc = appDoc();
     const nav = doc && appNav(doc);
     if (!nav) { appActive = ''; return; }
@@ -689,8 +719,9 @@
   function diagnose() {
     const lines = ['Seal Helper ' + VERSION, 'path ' + location.pathname.replace(/[0-9a-f-]{20,}/g, 'ID'), 'side ' + !!$('#sh-side') + ' page ' + page + ' sections ' + appSections.length,
       'renders last 5 s ' + renderTimes.filter(t => Date.now() - t < 5000).length + ' · last error ' + (lastError || 'none') + ' · tables ' + Object.keys(appTables).join(',')];
+    lines.push('frame ' + frameState(appFrame()) + ' · loads ' + frameLoads.length);
     const doc = appDoc();
-    if (!doc) { lines.push('no notebook frame'); return lines.join('\n'); }
+    if (!doc) { lines.push('no notebook frame read'); return lines.join('\n'); }
     const nav = appNav(doc);
     const hid = hiddenEl(doc);
     lines.push('shift ' + ((appFrame() && appFrame().dataset.shShift) || 'none') + ' rail ' + (hid ? selOf(hid) : 'none') + ' nav ' + (nav ? nav.byLabel.size : 0) + ' active [' + (nav ? nav.active : '') + '] visible ' + contentVisible(doc));
@@ -812,7 +843,7 @@
     navCache.set(doc, { at: Date.now(), nav: !!nav });
     return nav ? doc : null;
   }
-  const atNotebook = () => isWorkspaceRoot() || !!notebookDoc() || (!isOn('readnb') && (() => { const f = $('iframe[title="Custom Content"]'); return !!f && f.getBoundingClientRect().height > 200; })());
+  const atNotebook = () => isWorkspaceRoot() || !!notebookDoc() || ((!isOn('readnb') || !appDoc()) && (() => { const f = $('iframe[title="Custom Content"]'); return !!f && f.getBoundingClientRect().height > 200; })());
 
   function onRoute() {
     if (location.pathname === lastRoute) return;
@@ -1668,6 +1699,7 @@
   const observer = new MutationObserver(muts => {
     // Nos propres elements ne relancent rien.
     if (muts.every(m => m.target.closest && m.target.closest('.sh'))) return;
+    hookFrame();
     schedule();
   });
   window.addEventListener('resize', schedule);
