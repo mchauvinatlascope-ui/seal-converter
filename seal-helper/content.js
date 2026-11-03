@@ -14,7 +14,7 @@
   const isMac = /Mac/.test(navigator.platform);
   let opts = { ...DEFAULTS };
   const isOn = k => opts.on && opts[k];
-  const VERSION = '1.5.3';
+  const VERSION = '1.5.4';
 
   // ---------------------------------------------------------------- outils
   function h(tag, attrs, ...kids) {
@@ -440,6 +440,7 @@
   function settle(resume, from, find) {
     const until = Date.now() + 4000;
     let presses = 1, lastPress = Date.now();
+    const loadsBefore = frameLoads.length;
     const done = () => {
       const doc = appDoc();
       if (!doc) return location.pathname !== from;
@@ -449,7 +450,7 @@
     };
     const tick = () => {
       if (done() || Date.now() > until) { setTimeout(() => veil(false), 150); render(true); return; }
-      if (find && presses < 4 && Date.now() - lastPress > 500) {
+      if (find && presses < 4 && Date.now() - lastPress > 500 && frameLoads.length === loadsBefore) {
         const doc = appDoc(); const el = doc && find(doc);
         if (el) { pressIn(el); presses++; lastPress = Date.now(); }
       }
@@ -462,11 +463,11 @@
     guideOpened = true;
     clearTimeout(appWait);
     const from = location.pathname;
-    let homeTried = 0;
+    let homeTried = 0, pressedAt = 0;
     const tryIt = () => {
       const doc = appDoc();
       const el = doc && find(doc);
-      if (el) { pressIn(el); if (after) after(); hideToast(); render(true); settle(resume, from, find); return true; }
+      if (el) { pressIn(el); pressedAt = Date.now(); if (after) after(); hideToast(); render(true); settle(resume, from, find); return true; }
       // Le bouton n est pas dans la vue courante de l appli : on repasse par son accueil, une fois.
       if (doc && !homeTried && Date.now() - started > 400) { const nav = appNav(doc); const first = nav && nav.byLabel.values().next().value; if (first) { homeTried = 1; pressIn(first); } }
       return false;
@@ -569,9 +570,10 @@
   }
 
   const hooked = new WeakSet();
+  let frameLoads = []; // instants des chargements du cadre de l appli
   function readApp() {
     const f = $('iframe[title="Custom Content"]');
-    if (f && !hooked.has(f)) { hooked.add(f); f.addEventListener('load', schedule); }
+    if (f && !hooked.has(f)) { hooked.add(f); f.addEventListener('load', () => { frameLoads.push(Date.now()); frameLoads = frameLoads.slice(-20); schedule(); }); }
     const doc = appDoc();
     const nav = doc && appNav(doc);
     if (!nav) { appActive = ''; return; }
@@ -691,7 +693,10 @@
     if (!doc) { lines.push('no notebook frame'); return lines.join('\n'); }
     const nav = appNav(doc);
     const hid = hiddenEl(doc);
-    lines.push('shift ' + ((appFrame() && appFrame().dataset.shShift) || 'none') + ' rail ' + (hid ? selOf(hid) : 'none') + ' nav ' + (nav ? nav.byLabel.size : 0) + ' visible ' + contentVisible(doc));
+    lines.push('shift ' + ((appFrame() && appFrame().dataset.shShift) || 'none') + ' rail ' + (hid ? selOf(hid) : 'none') + ' nav ' + (nav ? nav.byLabel.size : 0) + ' active [' + (nav ? nav.active : '') + '] visible ' + contentVisible(doc));
+    const now = Date.now();
+    lines.push('frame loads last 10 s ' + frameLoads.filter(t => now - t < 10000).length + ' · last 60 s ' + frameLoads.filter(t => now - t < 60000).length + ' · src ' + (appFrame() ? (appFrame().getAttribute('src') || '').replace(/\?.*$/, '?…').replace(/[0-9a-f-]{20,}/g, 'ID').slice(0, 80) : '-'));
+    if (nav) { const marks = [...nav.byLabel.values()].slice(0, 3).map(b => [...b.attributes].map(a => a.name).filter(n => /aria-|class|data-/.test(n)).join(',')); lines.push('rail attrs ' + marks.join(' | ')); }
     const rect = el => { const r = el.getBoundingClientRect(); return Math.round(r.left) + ',' + Math.round(r.top) + ' ' + Math.round(r.width) + 'x' + Math.round(r.height); };
     const cs = el => { const c = doc.defaultView.getComputedStyle(el); return c.display + (c.display.includes('grid') ? ' cols[' + c.gridTemplateColumns + '] rows[' + c.gridTemplateRows + ']' : '') + (c.position !== 'static' ? ' ' + c.position : ''); };
     lines.push('frame ' + doc.documentElement.clientWidth + 'x' + doc.documentElement.clientHeight + ' scroll ' + doc.documentElement.scrollWidth + 'x' + doc.documentElement.scrollHeight + ' learned ' + (learnedWay || '-'));
