@@ -14,7 +14,7 @@
   const isMac = /Mac/.test(navigator.platform);
   let opts = { ...DEFAULTS };
   const isOn = k => opts.on && opts[k];
-  const VERSION = '1.5.9';
+  const VERSION = '1.5.10';
 
   // ---------------------------------------------------------------- outils
   function h(tag, attrs, ...kids) {
@@ -283,7 +283,7 @@
     if (f && !hooked.has(f)) {
       hooked.add(f); hookedAt.set(f, Date.now());
       f.addEventListener('load', () => {
-        frameReady.set(f, { src: f.getAttribute('src'), at: Date.now() });
+        frameReady.set(f, { src: f.getAttribute('src'), at: Date.now(), path: location.pathname });
         frameLoads.push(Date.now()); frameLoads = frameLoads.slice(-20);
         setTimeout(schedule, READY_DELAY + 50);
       });
@@ -715,6 +715,7 @@
     const lines = ['Seal Helper ' + VERSION, 'path ' + location.pathname.replace(/[0-9a-f-]{20,}/g, 'ID'), 'side ' + !!$('#sh-side') + ' page ' + page + ' sections ' + appSections.length,
       'renders last 5 s ' + renderTimes.filter(t => Date.now() - t < 5000).length + ' · last error ' + (lastError || 'none') + ' · tables ' + Object.keys(appTables).join(',')];
     lines.push('frame ' + frameState(appFrame()) + ' · loads ' + frameLoads.length);
+    try { lines.push('notebook at ' + (localStorage.getItem(NB_PATH) || 'root').replace(/[0-9a-f-]{20,}/g, 'ID')); } catch (e) {}
     const doc = appDoc();
     if (!doc) { lines.push('no notebook frame read'); return lines.join('\n'); }
     const nav = appNav(doc);
@@ -895,7 +896,10 @@
   // Adresse de la page du cahier, notee quand on y est ; a defaut, la racine de l espace (qui l affiche).
   const NB_PATH = 'sh-nbpath';
   function rememberNotebook() {
-    if (isWorkspaceRoot() || !notebookDoc()) return;
+    // Seule l adresse ou le cahier a lui-meme fini de charger compte : en ouvrant une fiche depuis
+    // le cahier, l adresse change avant que le cadre ne parte (ne jamais noter celle de la fiche).
+    const r = frameReady.get(appFrame());
+    if (isWorkspaceRoot() || !r || r.path !== location.pathname || /\/cs\//.test(location.pathname) || !notebookDoc()) return;
     try { if (localStorage.getItem(NB_PATH) !== location.pathname) localStorage.setItem(NB_PATH, location.pathname); } catch (e) {}
   }
   function loadNotebook(resume) {
@@ -903,7 +907,7 @@
     if (!m) return;
     let path = '';
     try { path = localStorage.getItem(NB_PATH) || ''; } catch (e) {}
-    if (!path.startsWith(m[0] + '/')) path = m[0];
+    if (!path.startsWith(m[0] + '/') || path === location.pathname || /\/cs\//.test(path)) { path = m[0]; try { localStorage.removeItem(NB_PATH); } catch (e) {} }
     try { if (resume) sessionStorage.setItem(PENDING, JSON.stringify({ ...resume, at: Date.now() })); } catch (e) {}
     veil(true, 8000);
     location.assign(path);
