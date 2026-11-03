@@ -14,7 +14,7 @@
   const isMac = /Mac/.test(navigator.platform);
   let opts = { ...DEFAULTS };
   const isOn = k => opts.on && opts[k];
-  const VERSION = '1.5.5';
+  const VERSION = '1.5.6';
 
   // ---------------------------------------------------------------- outils
   function h(tag, attrs, ...kids) {
@@ -695,6 +695,7 @@
     const hid = hiddenEl(doc);
     lines.push('shift ' + ((appFrame() && appFrame().dataset.shShift) || 'none') + ' rail ' + (hid ? selOf(hid) : 'none') + ' nav ' + (nav ? nav.byLabel.size : 0) + ' active [' + (nav ? nav.active : '') + '] visible ' + contentVisible(doc));
     const now = Date.now();
+    lines.push('quiet on notebook ' + atNotebook() + ' · panes views ' + paneLoaded('views') + ' changes ' + paneLoaded('changes'));
     lines.push('frame loads last 10 s ' + frameLoads.filter(t => now - t < 10000).length + ' · last 60 s ' + frameLoads.filter(t => now - t < 60000).length + ' · src ' + (appFrame() ? (appFrame().getAttribute('src') || '').replace(/\?.*$/, '?…').replace(/[0-9a-f-]{20,}/g, 'ID').slice(0, 80) : '-'));
     if (nav) { const marks = [...nav.byLabel.values()].slice(0, 3).map(b => [...b.attributes].map(a => a.name).filter(n => /aria-|class|data-/.test(n)).join(',')); lines.push('rail attrs ' + marks.join(' | ')); }
     const rect = el => { const r = el.getBoundingClientRect(); return Math.round(r.left) + ',' + Math.round(r.top) + ' ' + Math.round(r.width) + 'x' + Math.round(r.height); };
@@ -823,7 +824,6 @@
     if (!atNotebook() || !$('[data-testid="platform-layout"]')) return;
     arrived = true;
     page = 'home';
-    try { history.replaceState({ ...(history.state || {}), sh: 'home' }, '', location.href); } catch (e) {}
   }
 
   function go(el) {
@@ -1162,7 +1162,7 @@
     const stats = h('div', { class: 'sh-stats' },
       mExp ? stat('Experiments', mExp.n, mExp.label.replace(/^experiments?\s*/i, '') || 'in progress', () => openAppSection(secFor(/experiment/i) || mExp.label), 'blue')
         : stat('In progress', drafts.length, drafts.length === 1 ? 'draft record' : 'draft records', () => { workType = ''; openPage('work'); }),
-      stat('To publish', d.changesLoaded ? d.pending.length : '…', d.pending.length ? 'waiting for review' : d.changesLoaded ? 'all published' : 'loading', () => openPage('pub'), d.pending.length ? 'hot' : ''),
+      stat('To publish', d.changesLoaded ? d.pending.length : '…', d.pending.length ? 'waiting for review' : d.changesLoaded ? 'all published' : atNotebook() ? 'open a record to load' : 'loading', () => openPage('pub'), d.pending.length ? 'hot' : ''),
       mProj ? stat('Projects', mProj.n, ad.cards.length ? `${ad.cards.filter(c => /active|progress/i.test(c.status)).length} active` : 'in the lab', () => openAppSection(secFor(/project/i) || 'Projects'), 'violet')
         : stat('Published', published.length, 'in your recent records', () => openPage('work')),
       mProt ? stat('Protocols', mProt.n, 'templates ready to run', () => openAppSection(secFor(/protocol/i) || 'Protocols'), 'teal')
@@ -1233,7 +1233,7 @@
       pend.length ? pend.slice(0, 5).map(c => h('button', { type: 'button', class: 'sh-check', onclick: () => go(c.el) },
         h('span', { class: 'sh-box' }), h('span', { class: 'sh-lt' }, h('b', {}, c.title), h('small', {}, [c.hash, c.day, c.time].filter(Boolean).join(' · '))),
         c.n > 1 ? h('span', { class: 'sh-x' }, '×' + c.n) : null))
-        : h('p', { class: 'sh-empty' + (d.changesLoaded ? '' : ' sh-loading') }, d.changesLoaded ? 'Nothing waiting. Everything you changed is published.' : 'Loading your changes from Seal…'));
+        : h('p', { class: 'sh-empty' + (d.changesLoaded || atNotebook() ? '' : ' sh-loading') }, d.changesLoaded ? 'Nothing waiting. Everything you changed is published.' : atNotebook() ? 'Seal fills this list once you open a record or a Seal view.' : 'Loading your changes from Seal…'));
 
     // Fil d activite : changements groupes par jour, facon journal de labo.
     const feed = h('div', { class: 'sh-feed' });
@@ -1410,7 +1410,7 @@
       h('section', { class: 'sh-panel' }, list.length ? h('table', { class: 'sh-table' },
         h('thead', {}, h('tr', {}, h('th', {}, 'Change'), h('th', {}, 'What'), h('th', { class: 'sh-num' }, 'Records'), h('th', { class: 'sh-num' }, 'Last edit'), h('th', {}, ''))), body)
         : d.changesLoaded ? h('p', { class: 'sh-empty' }, 'Nothing waiting. Everything you changed is published.')
-        : h('p', { class: 'sh-empty sh-loading' }, 'Loading your changes from Seal…')));
+        : h('p', { class: 'sh-empty' + (atNotebook() ? '' : ' sh-loading') }, atNotebook() ? 'Seal fills this list once you open a record or a Seal view; it then stays here.' : 'Loading your changes from Seal…')));
   }
 
   // ------------------------------------------------ fiche : proprietes et plan
@@ -1625,7 +1625,7 @@
   // ------------------------------------------- Info ferme a l arrivee (v0.1)
   let closeUntil = 0;
   function closeInfoOnArrival() {
-    if (!isOn('info') || Date.now() > closeUntil) return;
+    if (!isOn('info') || Date.now() > closeUntil || atNotebook()) return;
     const panel = $('[data-side-panel="open"]');
     const btn = panel && $('button[aria-label="Close panel"]', panel);
     if (btn) { closeUntil = 0; btn.click(); }
@@ -1647,7 +1647,11 @@
     if (isOn('doc')) step('doc', () => markRules(document.body));
     if (isOn('quiet')) step('quiet', () => markFaded(document.body));
     step('info', closeInfoOnArrival);
-    if (isOn('side')) { if (page && !paneLoaded('changes') && Date.now() - panesTried > 3000) panesTried = 0; step('app', readApp); step('panes', ensurePanes); step('views', expandViews); step('resume', resumePending); }
+    if (isOn('side')) {
+      step('app', readApp);
+      if (!atNotebook()) { if (page && !paneLoaded('changes') && Date.now() - panesTried > 3000) panesTried = 0; step('panes', ensurePanes); step('views', expandViews); }
+      step('resume', resumePending);
+    }
     else step('unhide', () => { unshiftFrame(appFrame()); const doc = appDoc(); if (doc) hiddenOf.delete(doc); });
     if (isOn('side')) step('arrive', arriveOnToday);
     step('side', () => render(false));

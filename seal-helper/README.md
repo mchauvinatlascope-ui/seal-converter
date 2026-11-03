@@ -4,7 +4,7 @@ A Chrome extension that makes Seal calmer and easier to read. It only changes ho
 
 ## Install (2 minutes)
 
-1. Download `seal-helper-1.5.5.zip` and unzip it.
+1. Download `seal-helper-1.5.6.zip` and unzip it.
 2. Open `chrome://extensions` and switch on **Developer mode** (top right).
 3. Click **Load unpacked** and pick the unzipped `seal-helper` folder.
 4. Open Seal. Click the extension icon (puzzle piece, then pin Seal Helper) to switch each setting on or off.
@@ -13,7 +13,11 @@ To update: replace the folder with the new one, then click the reload arrow on t
 
 ## If you see no change
 
-Click the extension icon on a Seal tab: the first card says whether Seal Helper is **active on this tab**, **paused**, or whether the tab **needs a reload** after an update (one button does it). After replacing the folder, always press the reload arrow on the Seal Helper card in `chrome://extensions`, then reload Seal. The sidebar shows its version (v1.5.5) at the bottom.
+Click the extension icon on a Seal tab: the first card says whether Seal Helper is **active on this tab**, **paused**, or whether the tab **needs a reload** after an update (one button does it). After replacing the folder, always press the reload arrow on the Seal Helper card in `chrome://extensions`, then reload Seal. The sidebar shows its version (v1.5.6) at the bottom.
+
+## 1.5.6
+
+- **Quiet on the notebook page**: while the notebook page is shown, the extension only reads; it no longer opens Seal’s Views and Changes tabs in the background, unfolds view groups, closes the Info panel or touches the browser history there. The changes list fills once you open a record or a Seal view, and then stays.
 
 ## 1.5.5
 
