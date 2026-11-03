@@ -14,7 +14,7 @@
   const isMac = /Mac/.test(navigator.platform);
   let opts = { ...DEFAULTS };
   const isOn = k => opts.on && opts[k];
-  const VERSION = '1.4.2';
+  const VERSION = '1.5.0';
 
   // ---------------------------------------------------------------- outils
   function h(tag, attrs, ...kids) {
@@ -344,6 +344,7 @@
   }
 
   // Les boutons « + New … » de l appli : on les liste pour la barre et Today.
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const CREATE_LABEL = { experiment: 'New experiment', project: 'New project', protocol: 'New protocol', panel: 'New antibody panel', general: 'New inventory item', antibodies: 'New antibody' };
   const CREATE_ICON = { experiment: 'flask', project: 'folder', protocol: 'proto', panel: 'view', general: 'stock', antibodies: 'stock' };
   const CREATE_HINT = { experiment: 'Pick a project, give it a title', project: 'Groups the experiments of one question', protocol: 'A copy of the master protocol to fill in', panel: 'Markers, fluorochromes, clones', general: 'Reagent, kit or consumable', antibodies: 'Clone, lot and dilution' };
@@ -384,6 +385,37 @@
       cards: $$('.project-card[data-record]', doc).map(c => ({ id: c.getAttribute('data-record'), title: txt($('h3', c)), sub: txt($('p', c)), status: tagOf(c),
         n: parseInt(txt($('.project-stats b', c)), 10) || 0, updated: (txt($('.project-stats span', c)) || '').replace(/^updated\s*/i, '') })),
     };
+  }
+
+  // Tableau d une section de l appli (Experiments, Projects, Protocols) : colonnes reconnues par leur en-tete.
+  const COL = { title: /^(experiment|project|protocol|name|title)$/i, id: /^id$/i, project: /^project$/i, status: /^status$/i, folder: /^folder$/i, updated: /^(updated|modified|last edit)$/i, owner: /^(owner|by)$/i };
+  const TABLES_KEY = 'sealHelperAppTables';
+  let appTables = {}; // { 'Experiments': { at, rows: [{ title, id, project, status, updated, record }] } }
+  function readAppTable(doc, section) {
+    if (!section) return null;
+    for (const table of $$('table', doc)) {
+      const heads = $$('thead th, thead td, tr:first-child th', table).map(th => txt(th));
+      if (heads.length < 2) continue;
+      const col = {};
+      for (const [k, re] of Object.entries(COL)) { const i = heads.findIndex(x => re.test(x)); if (i >= 0 && col[k] === undefined) col[k] = i; }
+      if (col.title === undefined && col.id === undefined) continue;
+      const rows = $$('tbody tr', table).filter(tr => tr.children.length >= 2).map(tr => {
+        const cells = [...tr.children].map(td => txt(td));
+        const cell = k => (col[k] !== undefined ? cells[col[k]] || '' : '');
+        const link = $('a[href], [data-record], [data-native], button', tr.children[col.title !== undefined ? col.title : 0]);
+        const href = link && link.getAttribute('href') || '';
+        const m = href.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+        return { title: cell('title') || cell('id'), id: cell('id'), project: cell('project'), status: cell('status'), updated: cell('updated'), owner: cell('owner'),
+          record: (link && (link.getAttribute('data-record') || link.getAttribute('data-native'))) || (m ? m[0] : ''), href };
+      }).filter(r => r.title);
+      if (rows.length) return { at: Date.now(), rows };
+    }
+    return null;
+  }
+  function openTableRow(section, r) {
+    if (UUID.test(r.record || '')) { openRecord({ id: r.record, title: r.title }); return; }
+    // Pas d identifiant : on ouvre la section puis on clique la ligne par son titre.
+    appAct(doc => { const nav = appNav(doc); if (!nav || nav.active !== section) return null; return $$('table tbody tr', doc).map(tr => $('a[href], [data-record], button', tr)).find(a => a && txt(a) === r.title) || null; }, null, r.title, { section });
   }
 
   // Clique pour toi dans l appli (bouton + New…, fiche, section), en ouvrant l accueil s il le faut.
@@ -466,7 +498,6 @@
   function rememberNew(kind, key) { lastNew = { kind, key }; try { localStorage.setItem('sh-lastnew', JSON.stringify(lastNew)); } catch (e) {} }
   const firstLast = (list, kind, keyOf) => { const i = lastNew && lastNew.kind === kind ? list.findIndex(x => keyOf(x) === lastNew.key) : -1; return i > 0 ? [list[i], ...list.slice(0, i), ...list.slice(i + 1)] : list; };
   const openCreate = key => { rememberNew('create', key); appAct(doc => $(`[data-create="${key}"]`, doc), null, CREATE_LABEL[key] || 'the notebook', { create: key }); };
-  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const openRecord = r => {
     // Un identifiant Seal : la fiche s ouvre par son adresse, sans repasser par l accueil du cahier.
     const id = UUID.test(r.id || '') ? r.id : UUID.test(r.native || '') ? r.native : '';
@@ -543,6 +574,11 @@
     appActive = nav.active;
     const creates = readCreates(doc);
     if (creates.length && JSON.stringify(creates) !== JSON.stringify(appCreates)) { appCreates = creates; try { chrome.storage.local.set({ sealHelperAppCreates: creates }); } catch (e) {} }
+    const tbl = readAppTable(doc, nav.active);
+    if (tbl && (!appTables[nav.active] || JSON.stringify(appTables[nav.active].rows) !== JSON.stringify(tbl.rows))) {
+      appTables = { ...appTables, [nav.active]: tbl };
+      try { chrome.storage.local.set({ [TABLES_KEY]: appTables }); } catch (e) {}
+    }
     const ad = readAppData(doc);
     if (ad.metrics.length || ad.experiments.length) {
       const sig = JSON.stringify({ ...ad, at: 0 });
@@ -1302,9 +1338,17 @@
     const f = workFilter.toLowerCase();
     const match = r => !f || (r.title + ' ' + r.sub).toLowerCase().includes(f);
     const stKey = s => statusClass(s || '');
-    const exps = ad.experiments.filter(match).filter(r => !workStatus || stKey(r.status) === workStatus);
-    const projs = (ad.cards.length ? ad.cards : ad.projects).filter(match).filter(r => !workStatus || stKey(r.status) === workStatus);
-    const statuses = [...new Set([...ad.experiments, ...ad.cards].map(r => r.status).filter(Boolean))];
+    const secFor0 = re => appSections.find(l => re.test(l));
+    const expSec = secFor0(/experiment|manip/i), projSec = secFor0(/project/i);
+    const fullExp = expSec && appTables[expSec] ? appTables[expSec] : null;
+    const fullProj = projSec && appTables[projSec] ? appTables[projSec] : null;
+    const expRows = fullExp ? fullExp.rows.map(r => ({ ...r, sub: [r.id, r.project].filter(Boolean).join(' · '), full: true, sec: expSec })) : ad.experiments;
+    const projRows = fullProj ? fullProj.rows.map(r => ({ ...r, sub: r.id, n: null, full: true, sec: projSec })) : (ad.cards.length ? ad.cards : ad.projects);
+    const exps = expRows.filter(match).filter(r => !workStatus || stKey(r.status) === workStatus);
+    const projs = projRows.filter(match).filter(r => !workStatus || stKey(r.status) === workStatus);
+    const statuses = [...new Set([...expRows, ...projRows].map(r => r.status).filter(Boolean))];
+    const openRow = r => (r.full ? openTableRow(r.sec, r) : openRecord(r));
+    const seen = t => t ? 'Seen ' + new Date(t).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' }) + ' · ' : '';
     const stChips = statuses.length > 1 ? h('div', { class: 'sh-chips', role: 'group', 'aria-label': 'Status' },
       [['', 'All'], ...statuses.map(st => [stKey(st), st])].filter((x, i, a) => a.findIndex(y => y[0] === x[0]) === i)
         .map(([k, l]) => h('button', { type: 'button', class: 'sh-chip' + (workStatus === k ? ' on' : ''), 'aria-pressed': String(workStatus === k), onclick: () => { workStatus = k; render(true); } }, l))) : null;
@@ -1313,23 +1357,23 @@
     const secFor = re => appSections.find(l => re.test(l));
     const expTable = h('table', { class: 'sh-table' },
       h('thead', {}, h('tr', {}, h('th', {}, 'Experiment'), h('th', {}, 'Project'), h('th', {}, 'Status'), h('th', {}, ''))),
-      h('tbody', {}, exps.map(r => h('tr', { onclick: () => openRecord(r), tabindex: '0', onkeydown: e => e.key === 'Enter' && openRecord(r) },
+      h('tbody', {}, exps.map(r => h('tr', { onclick: () => openRow(r), tabindex: '0', onkeydown: e => e.key === 'Enter' && openRow(r) },
         h('td', {}, h('span', { class: 'sh-cell' }, h('span', { class: 'sh-ti sm tint-blue' }, icon('flask')), h('b', {}, r.title))),
-        h('td', { class: 'sh-muted' }, (r.sub || '').split(' · ').pop()), h('td', {}, pill(r.status)), h('td', { class: 'sh-go' }, 'Open ›')))));
+        h('td', { class: 'sh-muted' }, r.project || (r.sub || '').split(' · ').pop()), h('td', {}, pill(r.status)), h('td', { class: 'sh-go' }, 'Open ›')))));
     const projTable = h('table', { class: 'sh-table' },
       h('thead', {}, h('tr', {}, h('th', {}, 'Project'), h('th', { class: 'sh-num' }, 'Experiments'), h('th', {}, 'Status'), h('th', {}, ''))),
-      h('tbody', {}, projs.map(r => h('tr', { onclick: () => openRecord(r), tabindex: '0', onkeydown: e => e.key === 'Enter' && openRecord(r) },
+      h('tbody', {}, projs.map(r => h('tr', { onclick: () => openRow(r), tabindex: '0', onkeydown: e => e.key === 'Enter' && openRow(r) },
         h('td', {}, h('span', { class: 'sh-cell' }, h('span', { class: 'sh-ti sm tint-violet' }, icon('folder')), h('b', {}, r.title))),
         h('td', { class: 'sh-num sh-muted' }, r.n != null ? String(r.n) : ''), h('td', {}, pill(r.status)), h('td', { class: 'sh-go' }, 'Open ›')))));
-    const panel = (title, re, n, table, empty) => h('section', { class: 'sh-panel' },
-      h('header', {}, h('h3', {}, title), h('span', { class: 'sh-hdr-actions' }, h('span', { class: 'sh-sub' }, n + (n === 1 ? ' shown' : ' shown')),
+    const panel = (title, re, n, table, empty, full) => h('section', { class: 'sh-panel' },
+      h('header', {}, h('h3', {}, title), h('span', { class: 'sh-hdr-actions' }, h('span', { class: 'sh-sub' }, (full ? seen(full.at) + n + ' in the notebook' : n + ' recent') ),
         h('button', { type: 'button', class: 'sh-more', onclick: () => openAppSection(secFor(re) || title) }, 'All in the notebook ›'))),
       n ? table : h('p', { class: 'sh-empty' }, empty));
     return h('div', { class: 'sh-wrap' },
-      h('div', { class: 'sh-hello' }, h('div', {}, h('div', { class: 'sh-eyebrow' }, eyebrow(d, 'My work')), h('h1', {}, 'My work'), h('p', {}, 'Experiments and projects as the lab notebook shows them, with their status. Numbers refresh each time the notebook page is open.')), input),
+      h('div', { class: 'sh-hello' }, h('div', {}, h('div', { class: 'sh-eyebrow' }, eyebrow(d, 'My work')), h('h1', {}, 'My work'), h('p', {}, fullExp ? 'All experiments and projects of the notebook, as last seen in its Experiments and Projects sections.' : 'Recent experiments and projects of the notebook. Open its Experiments section once to get the full list here.')), input),
       srcChips, stChips,
-      panel('Experiments', /experiment|manip/i, exps.length, expTable, 'No experiment matches.'),
-      panel('Projects', /project/i, projs.length, projTable, 'No project matches.'));
+      panel('Experiments', /experiment|manip/i, exps.length, expTable, 'No experiment matches.', fullExp),
+      panel('Projects', /project/i, projs.length, projTable, 'No project matches.', fullProj));
   }
 
   let showEmpty = false;
@@ -1474,7 +1518,7 @@
     const d = data();
     const sig = JSON.stringify([page, d.lab, d.favourites.map(r => r.title + r.status + r.current), d.recent.map(r => r.title + r.status + r.current),
       d.mine.map(r => r.title + r.status), d.changes.map(c => c.hash + c.open + c.title + c.day + c.time), d.views.map(v => v.title + v.depth + v.open),
-      d.changeset && [d.changeset.hash, d.changeset.name, d.changeset.rows.map(r => r.title + r.current)], !!d.newBtn, d.changesLoaded, showEmpty, workFilter, workType, workSrc, workStatus, tipsDone, helpOpen, lab, labOpen, pickFor, allViewsOpen, appSections, appActive, atNotebook(), recordSection(), location.pathname, newOpen, appCreates, appData && appData.at]);
+      d.changeset && [d.changeset.hash, d.changeset.name, d.changeset.rows.map(r => r.title + r.current)], !!d.newBtn, d.changesLoaded, showEmpty, workFilter, workType, workSrc, workStatus, tipsDone, helpOpen, Object.values(appTables).map(t => t.at), lab, labOpen, pickFor, allViewsOpen, appSections, appActive, atNotebook(), recordSection(), location.pathname, newOpen, appCreates, appData && appData.at]);
     if (!force && sig === sideSig && $('#sh-side')) return;
     sideSig = sig;
     $('#sh-side')?.remove();
@@ -1703,8 +1747,9 @@
     refresh();
   }
 
-  try { chrome.storage.local.get([APP_KEY, 'sealHelperAppCreates', APPDATA_KEY, WAY_KEY], r => {
+  try { chrome.storage.local.get([APP_KEY, 'sealHelperAppCreates', APPDATA_KEY, WAY_KEY, TABLES_KEY], r => {
     if (HIDE_WAYS.includes(r[WAY_KEY])) learnedWay = r[WAY_KEY];
+    if (r[TABLES_KEY] && typeof r[TABLES_KEY] === 'object') appTables = r[TABLES_KEY];
     if (Array.isArray(r[APP_KEY])) appSections = r[APP_KEY];
     if (Array.isArray(r.sealHelperAppCreates)) appCreates = r.sealHelperAppCreates;
     if (r[APPDATA_KEY] && r[APPDATA_KEY].metrics) appData = r[APPDATA_KEY];
