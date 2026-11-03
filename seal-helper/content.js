@@ -14,7 +14,7 @@
   const isMac = /Mac/.test(navigator.platform);
   let opts = { ...DEFAULTS };
   const isOn = k => opts.on && opts[k];
-  const VERSION = '1.2.0';
+  const VERSION = '1.3.0';
 
   // ---------------------------------------------------------------- outils
   function h(tag, attrs, ...kids) {
@@ -457,7 +457,14 @@
   function rememberNew(kind, key) { lastNew = { kind, key }; try { localStorage.setItem('sh-lastnew', JSON.stringify(lastNew)); } catch (e) {} }
   const firstLast = (list, kind, keyOf) => { const i = lastNew && lastNew.kind === kind ? list.findIndex(x => keyOf(x) === lastNew.key) : -1; return i > 0 ? [list[i], ...list.slice(0, i), ...list.slice(i + 1)] : list; };
   const openCreate = key => { rememberNew('create', key); appAct(doc => $(`[data-create="${key}"]`, doc), null, CREATE_LABEL[key] || 'the notebook', { create: key }); };
-  const openRecord = r => appAct(doc => (r.id ? $(`[data-record="${r.id}"]`, doc) : $(`[data-native="${r.native}"]`, doc)), null, r.title, { record: r.id, native: r.native, title: r.title });
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const openRecord = r => {
+    // Un identifiant Seal : la fiche s ouvre par son adresse, sans repasser par l accueil du cahier.
+    const id = UUID.test(r.id || '') ? r.id : UUID.test(r.native || '') ? r.native : '';
+    const base = location.pathname.match(/^\/o\/[^/]+\/s\/[^/]+/);
+    if (id && base) { page = null; guideOpened = true; veil(true, 4000); toast(`Opening ${r.title}…`); location.assign(base[0] + '/' + id); return; }
+    appAct(doc => (r.id ? $(`[data-record="${r.id}"]`, doc) : $(`[data-native="${r.native}"]`, doc)), null, r.title, { record: r.id, native: r.native, title: r.title });
+  };
   let resumed = false;
   function resumePending() {
     if (resumed || !appDoc()) return;
@@ -1369,6 +1376,7 @@
     const changes = byText(/show changes|^changes\b/i); if (changes) out.push({ key: 'changes', label: txt(changes).replace(/^show /i, '') || 'Changes', el: changes, title: 'What changed in this version' });
     const cs = byText(/changeset\s*#\d+/i); if (cs) out.push({ key: 'cs', label: txt(cs), el: cs, title: 'Open this change set' });
     const pub = byText(/publish|submit for review|review and publish|approve/i); if (pub) out.push({ key: 'pub', label: txt(pub), el: pub, primary: true, title: 'Publish this change' });
+    if (isOn('doc') && $('[data-native-document-editor], [data-native-document-root], [data-page-scroll-container]')) out.push({ key: 'print', label: 'Print', title: 'Print this record as a clean notebook page', print: true });
     return out;
   }
   function renderProps() {
@@ -1394,7 +1402,7 @@
       props.map(p => h('button', { type: 'button', class: 'sh-prop', title: 'Go to ' + p.label, onclick: () => p.card.scrollIntoView({ behavior: 'smooth', block: 'center' }) },
         h('small', {}, p.label), /status/i.test(p.label) ? pill(p.value) : h('span', {}, p.value))),
       acts.length ? h('div', { class: 'sh-acts', role: 'group', 'aria-label': 'Record actions' },
-        acts.map(a => h('button', { type: 'button', class: 'sh-act' + (a.primary ? ' primary' : '') + (a.pill ? ' aspill' : ''), title: a.title, onclick: () => press(a.el) },
+        acts.map(a => h('button', { type: 'button', class: 'sh-act' + (a.primary ? ' primary' : '') + (a.pill ? ' aspill' : '') + (a.print ? ' quiet' : ''), title: a.title, onclick: () => (a.print ? window.print() : press(a.el)) },
           a.pill ? h('span', { class: 'sh-pill ' + statusClass(a.label) }, a.label) : a.label, a.key === 'status' || a.key === 'version' ? h('span', { class: 'sh-chev', 'aria-hidden': 'true', html: ICON.chev }) : null))) : null);
     if (old) old.remove();
     header.after(bar);

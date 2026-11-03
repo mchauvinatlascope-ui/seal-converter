@@ -496,3 +496,21 @@ html.sh-side, html.sh-side body { overflow-x: hidden !important; }
 #sh-props .sh-act.primary:hover { background: #2b2e34; }
 #sh-props .sh-act .sh-chev { width: 12px; height: 12px; color: var(--sh-ink3); }
 #sh-props .sh-act .sh-chev svg { transform: rotate(90deg); }
+
+/* ======================================================================
+   1.3 : impression propre d une fiche (option Clean documents) : seulement la page,
+   sans barres ni tiroirs, sur toute la largeur de la feuille.
+   ====================================================================== */
+#sh-props .sh-act.quiet { color: var(--sh-ink2); font-weight: 500; }
+@media print {
+  html.sh-doc #sh-side, html.sh-doc #sh-page, html.sh-doc #sh-toast, html.sh-doc #sh-veil, html.sh-doc #sh-outline,
+  html.sh-doc #sh-props .sh-acts,
+  html.sh-doc [data-testid="nav-panel-layout-slot"], html.sh-doc [data-testid="fixed-nav-header"], html.sh-doc [data-testid="nav-panel-resize-handle"],
+  html.sh-doc [data-side-panel], html.sh-doc nav[aria-label="Entity panels"], html.sh-doc [data-testid="entity-top-navbar"] [data-sentry-component="ViewPanelHeaderActions"] { display: none !important; }
+  html.sh-doc [data-testid="platform-layout"], html.sh-doc [data-testid="platform-layout"] > div, html.sh-doc [data-testid="workspace-record"], html.sh-doc [data-testid="view-panel"],
+  html.sh-doc [data-page-scroll-container], html.sh-doc [data-entity-page] { height: auto !important; min-height: 0 !important; overflow: visible !important; position: static !important; }
+  html.sh-doc [data-page-scroll-container] { padding-right: 0 !important; }
+  html.sh-doc #sh-props { border-bottom: 1px solid #bbb; padding-left: 0; padding-right: 0; }
+  html.sh-doc #sh-props .sh-crumb { border: 0; padding-left: 0; }
+  html.sh-doc body { background: #fff !important; }
+}
