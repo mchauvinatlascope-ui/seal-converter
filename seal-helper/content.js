@@ -14,7 +14,7 @@
   const isMac = /Mac/.test(navigator.platform);
   let opts = { ...DEFAULTS };
   const isOn = k => opts.on && opts[k];
-  const VERSION = '1.5.8';
+  const VERSION = '1.5.9';
 
   // ---------------------------------------------------------------- outils
   function h(tag, attrs, ...kids) {
@@ -512,12 +512,7 @@
       const header = $('[data-testid="entity-top-navbar"]');
       const onHome = home && header && txt($('[data-title-text]', header)) === home.title;
       if (onHome) { /* deja sur la page du cahier, son menu n est pas encore la : la boucle attend */ }
-      else if (home) press(home.el);
-      else {
-        const m = location.pathname.match(/^\/o\/[^/]+\/s\/[^/]+/);
-        if (m) { try { if (resume) sessionStorage.setItem(PENDING, JSON.stringify({ ...resume, at: Date.now() })); } catch (e) {} location.assign(m[0]); }
-        return;
-      }
+      else { loadNotebook(resume); return; }
     }
     render(true);
     const until = Date.now() + 12000;
@@ -860,6 +855,7 @@
   }
 
   function go(el) {
+    if (!atNotebook() && isNotebookRow(el)) { page = null; guideOpened = true; loadNotebook(null); return; }
     // Une ligne Seal : on quitte nos pages et on laisse Seal ouvrir la fiche.
     page = null;
     guideOpened = true; // Home ne s ouvre seul qu a la premiere arrivee sur l accueil
@@ -893,11 +889,28 @@
   function openGuide(d) {
     guideOpened = true;
     page = null;
-    if (!atNotebook()) {
-      const app = d.favourites.find(f => f.type[0] === 'Page') || d.favourites[0];
-      if (app) press(app.el);
-    }
+    if (!atNotebook()) { loadNotebook(null); return; }
     render(true);
+  }
+  // Adresse de la page du cahier, notee quand on y est ; a defaut, la racine de l espace (qui l affiche).
+  const NB_PATH = 'sh-nbpath';
+  function rememberNotebook() {
+    if (isWorkspaceRoot() || !notebookDoc()) return;
+    try { if (localStorage.getItem(NB_PATH) !== location.pathname) localStorage.setItem(NB_PATH, location.pathname); } catch (e) {}
+  }
+  function loadNotebook(resume) {
+    const m = location.pathname.match(/^\/o\/[^/]+\/s\/[^/]+/);
+    if (!m) return;
+    let path = '';
+    try { path = localStorage.getItem(NB_PATH) || ''; } catch (e) {}
+    if (!path.startsWith(m[0] + '/')) path = m[0];
+    try { if (resume) sessionStorage.setItem(PENDING, JSON.stringify({ ...resume, at: Date.now() })); } catch (e) {}
+    veil(true, 8000);
+    location.assign(path);
+  }
+  function isNotebookRow(el) {
+    const d = data();
+    return [...d.favourites, ...d.recent].some(r => r.el === el && r.type && r.type[0] === 'Page');
   }
 
   // --------------------------------------------------------------- la barre
@@ -1681,7 +1694,7 @@
     if (isOn('quiet')) step('quiet', () => markFaded(document.body));
     step('info', closeInfoOnArrival);
     if (isOn('side')) {
-      if (isOn('readnb')) step('app', readApp);
+      if (isOn('readnb')) { step('app', readApp); step('nbpath', rememberNotebook); }
       if (!atNotebook()) { if (page && !paneLoaded('changes') && Date.now() - panesTried > 3000) panesTried = 0; step('panes', ensurePanes); step('views', expandViews); }
       step('resume', resumePending);
     }
