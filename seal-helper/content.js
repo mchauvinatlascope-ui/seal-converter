@@ -14,7 +14,7 @@
   const isMac = /Mac/.test(navigator.platform);
   let opts = { ...DEFAULTS };
   const isOn = k => opts.on && opts[k];
-  const VERSION = '1.8.1';
+  const VERSION = '1.8.2';
 
   // Ecran de passage : quand on doit recharger la page (fiche -> cahier, cahier -> fiche), un ecran
   // calme au nom de la destination couvre le depart, le rechargement et les sauts de l appli,
@@ -393,7 +393,17 @@
     return el;
   }
   // Libelle d un bouton du menu sans son pictogramme.
-  const railLabel = b => [...b.childNodes].filter(n => n.nodeType === 3 || !n.matches('.nav-icon')).map(n => n.textContent).join('').replace(/\s+/g, ' ').trim();
+  // Menu replie en icones (bouton « de l appli) : le libelle peut ne rester que dans aria-label, title ou data-view.
+  const railText = b => [...b.childNodes].filter(n => n.nodeType === 3 || !n.matches('.nav-icon')).map(n => n.textContent).join('').replace(/\s+/g, ' ').trim();
+  const railLabel = b => {
+    const t = railText(b);
+    if (/\p{L}{2}/u.test(t)) return t;
+    const a = (b.getAttribute('aria-label') || b.getAttribute('title') || '').trim();
+    if (/\p{L}{2}/u.test(a)) return a;
+    const v = b.getAttribute('data-view') || '';
+    return v ? v.charAt(0).toUpperCase() + v.slice(1).replace(/[-_]/g, ' ') : '';
+  };
+  const RAIL_TOGGLE = /^(«|»|‹|›)$|collapse|expand|toggle|minimi[sz]e|hide menu|show menu/i;
   function appNav(doc) {
     const rail = $('nav[aria-label="Lab navigation"]', doc);
     if (rail) {
@@ -401,7 +411,7 @@
       const meta = new Map();
       for (const b of $$('.rail-button, button, a', rail)) {
         const l = railLabel(b);
-        if (!l || byLabel.has(l)) continue;
+        if (!l || byLabel.has(l) || RAIL_TOGGLE.test(l) || RAIL_TOGGLE.test(railText(b))) continue;
         byLabel.set(l, b);
         meta.set(l, { view: b.getAttribute('data-view') || '', external: b.tagName === 'A' && b.target === '_blank' });
       }
