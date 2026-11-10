@@ -14,7 +14,7 @@
   const isMac = /Mac/.test(navigator.platform);
   let opts = { ...DEFAULTS };
   const isOn = k => opts.on && opts[k];
-  const VERSION = '1.8.2';
+  const VERSION = '1.9.0';
 
   // Ecran de passage : quand on doit recharger la page (fiche -> cahier, cahier -> fiche), un ecran
   // calme au nom de la destination couvre le depart, le rechargement et les sauts de l appli,
@@ -49,9 +49,9 @@
     if (!cover) return;
     if (Date.now() - cover.at > 10000 || !isOn('side')) { hideCover(); return; }
     if (location.pathname === cover.from) return; // la page n est pas encore partie
-    if (cover.kind === 'record') { if ($('[data-testid="entity-top-navbar"], [data-testid="changeset-top-navbar"]')) setTimeout(hideCover, 250); return; }
+    if (cover.kind === 'record') { if ($('[data-testid="entity-top-navbar"], [data-testid="changeset-top-navbar"]')) setTimeout(hideCover, 80); return; }
     if (cover.kind === 'section' && isOn('readnb')) return; // levee par la reprise de la section (settle)
-    if (atNotebook() && (frameState(appFrame()) === 'ready' || !isOn('readnb'))) setTimeout(hideCover, 300);
+    if (atNotebook() && (frameState(appFrame()) === 'ready' || !isOn('readnb'))) setTimeout(hideCover, 120);
   }
 
   // ---------------------------------------------------------------- outils
@@ -464,11 +464,70 @@
     return [...seen.values()].sort((x, y) => (order.indexOf(x.key) + 1 || 99) - (order.indexOf(y.key) + 1 || 99));
   }
 
+  // Fiches supprimees : retirees de nos listes gardees (tableaux, accueil) des que Seal confirme
+  // (adresse quittee apres « Delete », ou page « not found »), et tenues a l ecart 2 jours.
+  const GONE_KEY = 'sealHelperGone';
+  let gone = {}; // uuid -> instant
+  const UUID_IN = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+  const curRecordId = () => (location.pathname.match(UUID_IN) || [])[0] || '';
+  const idsOf = r => [r.record, r.id, r.native, ((r.href || '').match(UUID_IN) || [])[0]].filter(x => UUID.test(x || '')).map(x => x.toLowerCase());
+  const isGone = r => idsOf(r).some(x => gone[x]);
+  function saveGone() { try { chrome.storage.local.set({ [GONE_KEY]: gone }); } catch (e) {} }
+  function markGone(id) {
+    id = (id || '').toLowerCase();
+    if (!UUID.test(id) || gone[id]) return false;
+    gone[id] = Date.now();
+    saveGone();
+    let changed = false;
+    for (const [sec, t] of Object.entries(appTables)) {
+      const rows = (t.rows || []).filter(r => !isGone(r));
+      if (rows.length !== (t.rows || []).length) { appTables = { ...appTables, [sec]: { ...t, rows } }; changed = true; }
+    }
+    if (changed) { try { chrome.storage.local.set({ [TABLES_KEY]: appTables }); } catch (e) {} }
+    if (appData) {
+      const keep = l => (l || []).filter(r => !isGone(r));
+      appData = { ...appData, experiments: keep(appData.experiments), projects: keep(appData.projects), protocols: keep(appData.protocols), cards: keep(appData.cards), hero: appData.hero && isGone(appData.hero) ? null : appData.hero };
+      try { chrome.storage.local.set({ [APPDATA_KEY]: appData }); } catch (e) {}
+    }
+    sideSig = '';
+    return true;
+  }
+  function unGone(id) { id = (id || '').toLowerCase(); if (gone[id]) { delete gone[id]; saveGone(); } }
+  let pendingGone = null; // { id, path, at } : « Delete » clique sur une fiche, en attente de confirmation par Seal
+  document.addEventListener('click', e => {
+    const el = e.target && e.target.closest && e.target.closest('button, [role="menuitem"], [role="button"], a');
+    if (!el || el.closest('.sh')) return;
+    if (!/^\s*(delete|archive|move to trash|trash)\b/i.test(el.textContent || '')) return;
+    const id = curRecordId();
+    if (id) pendingGone = { id, path: location.pathname, at: Date.now() };
+  }, true);
+  let missingFor = '', missingTimer = 0;
+  function checkGone() {
+    const id = curRecordId();
+    if (pendingGone) {
+      if (Date.now() - pendingGone.at > 20000) pendingGone = null;
+      else if (location.pathname !== pendingGone.path) {
+        if (markGone(pendingGone.id)) toast('Deleted record removed from your lists.', 'ok', 3000);
+        pendingGone = null;
+      }
+    }
+    if (!id) return;
+    if ($('[data-testid="entity-top-navbar"], [data-testid="changeset-top-navbar"]')) { unGone(id); missingFor = ''; return; }
+    if (missingFor === location.pathname) return;
+    if (Date.now() - routeAt < 4000) { if (!missingTimer) missingTimer = setTimeout(() => { missingTimer = 0; schedule(); }, 4100 - (Date.now() - routeAt)); return; }
+    const main = $('[data-testid="platform-layout"]') || document.body;
+    const text = (main.innerText || '').slice(0, 4000);
+    if (/\b(not found|no longer exists|has been deleted|was deleted|does not exist|doesn.t exist|could not be found)\b|\b404\b/i.test(text)) {
+      missingFor = location.pathname;
+      if (markGone(id)) toast('This record no longer exists. Removed from your lists.', 'warn', 4000);
+    }
+  }
+
   function readAppData(doc) {
     const tagOf = el => { const t = $('.tag', el); return t ? txt(t) : ''; };
     const rows = (h2re) => {
       const panel = $$('.panel', doc).find(pn => h2re.test(txt($('h2', pn))));
-      return panel ? $$('.item-row[data-record], .item-row[data-native]', panel).map(b => ({
+      return panel ? $$('.item-row[data-record], .item-row[data-native]', panel).filter(b => !isGone({ record: b.getAttribute('data-record'), native: b.getAttribute('data-native') })).map(b => ({
         id: b.getAttribute('data-record') || '', native: b.getAttribute('data-native') || '',
         title: txt($('strong', b)), sub: txt($('small', b)), status: tagOf(b),
       })) : [];
@@ -513,7 +572,8 @@
         return { title: cell('title') || cell('id'), id: cell('id'), project: cell('project'), status: cell('status'), updated: cell('updated'), owner: cell('owner'), folder: cell('folder'),
           record: (link && (link.getAttribute('data-record') || link.getAttribute('data-native'))) || (m ? m[0] : ''), href };
       }).filter(r => r.title);
-      if (rows.length) return { at: Date.now(), rows };
+      const kept = rows.filter(r => !isGone(r));
+      if (kept.length) return { at: Date.now(), rows: kept };
     }
     return null;
   }
@@ -916,6 +976,7 @@
   // page = null (Seal visible) ou 'home' | 'work' | 'pub'
   let page = null;
   let lastRoute = '';
+  let routeAt = Date.now();
   let guideOpened = !!cover; // arrivee par l ecran de passage : on va a la destination, pas a Today
   const isWorkspaceRoot = () => /^\/o\/[^/]+\/s\/[^/]+\/?$/.test(location.pathname);
   // La page d accueil du labo (« Start Here ») est une fiche Seal qui contient l appli : c est le cahier.
@@ -937,6 +998,7 @@
   function onRoute() {
     if (location.pathname === lastRoute) return;
     lastRoute = location.pathname;
+    routeAt = Date.now();
     closeUntil = Date.now() + 4000;
     page = null;
   }
@@ -1870,6 +1932,8 @@
     const step = (name, fn) => { try { fn(); } catch (e) { lastError = name + ': ' + (e && e.message); console.warn('[Seal Helper] ' + name, e); } };
     step('route', onRoute);
     step('cover', checkCover);
+    step('gone', checkGone);
+    step('lift', liftPopups);
     step('theme', followTheme);
     if (isOn('dates')) step('dates', () => shortenTexts(document.body));
     if (isOn('doc')) step('doc', () => markRules(document.body));
@@ -1889,11 +1953,32 @@
   }
   function schedule() {
     if (timer) return;
-    timer = setTimeout(run, Math.max(60, 350 - (Date.now() - lastRun)));
+    timer = setTimeout(run, Math.max(40, 160 - (Date.now() - lastRun)));
   }
+  // Menus, clic droit, fenetres et bulles de Seal : toujours devant notre barre (sinon elle les cache a gauche).
+  const POPUP = '[role="menu"], [role="listbox"], [role="dialog"], [role="alertdialog"], [role="tooltip"], [data-radix-popper-content-wrapper], [data-radix-menu-content], [data-floating-ui-portal]';
+  const lifted = new WeakSet();
+  function liftPopups() {
+    if (!document.body) return;
+    const layout = $('[data-testid="platform-layout"]');
+    const side = $('#sh-side');
+    for (const el of document.querySelectorAll(POPUP)) {
+      if (el.closest('.sh')) continue;
+      let host = null;
+      for (let x = el; x && x !== document.body; x = x.parentElement) if (getComputedStyle(x).position === 'fixed') host = x;
+      if (!host) { host = el; while (host.parentElement && host.parentElement !== document.body) host = host.parentElement; }
+      if (!host || host === document.body || host === root) continue;
+      if (lifted.has(host) || (layout && host.contains(layout)) || (side && host.contains(side))) continue;
+      lifted.add(host);
+      host.style.setProperty('z-index', '1500', 'important');
+    }
+  }
+  document.addEventListener('contextmenu', () => { for (const t of [0, 40, 120, 300]) setTimeout(liftPopups, t); }, true);
+  document.addEventListener('pointerdown', () => { for (const t of [40, 150]) setTimeout(liftPopups, t); }, true);
   const observer = new MutationObserver(muts => {
     // Nos propres elements ne relancent rien.
     if (muts.every(m => m.target.closest && m.target.closest('.sh'))) return;
+    if (muts.some(m => m.addedNodes.length)) liftPopups();
     hookFrame();
     schedule();
   });
@@ -1998,9 +2083,10 @@
     refresh();
   }
 
-  try { chrome.storage.local.get([APP_KEY, 'sealHelperAppCreates', APPDATA_KEY, WAY_KEY, TABLES_KEY], r => {
+  try { chrome.storage.local.get([APP_KEY, 'sealHelperAppCreates', APPDATA_KEY, WAY_KEY, TABLES_KEY, GONE_KEY], r => {
+    if (r[GONE_KEY] && typeof r[GONE_KEY] === 'object') { const lim = Date.now() - 2 * 864e5; gone = Object.fromEntries(Object.entries(r[GONE_KEY]).filter(([, t]) => t > lim)); }
     if (HIDE_WAYS.includes(r[WAY_KEY])) learnedWay = r[WAY_KEY];
-    if (r[TABLES_KEY] && typeof r[TABLES_KEY] === 'object') appTables = r[TABLES_KEY];
+    if (r[TABLES_KEY] && typeof r[TABLES_KEY] === 'object') appTables = Object.fromEntries(Object.entries(r[TABLES_KEY]).map(([k, t]) => [k, { ...t, rows: (t.rows || []).filter(x => !isGone(x)) }]));
     if (Array.isArray(r[APP_KEY])) appSections = r[APP_KEY];
     if (Array.isArray(r.sealHelperAppCreates)) appCreates = r.sealHelperAppCreates;
     if (r[APPDATA_KEY] && r[APPDATA_KEY].metrics) appData = r[APPDATA_KEY];
