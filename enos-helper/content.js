@@ -1,16 +1,19 @@
-// enos Helper 0.1
+// enos Helper 0.2
 // Ne fait que changer l affichage dans ce navigateur : n ecrit jamais dans enos,
 // n envoie rien, ne touche a aucun formulaire.
 // Dans enos l adresse ne change pas quand on ouvre un projet, une procedure ou une fiche :
-// un raccourci est donc un chemin de clics (le rail, la loupe d une ligne, « Procedures »
-// dans Details...) que l extension note en te regardant naviguer, et rejoue pour toi,
-// clic par clic, sur les elements d origine d enos. Si un pas n est plus trouvable,
+// un raccourci est donc un chemin de clics (une entree du menu, la loupe d une ligne,
+// « Procedures » dans Details...) que l extension note en te regardant naviguer, et rejoue
+// pour toi, clic par clic, sur les elements d origine d enos. Si un pas n est plus trouvable,
 // elle s arrete et le dit ; enos reste comme d habitude.
+// Reperes d enos (diagnostic du 2026-11-16) : header#content-navbar (40 px, orange),
+// aside#sidebar_left 60 px avec ul#sidebar-menu (menu complet, sous-menus presents meme replies),
+// section#content, aside#sidebar_right (Details, 350 px), icones fa-* / bsi-* / glyphicon-*.
 (() => {
   if (window.top !== window) return; // jamais dans un cadre interne
-  const VERSION = '0.1.0';
+  const VERSION = '0.2.0';
   const KEY = 'enosHelper';
-  const DEFAULTS = { on: true, layout: 'drawer', recentMax: 30, palette: true, autoOpen: false };
+  const DEFAULTS = { on: true, layout: 'drawer', recentMax: 30, palette: true, autoOpen: false, chips: true };
   const root = document.documentElement;
   const isMac = /Mac/.test(navigator.platform);
   const SITE = 'eh:' + location.origin;
@@ -22,7 +25,7 @@
   const $ = (sel, scope = document) => scope.querySelector(sel);
   const $$ = (sel, scope = document) => [...scope.querySelectorAll(sel)];
   const txt = el => (el ? (el.textContent || '').replace(/\s+/g, ' ').trim() : '');
-  const ours = el => !!(el && el.closest && el.closest('#eh-side, #eh-pal, #eh-tab, #eh-toast'));
+  const ours = el => !!(el && el.closest && el.closest('#eh-side, #eh-pal, #eh-tab, #eh-toast, #eh-chips'));
   function h(tag, attrs, ...kids) {
     const el = document.createElement(tag);
     for (const [k, v] of Object.entries(attrs || {})) {
@@ -49,10 +52,13 @@
     up: '<svg viewBox="0 0 16 16"><path d="m4 10 4-4 4 4"/></svg>',
     down: '<svg viewBox="0 0 16 16"><path d="m4 6 4 4 4-4"/></svg>',
     pen: '<svg viewBox="0 0 16 16"><path d="M10.5 3 13 5.5 6 12.5H3.5V10z"/></svg>',
+    chev: '<svg viewBox="0 0 16 16"><path d="m6 4 4 4-4 4"/></svg>',
+    filter: '<svg viewBox="0 0 16 16"><path d="M2.5 3.5h11L9.5 8.5v4l-3 1.5v-5.5z"/></svg>',
   };
   const icon = (name, cls = 'eh-i') => h('span', { class: cls, 'aria-hidden': 'true', html: ICON[name] || ICON.page });
   const visible = el => { if (!el || !el.isConnected) return false; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden'; };
   const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const mod = () => (isMac ? '⌘' : 'Ctrl');
 
   // Clic pour toi sur un element d enos (liens, boutons, icones, lignes).
   function press(el) {
@@ -85,15 +91,29 @@
   }
   function save() { try { chrome.storage.local.set({ [SITE]: store }); } catch (e) { lastError = 'save: ' + e; } }
 
-  // ------------------------------------------------------------ la page en cours
-  // Le rail d icones a gauche et la barre du haut : un clic la-dedans repart de zero.
-  function railOf(el) { const r = el.getBoundingClientRect(); return r.left < 64 && r.width < 64 && r.top < window.innerHeight; }
-  function topBarOf(el) { const r = el.getBoundingClientRect(); return r.top < 130 && r.height < 60; }
+  // ------------------------------------------------------------ les reperes d enos
+  const navbar = () => $('header#content-navbar, header.navbar-fixed-top, header.navbar');
+  const sideMenu = () => $('#sidebar-menu, #sidebar_left ul.sidebar-menu, aside.nano ul.nav');
+  const loggedOut = () => !!$$('input[type="password"]').some(visible) || /\/login/.test(location.hash);
+  // Le menu de gauche et la barre du haut : un clic la-dedans repart de zero.
+  function railOf(el) {
+    if (el.closest('#sidebar_left, #sidebar-menu, aside.sidebar-left, .sidebar-menu')) return true;
+    const r = el.getBoundingClientRect(); return r.left < 64 && r.width < 64 && r.top < window.innerHeight;
+  }
+  function topBarOf(el) { if (el.closest('header#content-navbar, header.navbar-fixed-top')) return true; const r = el.getBoundingClientRect(); return r.top < 130 && r.height < 60; }
+  // Clics qui ne menent nulle part (menu replie/deplie, plein ecran, verrou, notifications, compte, connexion).
+  const NOISE = /^(toggle menu|fullscreen|lock session|get search results|sign in|log ?in|connexion|se connecter|logout|notifications?|received notifications|sent notifications|collapse|select all|\d+)$/i;
+  function noise(el, s) {
+    if (el.closest('#toggle_sidemenu_l, .navbar-right, .growl-container, .modal-backdrop, #eh-chips')) return true;
+    if (NOISE.test(s.text || s.title || '')) return true;
+    if (loggedOut()) return true;
+    return false;
+  }
   // Fil d Ariane « Projects / Procedures / Procedure » dans la barre du haut.
   function crumb() {
-    const cands = $$('.breadcrumb, [class*="breadcrumb"], [class*="crumb"]').filter(e => !ours(e) && visible(e));
-    for (const c of cands) { const t = txt(c); if (t && t.length < 120) return t.replace(/\s*\/\s*/g, ' / '); }
-    for (const e of $$('nav *, header *, div, span, a')) {
+    const cands = $$('.breadcrumb, [class*="breadcrumb"], [class*="crumb"], ol.breadcrumb li, #content-navbar .navbar-left ~ *').filter(e => !ours(e) && visible(e));
+    for (const c of cands) { const t = txt(c); if (t && t.length < 120 && t.length > 1) return t.replace(/\s*\/\s*/g, ' / '); }
+    for (const e of $$('header *, nav *, section > div > div, span, a, h1, h2, h3, h4')) {
       if (ours(e) || e.children.length > 6) continue;
       const t = txt(e);
       if (t.length > 4 && t.length < 120 && / \/ /.test(t) && e.getBoundingClientRect().top < 130 && visible(e) && ![...e.children].some(k => / \/ /.test(txt(k)))) return t.replace(/\s*\/\s*/g, ' / ');
@@ -104,16 +124,23 @@
   function reference() {
     const lab = $$('label, b, strong, span, div').find(e => !ours(e) && /^Reference$/i.test(txt(e)) && e.children.length === 0 && visible(e));
     if (!lab) return '';
+    const F = 'input, select, textarea, [contenteditable], .form-control';
     let box = lab.nextElementSibling;
-    while (box && !box.matches('input, select, textarea, [contenteditable], .form-control') && !box.querySelector('input, select, textarea, [contenteditable], .form-control')) box = box.nextElementSibling;
-    if (box && !box.matches('input, select, textarea, [contenteditable], .form-control')) box = box.querySelector('input, select, textarea, [contenteditable], .form-control');
+    while (box && !box.matches(F) && !box.querySelector(F)) box = box.nextElementSibling;
+    if (!box && lab.parentElement) { box = lab.parentElement.nextElementSibling; while (box && !box.matches(F) && !box.querySelector(F)) box = box.nextElementSibling; }
+    if (box && !box.matches(F)) box = box.querySelector(F);
     const v = box ? (box.value != null && box.value !== '' ? box.value : txt(box)) : '';
     return (v || '').trim().slice(0, 40);
+  }
+  // Titre du volet au travail (« Procedures », « Procedure », « Projects »).
+  function panelTitle() {
+    const c = $$('#content .panel-title, #content .panel-heading, #content h1, #content h2, #content h3, #content h4, #content [class*="title"], .panel-title, h4').filter(e => !ours(e) && visible(e) && txt(e).length > 1 && txt(e).length < 60);
+    return txt(c[0]) || '';
   }
   function viewName() {
     const c = crumb();
     const ref = reference();
-    const base = c || txt($$('h1, h2, h3, h4, [class*="panel-title"], [class*="panel-heading"], [class*="header"]').find(e => !ours(e) && visible(e) && txt(e).length > 1 && txt(e).length < 60)) || 'enos';
+    const base = c || panelTitle() || 'enos';
     return ref ? base + ' · ' + ref : base;
   }
 
@@ -121,7 +148,7 @@
   // Signature d un element clique : de quoi le retrouver (texte, titre, icone, ligne de tableau).
   const ACTIONABLE = 'a, button, [role="button"], [role="menuitem"], [role="tab"], [ng-click], [data-ng-click], [ui-sref], li, i, svg, img, th, td, tr, label, [tabindex]';
   function iconOf(el) {
-    const cls = e => (e && typeof e.className === 'string' ? e.className.trim().split(/\s+/).filter(c => /^(fa|fas|far|fab|glyphicon|icon|bsi|ion|mdi)/.test(c)) : []);
+    const cls = e => (e && typeof e.className === 'string' ? e.className.trim().split(/\s+/).filter(c => /^(fa|fas|far|fab|glyphicon|icon|bsi|ion|mdi)-/.test(c)) : []);
     let c = cls(el);
     if (!c.length) for (const k of el.children) { c = cls(k); if (c.length) break; }
     return c.slice(0, 3).join(' ');
@@ -129,10 +156,9 @@
   function sig(target) {
     let el = target.closest ? target.closest(ACTIONABLE) : null;
     if (!el || ours(el)) return null;
-    // Une icone dans un bouton : on vise le bouton ; un td sans action : on vise la ligne.
+    // Une icone dans un bouton : on vise le bouton.
     if (/^(i|svg|img)$/i.test(el.tagName) && el.parentElement && el.parentElement.closest('a, button, [role="button"], [ng-click], [data-ng-click]')) el = el.parentElement.closest('a, button, [role="button"], [ng-click], [data-ng-click]');
-    const s = { tag: el.tagName.toLowerCase(), text: txt(el).slice(0, 60), title: (el.getAttribute('title') || el.getAttribute('aria-label') || el.getAttribute('placeholder') || '').slice(0, 60), icon: iconOf(el) };
-    if (txt(el).length > 60) s.text = '';
+    const s = sigOf(el);
     const row = el.closest('tr, [role="row"]');
     if (row && !/^(th|tr)$/.test(s.tag)) {
       s.row = rowKey(row);
@@ -143,15 +169,24 @@
       const all = $$(ACTIONABLE).filter(e => !ours(e) && same(sigOf(e), s, true));
       s.n = Math.max(0, all.indexOf(el));
     }
+    if (noise(el, s)) return null;
     s.root = railOf(el) || (topBarOf(el) && /home|logo|brand/i.test((el.className || '') + ' ' + s.icon + ' ' + (el.getAttribute('href') || '')));
-    s.label = (s.text || s.title || (s.icon ? s.icon.replace(/^(fa|fas|far|glyphicon|icon|bsi)[- ]?/, '') : s.tag)) + (s.row ? ' on ' + (s.rowLabel || s.row) : '');
+    s.menu = el.closest('#sidebar-menu, .sidebar-menu') ? menuPath(el).concat(s.text || s.title).filter(Boolean).join(' › ') : '';
+    s.label = (s.menu || s.text || s.title || (s.icon ? s.icon.replace(/^(fa|fas|far|glyphicon|icon|bsi)-/, '') : s.tag)) + (s.row ? ' on ' + (s.rowLabel || s.row) : '');
     return s;
   }
-  // Une ligne de tableau : ses cellules (sans la colonne des actions) ; pour l afficher, la cellule qui ressemble a une reference.
+  // Une ligne de tableau : la cellule qui ressemble a une reference (ML-040014), sinon les deux premieres cellules de texte
+  // sans chiffres (les compteurs changent d un jour a l autre).
   const rowCells = row => $$('td, [role="cell"], [role="gridcell"]', row).filter(c => txt(c) && !c.querySelector('a, button, [ng-click], [data-ng-click]'));
-  const rowKey = row => rowCells(row).map(c => txt(c).slice(0, 40)).join(' | ').slice(0, 160) || txt(row).slice(0, 60);
-  const rowLabel = row => { const t = rowCells(row).map(c => txt(c)); return (t.find(x => /^[A-Z]{1,5}-?\d{2,}/.test(x)) || t[1] || t[0] || '').slice(0, 40); };
-  const sigOf = el => ({ tag: el.tagName.toLowerCase(), text: txt(el).length > 60 ? '' : txt(el).slice(0, 60), title: (el.getAttribute('title') || el.getAttribute('aria-label') || el.getAttribute('placeholder') || '').slice(0, 60), icon: iconOf(el) });
+  const refLike = t => /^[A-Z]{1,6}[-_ ]?\d{2,}|^\d{4}\/[A-Z]/.test(t);
+  function rowKey(row) {
+    const t = rowCells(row).map(c => txt(c).slice(0, 40));
+    const ref = t.find(refLike);
+    if (ref) return ref;
+    return t.filter(x => !/^[\d.,% ]+$/.test(x)).slice(0, 2).join(' | ').slice(0, 100) || txt(row).slice(0, 60);
+  }
+  const rowLabel = row => { const t = rowCells(row).map(c => txt(c)); return (t.find(refLike) || t[1] || t[0] || '').slice(0, 40); };
+  const sigOf = el => ({ tag: el.tagName.toLowerCase(), text: txt(el).length > 60 ? '' : txt(el).slice(0, 60), title: (el.getAttribute('title') || el.getAttribute('aria-label') || el.getAttribute('placeholder') || '').slice(0, 60), icon: iconOf(el), href: (el.getAttribute('href') || '').slice(0, 80) });
   const same = (a, b, loose) => a.tag === b.tag && a.text === b.text && a.title === b.title && (loose ? true : a.icon === b.icon) && (a.icon === b.icon || !b.icon || !a.icon);
   function find(s) {
     let scope = [document];
@@ -160,14 +195,15 @@
       if (!rows.length) return null;
       scope = rows;
     }
-    const cands = scope.flatMap(sc => $$(ACTIONABLE, sc)).filter(e => !ours(e) && same(sigOf(e), s, true) && (s.row || visible(e) || s.tag === 'li' || s.tag === 'a'));
+    let cands = scope.flatMap(sc => $$(ACTIONABLE, sc)).filter(e => !ours(e) && same(sigOf(e), s, true) && (s.row || visible(e) || s.tag === 'li' || s.tag === 'a' || s.menu));
+    if (s.href) { const byHref = cands.filter(e => (e.getAttribute('href') || '').slice(0, 80) === s.href); if (byHref.length) cands = byHref; }
     if (!cands.length) return null;
     const exact = cands.filter(e => sigOf(e).icon === s.icon);
     const pool = exact.length ? exact : cands;
     return pool[Math.min(s.n || 0, pool.length - 1)] || pool[0];
   }
 
-  // En te regardant naviguer : chaque clic dans enos est note ; un clic dans le rail repart de zero.
+  // En te regardant naviguer : chaque clic utile dans enos est note ; un clic dans le menu de gauche repart de zero.
   let trail = [];
   let recording = true;
   document.addEventListener('click', e => {
@@ -210,7 +246,7 @@
     return null;
   }
   function goHome() {
-    const home = $$('a, button, [ng-click], i, span').find(e => !ours(e) && topBarOf(e) && /home/i.test(iconOf(e) + ' ' + (e.getAttribute('title') || '') + ' ' + (e.getAttribute('href') || '')));
+    const home = $$('a, button, [ng-click], i, span').find(e => !ours(e) && (topBarOf(e) || railOf(e)) && /home/i.test(iconOf(e) + ' ' + (e.getAttribute('title') || '') + ' ' + (e.getAttribute('href') || '') + ' ' + txt(e)));
     if (home) return press(home.closest('a, button, [ng-click]') || home);
     return false;
   }
@@ -218,6 +254,7 @@
     if (replaying) return;
     const steps = item.trail || [];
     if (!steps.length) { toast('This shortcut has no steps.'); return; }
+    if (loggedOut()) { toast('Sign in to enos first, then open the shortcut.'); return; }
     replaying = item; recording = false;
     root.classList.add('eh-busy');
     try {
@@ -226,7 +263,7 @@
         toast('Opening ' + item.name + ' · step ' + (i + 1) + ' of ' + steps.length + ' (' + s.label + ')', true);
         let el = await waitFor(s, i === 0 ? 2500 : 8000);
         if (!el && i === 0 && goHome()) { await settle(); el = await waitFor(s, 6000); }
-        if (!el) { toast('Could not follow step ' + (i + 1) + ' of ' + steps.length + ' (' + s.label + '). enos may have changed, or this view is reached from elsewhere. Open it by hand once, then pin it again.'); return; }
+        if (!el) { toast('Could not follow step ' + (i + 1) + ' of ' + steps.length + ' (' + s.label + '). enos may have changed, or the row is not in the list today. Open it by hand once, then pin it again (you can drop steps before pinning).'); return; }
         press(el);
         await settle();
       }
@@ -248,21 +285,22 @@
   }
 
   // ------------------------------------------------------------ epingles
-  let naming = null; // { name } : saisie du nom en cours
+  let naming = null; // { name, steps } : saisie du nom en cours, pas que l on peut retirer
   function pinHere() {
-    if (!trail.length) { toast('Nothing to pin yet: open the view you want in enos first (from the rail), then Pin this view.'); return; }
-    naming = { name: viewName() };
+    if (!trail.length) { toast('Nothing to pin yet: go to the view you want in enos first (from the left menu), then Pin this view.'); return; }
+    naming = { name: viewName(), steps: trail.map(s => ({ ...s })) };
     render();
     const i = $('#eh-name'); if (i) { i.focus(); i.select(); }
   }
   function confirmPin() {
-    if (!naming) return;
+    if (!naming || !naming.steps.length) return;
     const name = (naming.name || '').trim() || viewName();
     store.pins = store.pins.filter(p => p.name !== name);
-    store.pins.push({ name, trail: trail.map(s => ({ ...s })), at: Date.now() });
+    store.pins.push({ name, trail: naming.steps, at: Date.now() });
+    const n = naming.steps.length;
     naming = null;
     save(); render();
-    toast('Pinned « ' + name + ' » · ' + trail.length + ' step' + (trail.length > 1 ? 's' : ''), false, 3000);
+    toast('Pinned « ' + name + ' » · ' + n + ' step' + (n > 1 ? 's' : ''), false, 3000);
   }
   function pinFromRecent(r) { store.pins = store.pins.filter(p => p.name !== r.name); store.pins.push({ name: r.name, trail: r.trail, at: Date.now() }); save(); render(); }
   function rename(p) {
@@ -270,13 +308,13 @@
     return i;
   }
 
-  // ------------------------------------------------------------ les menus d enos (Ctrl K)
+  // ------------------------------------------------------------ les menus d enos
   const ACT = 'a[href], button, [role="menuitem"], [role="button"], [role="tab"], [ng-click], [data-ng-click], [ui-sref], [bsi-action]';
   const SKIP = /^(ok|cancel|close|yes|no|×|x)$/i;
   function menuPath(el) {
     const parts = [];
     let p = el.parentElement;
-    while (p && p !== document.body && parts.length < 3) {
+    while (p && p !== document.body && parts.length < 4) {
       if (p.matches('li, .dropdown, [uib-dropdown], [class*="dropdown"], [class*="submenu"], [bsi-menu], [role="menuitem"]')) {
         const kids = [...p.children];
         const holder = kids.find(c => c.contains(el));
@@ -292,17 +330,23 @@
     const out = [];
     const seen = new Set();
     for (const el of $$(ACT)) {
-      if (ours(el) || el.closest('table, [role="grid"]')) continue;
+      if (ours(el) || el.closest('table, [role="grid"], .navbar-right, .growl-container')) continue;
       if (el.matches('input, textarea, select') || el.closest('[contenteditable="true"]')) continue;
       if (el.querySelector(ACT)) continue;
       const label = txt(el) || el.getAttribute('aria-label') || el.getAttribute('title') || '';
-      if (!label || label.length > 60 || SKIP.test(label)) continue;
+      if (!label || label.length > 60 || SKIP.test(label) || NOISE.test(label)) continue;
       const key = label.toLowerCase() + '|' + (el.getAttribute('href') || el.getAttribute('ng-click') || el.getAttribute('data-ng-click') || el.getAttribute('ui-sref') || '');
       if (seen.has(key)) continue;
       seen.add(key);
-      out.push({ el, label, path: menuPath(el), hidden: !visible(el) });
+      out.push({ el, label, path: menuPath(el), hidden: !visible(el), menu: !!el.closest('#sidebar-menu, .sidebar-menu') });
     }
     return out;
+  }
+  // Le menu de gauche d enos, a plat : Projects › Management, Animals › Reports › Queries...
+  function menuTree() {
+    const m = sideMenu();
+    if (!m) return [];
+    return scanActions().filter(a => a.menu).map(a => ({ ...a, full: a.path.concat(a.label).join(' › '), top: a.path[0] || a.label }));
   }
   function matches(q, a) {
     const hay = (a.label + ' ' + (a.path || []).join(' ')).toLowerCase();
@@ -311,10 +355,29 @@
     const l = a.label.toLowerCase();
     return l.startsWith(words[0]) ? 3 : l.includes(words[0]) ? 2 : 1;
   }
+  // Ouvrir une entree de menu : clic sur l entree, apres ses parents si elle est repliee.
+  function openMenuEntry(a) {
+    trail = [];
+    press(a.el);
+    const s = sig(a.el);
+    if (s) { s.root = true; trail = [s]; }
+    scheduleVisit();
+  }
+
+  // ------------------------------------------------------------ les puces dans la barre d enos
+  const chipsEl = h('div', { id: 'eh-chips', role: 'toolbar', 'aria-label': 'enos Helper shortcuts' });
+  function renderChips() {
+    if (!opts.on || !opts.chips || loggedOut()) { chipsEl.remove(); return; }
+    if (!chipsEl.isConnected && document.body) document.body.append(chipsEl);
+    const pins = store.pins.slice(0, 9);
+    chipsEl.replaceChildren(
+      ...pins.map((p, i) => h('button', { type: 'button', class: 'eh-chip', title: stepsHint(p) + ' · Alt ' + (i + 1), onclick: () => replay(p) }, h('span', {}, p.name))),
+      h('button', { type: 'button', class: 'eh-chip eh-chip-more', title: 'enos Helper (' + mod() + ' .) · ' + mod() + ' K finds', onclick: () => toggleSide() }, icon(pins.length ? 'menu' : 'star'), !pins.length && h('span', {}, 'Pin a view')));
+  }
 
   // ------------------------------------------------------------ la barre
   const sideEl = h('aside', { id: 'eh-side', 'aria-label': 'enos Helper' });
-  const tabEl = h('button', { id: 'eh-tab', type: 'button', title: 'enos Helper (' + (isMac ? '⌘' : 'Ctrl') + ' .)', onclick: () => toggleSide() }, h('span', {}, 'enos Helper'));
+  const tabEl = h('button', { id: 'eh-tab', type: 'button', title: 'enos Helper (' + mod() + ' .)', onclick: () => toggleSide() }, h('span', {}, 'enos Helper'));
   let sideOpen = false;
   function toggleSide(force) {
     sideOpen = force == null ? !sideOpen : !!force;
@@ -339,41 +402,61 @@
       icon(kind === 'pin' ? 'starFull' : 'clock'), h('span', { class: 'eh-t' }, it.name), extra);
   }
   let filter = '';
+  let openGroups = new Set();
   function render() {
+    renderChips();
     if (!opts.on || !sideEl.isConnected) return;
     const q = filter.trim().toLowerCase();
     const inQ = it => !q || (it.name + ' ' + stepsHint(it)).toLowerCase().includes(q);
     const pins = store.pins.filter(inQ);
     const pinned = new Set(store.pins.map(p => p.name));
-    const recent = store.recent.filter(r => !pinned.has(r.name) && inQ(r)).slice(0, q ? 30 : 12);
-    const menu = q ? scanActions().map(a => [matches(q, a), a]).filter(x => x[0]).sort((a, b) => b[0] - a[0]).slice(0, 12).map(x => x[1]) : [];
+    const recent = store.recent.filter(r => !pinned.has(r.name) && inQ(r)).slice(0, q ? 30 : 8);
+    const acts = scanActions();
+    const found = q ? acts.map(a => [matches(q, a), a]).filter(x => x[0]).sort((a, b) => b[0] - a[0]).slice(0, 14).map(x => x[1]) : [];
+    const tree = !q ? acts.filter(a => a.menu).map(a => ({ ...a, top: a.path[0] || a.label })) : [];
+    const tops = [...new Set(tree.map(a => a.top))];
     const tools = (i, arr, p) => h('span', { class: 'eh-mv' },
       h('button', { type: 'button', title: 'Rename', onclick: e => { e.stopPropagation(); const r = e.target.closest('.eh-row'); r.replaceChildren(rename(p)); r.querySelector('input').focus(); } }, icon('pen')),
       h('button', { type: 'button', title: 'Move up', disabled: i === 0, onclick: e => { e.stopPropagation(); [arr[i - 1], arr[i]] = [arr[i], arr[i - 1]]; save(); render(); } }, icon('up')),
       h('button', { type: 'button', title: 'Move down', disabled: i === arr.length - 1, onclick: e => { e.stopPropagation(); [arr[i + 1], arr[i]] = [arr[i], arr[i + 1]]; save(); render(); } }, icon('down')),
       h('button', { type: 'button', title: 'Remove shortcut', onclick: e => { e.stopPropagation(); arr.splice(i, 1); save(); render(); } }, icon('x')));
+    const menuRow = a => h('button', { type: 'button', class: 'eh-row' + (a.hidden && !a.menu ? ' eh-dim' : ''), title: a.path.concat(a.label).join(' › '), onclick: () => { closeAll(); openMenuEntry(a); } },
+      icon(/quer/i.test(a.label) ? 'filter' : 'menu'), h('span', { class: 'eh-t' }, a.label), a.path.length ? h('small', {}, a.path.join(' › ')) : null);
     const body = [
       h('header', {},
         h('b', {}, 'enos Helper'),
-        opts.layout !== 'push' && h('button', { type: 'button', class: 'eh-x', title: 'Hide (' + (isMac ? '⌘' : 'Ctrl') + ' .)', onclick: () => toggleSide(false) }, icon('x'))),
+        opts.layout !== 'push' && h('button', { type: 'button', class: 'eh-x', title: 'Hide (' + mod() + ' .)', onclick: () => toggleSide(false) }, icon('x'))),
       h('label', { class: 'eh-search' }, icon('search'), h('input', { id: 'eh-q', type: 'search', placeholder: 'Find a shortcut, a view, a menu…', value: filter, autocomplete: 'off',
         oninput: e => { filter = e.target.value; render(); const i = $('#eh-q'); if (i) { i.focus(); i.setSelectionRange(filter.length, filter.length); } },
         onkeydown: e => { if (e.key === 'Escape') { filter = ''; render(); } if (e.key === 'Enter') { const first = $('#eh-side .eh-row'); if (first) first.click(); } } })),
       naming
-        ? h('div', { class: 'eh-naming' }, h('small', {}, 'Name of the shortcut (' + trail.length + ' step' + (trail.length > 1 ? 's' : '') + ': ' + trail.map(s => s.label).join(' › ') + ')'),
-          h('input', { id: 'eh-name', type: 'text', value: naming.name, oninput: e => { naming.name = e.target.value; }, onkeydown: e => { if (e.key === 'Enter') confirmPin(); if (e.key === 'Escape') { naming = null; render(); } } }),
-          h('div', {}, h('button', { type: 'button', class: 'eh-btn eh-main', onclick: confirmPin }, 'Pin'), h('button', { type: 'button', class: 'eh-btn', onclick: () => { naming = null; render(); } }, 'Cancel')))
-        : h('button', { type: 'button', class: 'eh-pin', title: trail.length ? 'Steps so far: ' + trail.map(s => s.label).join(' › ') : 'Open a view in enos first', onclick: pinHere }, icon('star'), 'Pin this view', trail.length ? h('small', {}, trail.length + ' step' + (trail.length > 1 ? 's' : '')) : null),
+        ? h('div', { class: 'eh-naming' },
+          h('input', { id: 'eh-name', type: 'text', value: naming.name, 'aria-label': 'Name of the shortcut', oninput: e => { naming.name = e.target.value; }, onkeydown: e => { if (e.key === 'Enter') confirmPin(); if (e.key === 'Escape') { naming = null; render(); } } }),
+          h('small', {}, naming.steps.length + ' step' + (naming.steps.length > 1 ? 's' : '') + ' · remove the ones that are not part of the way:'),
+          h('ol', { class: 'eh-steps' }, naming.steps.map((s, i) => h('li', {}, h('span', { class: 'eh-t' }, s.label), h('button', { type: 'button', title: 'Remove this step', onclick: () => { naming.steps.splice(i, 1); render(); } }, icon('x'))))),
+          h('div', {}, h('button', { type: 'button', class: 'eh-btn eh-main', disabled: !naming.steps.length, onclick: confirmPin }, 'Pin'), h('button', { type: 'button', class: 'eh-btn', onclick: () => { naming = null; render(); } }, 'Cancel')))
+        : h('button', { type: 'button', class: 'eh-pin', title: trail.length ? 'Steps so far: ' + trail.map(s => s.label).join(' › ') : 'Go to a view in enos first', onclick: pinHere }, icon('star'), 'Pin this view', trail.length ? h('small', {}, trail.length + ' step' + (trail.length > 1 ? 's' : '')) : null),
       h('h2', {}, 'Shortcuts'),
-      pins.length ? pins.map(p => row(p, 'pin', !q && tools(store.pins.indexOf(p), store.pins, p))) : h('p', { class: 'eh-empty' }, q ? 'No shortcut matches.' : 'Go to Procedures, to a query or to any view you use often, then Pin this view. From then on it opens in one click.'),
+      pins.length ? pins.map(p => row(p, 'pin', !q && tools(store.pins.indexOf(p), store.pins, p))) : h('p', { class: 'eh-empty' }, q ? 'No shortcut matches.' : 'Go to Procedures, to a query or to any view you use often, then Pin this view. It then opens in one click, here, in the orange bar, and with Alt 1 to 9.'),
       q && h('h2', {}, 'In the enos menus'),
-      q && (menu.length ? menu.map(a => h('button', { type: 'button', class: 'eh-row' + (a.hidden ? ' eh-dim' : ''), title: a.hidden ? 'In a closed menu' : '', onclick: () => { closeAll(); press(a.el); } },
-        icon('menu'), h('span', { class: 'eh-t' }, a.label), a.path.length ? h('small', {}, a.path.join(' › ')) : null)) : h('p', { class: 'eh-empty' }, 'Nothing in the menus of this page.')),
-      h('h2', {}, 'Recent views'),
-      recent.length ? recent.map(r => row(r, 'recent', h('span', { class: 'eh-mv' }, h('button', { type: 'button', title: 'Pin as a shortcut', onclick: e => { e.stopPropagation(); pinFromRecent(r); } }, icon('star'))), h('small', {}, when(r.at)))) : h('p', { class: 'eh-empty' }, q ? 'No recent view matches.' : 'The views you open in enos will be listed here, and reopen in one click.'),
-      h('footer', {}, 'v' + VERSION + ' · ' + (isMac ? '⌘' : 'Ctrl') + ' K finds · nothing is written to enos'),
+      q && (found.length ? found.map(menuRow) : h('p', { class: 'eh-empty' }, 'Nothing in the menus of this page.')),
+      !q && recent.length ? h('h2', {}, 'Recent views') : null,
+      !q && recent.length ? recent.map(r => row(r, 'recent', h('span', { class: 'eh-mv' }, h('button', { type: 'button', title: 'Pin as a shortcut', onclick: e => { e.stopPropagation(); pinFromRecent(r); } }, icon('star'))), h('small', {}, when(r.at)))) : null,
+      q && recent.length ? [h('h2', {}, 'Recent views'), recent.map(r => row(r, 'recent', h('small', {}, when(r.at))))] : null,
+      !q && tops.length ? h('h2', {}, 'enos menu') : null,
+      !q && tops.map(t => {
+        const kids = tree.filter(a => a.top === t && a.path.length);
+        const head = tree.find(a => a.top === t && !a.path.length);
+        const open = openGroups.has(t);
+        return h('div', { class: 'eh-group' + (open ? ' eh-open' : '') },
+          h('button', { type: 'button', class: 'eh-row eh-grp', onclick: () => { if (!kids.length && head) { closeAll(); openMenuEntry(head); return; } if (open) openGroups.delete(t); else openGroups.add(t); render(); } },
+            kids.length ? icon('chev', 'eh-i eh-chev') : icon('menu'), h('span', { class: 'eh-t' }, t), kids.length ? h('small', {}, kids.length) : null),
+          open && kids.map(a => h('button', { type: 'button', class: 'eh-row eh-sub', title: a.path.concat(a.label).join(' › '), onclick: () => { closeAll(); openMenuEntry(a); } },
+            icon(/quer/i.test(a.label) ? 'filter' : 'page'), h('span', { class: 'eh-t' }, a.path.slice(1).concat(a.label).join(' › ')))));
+      }),
+      h('footer', {}, 'v' + VERSION + ' · ' + mod() + ' K finds · Alt 1-9 shortcuts · nothing is written to enos'),
     ];
-    sideEl.replaceChildren(...body.flat().filter(Boolean));
+    sideEl.replaceChildren(...body.flat(3).filter(Boolean));
   }
 
   // ------------------------------------------------------------ le chercheur Ctrl K
@@ -384,14 +467,14 @@
     const items = [];
     const inQ = it => !q || matches(q, { label: it.name || '', path: (it.trail || []).map(s => s.label) });
     for (const p of store.pins) if (inQ(p)) items.push({ kind: 'Shortcut', label: p.name, sub: stepsHint(p), run: () => replay(p) });
-    if (q) for (const a of scanActions().map(a => [matches(q, a), a]).filter(x => x[0]).sort((a, b) => b[0] - a[0]).slice(0, 10)) items.push({ kind: 'Menu', label: a[1].label, sub: a[1].path.join(' › ') + (a[1].hidden ? ' · in a closed menu' : ''), run: () => press(a[1].el) });
+    if (q) for (const a of scanActions().map(a => [matches(q, a), a]).filter(x => x[0]).sort((a, b) => b[0] - a[0]).slice(0, 10)) items.push({ kind: 'Menu', label: a[1].label, sub: a[1].path.join(' › ') + (a[1].hidden && !a[1].menu ? ' · in a closed menu' : ''), run: () => openMenuEntry(a[1]) });
     const pinned = new Set(store.pins.map(p => p.name));
     for (const r of store.recent.filter(r => !pinned.has(r.name) && inQ(r)).slice(0, q ? 10 : 6)) items.push({ kind: 'Recent', label: r.name, sub: when(r.at), run: () => replay(r) });
     palItems = items;
     palSel = Math.min(palSel, Math.max(0, items.length - 1));
     const list = h('div', { class: 'eh-list', role: 'listbox' }, items.length ? items.map((it, i) => h('button', { class: 'eh-it' + (i === palSel ? ' eh-sel' : ''), type: 'button', role: 'option', 'aria-selected': i === palSel ? 'true' : 'false',
       onclick: () => { closeAll(); it.run(); }, onmousemove: () => { if (palSel !== i) { palSel = i; palette(); } } },
-      h('span', { class: 'eh-k' }, it.kind), h('span', { class: 'eh-t' }, it.label), it.sub ? h('small', {}, it.sub) : null)) : h('p', { class: 'eh-empty' }, q ? 'Nothing matches. Menus are found once enos has shown them at least once.' : 'Type to find a shortcut, a recent view or a menu entry.'));
+      h('span', { class: 'eh-k' }, it.kind), h('span', { class: 'eh-t' }, it.label), it.sub ? h('small', {}, it.sub) : null)) : h('p', { class: 'eh-empty' }, q ? 'Nothing matches.' : 'Type to find a shortcut, a recent view or an entry of the enos menu (Procedures, Queries, Animals…).'));
     palEl.replaceChildren(
       h('label', { class: 'eh-search' }, icon('search'), h('input', { id: 'eh-pq', type: 'search', placeholder: 'Find in enos…', value: palQ, autocomplete: 'off',
         oninput: e => { palQ = e.target.value; palSel = 0; palette(); const i = $('#eh-pq'); if (i) { i.focus(); i.setSelectionRange(palQ.length, palQ.length); } },
@@ -418,9 +501,10 @@
   // ------------------------------------------------------------ clavier
   document.addEventListener('keydown', e => {
     if (!opts.on) return;
-    const mod = isMac ? e.metaKey : e.ctrlKey;
-    if (mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'k') { e.preventDefault(); e.stopImmediatePropagation(); if (palEl.hidden) openPalette(); else closePalette(); }
-    else if (mod && !e.shiftKey && !e.altKey && e.key === '.') { e.preventDefault(); toggleSide(); }
+    const m = isMac ? e.metaKey : e.ctrlKey;
+    if (m && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'k') { e.preventDefault(); e.stopImmediatePropagation(); if (palEl.hidden) openPalette(); else closePalette(); }
+    else if (m && !e.shiftKey && !e.altKey && e.key === '.') { e.preventDefault(); toggleSide(); }
+    else if (e.altKey && !m && !e.shiftKey && /^[1-9]$/.test(e.key)) { const p = store.pins[+e.key - 1]; if (p) { e.preventDefault(); closeAll(); replay(p); } }
     else if (e.key === 'Escape' && !palEl.hidden) { closePalette(); }
   }, true);
 
@@ -435,32 +519,41 @@
     root.classList.toggle('eh-on', !!opts.on);
     root.classList.toggle('eh-push', opts.on && opts.layout === 'push');
     root.classList.toggle('eh-drawer', opts.on && opts.layout === 'drawer');
-    if (!opts.on) { sideOpen = false; root.classList.remove('eh-open'); palEl.hidden = true; return; }
+    if (!opts.on) { sideOpen = false; root.classList.remove('eh-open'); palEl.hidden = true; chipsEl.remove(); return; }
     mount();
     if (opts.layout === 'push') toggleSide(true);
     else if (opts.layout === 'none') toggleSide(false);
     else if (opts.autoOpen && !sideOpen) toggleSide(true);
     render();
   }
-  function tick() { if (opts.on && !sideEl.isConnected) { mount(); render(); } }
+  let wasOut = null;
+  function tick() {
+    if (!opts.on) return;
+    if (!sideEl.isConnected) { mount(); render(); }
+    const out = loggedOut();
+    if (out !== wasOut) { wasOut = out; if (out) trail = []; renderChips(); }
+    else if (!out && opts.chips && !chipsEl.isConnected) renderChips();
+  }
 
   // Etat de la page pour la fenetre de l extension : structure et libelles de menus, jamais le contenu des tableaux ni tes raccourcis.
   function diagnose() {
     const lines = ['enos Helper ' + VERSION, 'url ' + location.href, 'title ' + (document.title || '').slice(0, 60),
-      'layout ' + opts.layout + ' open ' + sideOpen + ' pins ' + store.pins.length + ' recent ' + store.recent.length + ' trail ' + trail.length + ' · last error ' + (lastError || 'none'),
-      'crumb [' + crumb() + '] reference found ' + !!reference()];
+      'layout ' + opts.layout + ' chips ' + opts.chips + ' open ' + sideOpen + ' pins ' + store.pins.length + ' recent ' + store.recent.length + ' trail ' + trail.length + ' logged out ' + loggedOut() + ' · last error ' + (lastError || 'none'),
+      'crumb [' + crumb() + '] panel [' + panelTitle() + '] reference found ' + !!reference() + ' navbar ' + !!navbar() + ' side menu ' + !!sideMenu()];
     const attrs = new Map();
     for (const el of $$('*')) for (const a of el.attributes) if (/^(bsi-|data-testid|ng-controller|ui-view|ng-view|ng-app|ng-repeat)/.test(a.name)) attrs.set(a.name, (attrs.get(a.name) || 0) + 1);
     lines.push('markers ' + [...attrs.entries()].sort((a, b) => b[1] - a[1]).slice(0, 40).map(([k, v]) => k + '×' + v).join(' '));
     lines.push('frames ' + $$('iframe').length + ' · links ' + $$('a[href]').length + ' · ng-click ' + $$('[ng-click], [data-ng-click]').length + ' · tables ' + $$('table').length + ' · rows ' + $$('tr').length);
     const acts = scanActions();
-    lines.push('menu entries ' + acts.length + ' (hidden ' + acts.filter(a => a.hidden).length + '): ' + acts.slice(0, 80).map(a => (a.path.length ? a.path.join('›') + '›' : '') + a.label.slice(0, 30) + (a.hidden ? '*' : '')).join(' | '));
-    lines.push('rail icons ' + $$('i, svg, span').filter(e => !ours(e) && railOf(e) && iconOf(e)).map(e => iconOf(e) + (e.closest('[title]') ? '(' + e.closest('[title]').getAttribute('title') + ')' : '')).slice(0, 20).join(' '));
-    lines.push('top bar icons ' + $$('i, svg').filter(e => !ours(e) && topBarOf(e) && iconOf(e)).map(e => iconOf(e)).slice(0, 20).join(' '));
-    const selOf = el => el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') + (el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\s+/).slice(0, 3).join('.') : '') + [...el.attributes].filter(a => /^bsi-/.test(a.name)).slice(0, 3).map(a => '[' + a.name + '=' + a.value.slice(0, 25) + ']').join('');
+    lines.push('menu entries ' + acts.length + ' (hidden ' + acts.filter(a => a.hidden).length + '): ' + acts.slice(0, 90).map(a => (a.path.length ? a.path.join('›') + '›' : '') + a.label.slice(0, 30) + (a.hidden ? '*' : '') + ((a.el.getAttribute('href') || '').replace(/[0-9a-f-]{20,}/g, 'ID') ? '=' + (a.el.getAttribute('href') || '').slice(0, 40) : '')).join(' | '));
+    const top = navbar();
+    if (top) lines.push('navbar texts ' + $$('*', top).filter(e => e.children.length === 0 && txt(e)).map(e => txt(e).slice(0, 40)).slice(0, 20).join(' | '));
     const rect = el => { const r = el.getBoundingClientRect(); return Math.round(r.left) + ',' + Math.round(r.top) + ' ' + Math.round(r.width) + 'x' + Math.round(r.height); };
-    const dump = (el, depth) => { if (!el || depth > 4 || ours(el)) return; lines.push('  '.repeat(depth) + selOf(el) + ' ' + rect(el)); for (const c of [...el.children].slice(0, 8)) dump(c, depth + 1); };
-    dump(document.body, 0);
+    const selOf = el => el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') + (el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\s+/).slice(0, 3).join('.') : '') + [...el.attributes].filter(a => /^bsi-/.test(a.name)).slice(0, 3).map(a => '[' + a.name + '=' + a.value.slice(0, 25) + ']').join('');
+    const content = $('#content, section.content-main');
+    if (content) { lines.push('content tree:'); const dump = (el, depth) => { if (!el || depth > 5 || ours(el)) return; lines.push('  '.repeat(depth) + selOf(el) + ' ' + rect(el) + (el.children.length === 0 && txt(el) && txt(el).length < 30 && !el.closest('table') ? ' "' + txt(el) + '"' : '')); for (const c of [...el.children].slice(0, 10)) dump(c, depth + 1); }; dump(content, 0); }
+    const right = $('#sidebar_right');
+    if (right) { lines.push('right panel ' + rect(right) + ' texts ' + $$('*', right).filter(e => e.children.length === 0 && txt(e)).map(e => txt(e).slice(0, 30)).slice(0, 20).join(' | ')); }
     return lines.join('\n');
   }
 

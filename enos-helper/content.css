@@ -91,3 +91,24 @@ html.eh-busy #eh-side, html.eh-busy #eh-tab { pointer-events: none; }
 #eh-toast .eh-i svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.6; }
 .eh-spin { flex: none; width: 14px; height: 14px; border: 2px solid rgba(255, 255, 255, .25); border-top-color: #fff; border-radius: 50%; animation: eh-spin .8s linear infinite; }
 @keyframes eh-spin { to { transform: rotate(360deg); } }
+
+/* ----- 0.2 : puces dans la barre orange d enos, menu d enos dans la barre, pas a retirer */
+#eh-chips { position: fixed; top: 0; right: 430px; height: 40px; z-index: 2147482998; display: flex; align-items: center; gap: 6px; max-width: calc(100vw - 1100px); min-width: 120px; overflow: hidden; padding: 0 8px; font: 12px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
+@media (max-width: 1500px) { #eh-chips { max-width: 30vw; } }
+.eh-chip { flex: none; display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 10px; border: 1px solid rgba(255, 255, 255, .55); border-radius: 13px; background: rgba(255, 255, 255, .16); color: #fff; font: inherit; font-weight: 600; cursor: pointer; white-space: nowrap; max-width: 180px; }
+.eh-chip span { overflow: hidden; text-overflow: ellipsis; }
+.eh-chip:hover { background: rgba(255, 255, 255, .3); }
+.eh-chip .eh-i svg { width: 14px; height: 14px; stroke: #fff; }
+.eh-chip-more { padding: 0 7px; }
+html.eh-busy .eh-chip { opacity: .6; pointer-events: none; }
+.eh-steps { margin: 4px 0 0; padding: 0 0 0 18px; }
+.eh-steps li { display: flex; align-items: center; gap: 6px; padding: 2px 0; color: var(--eh-fg); font-size: 12px; }
+.eh-steps li button { border: 0; background: none; color: var(--eh-fg3); padding: 2px; border-radius: 4px; cursor: pointer; display: inline-flex; }
+.eh-steps li button:hover { color: var(--eh-fg); background: var(--eh-hover); }
+.eh-naming input { margin-bottom: 6px; }
+.eh-btn:disabled { opacity: .4; cursor: default; }
+#eh-side .eh-grp .eh-chev svg { transition: transform .12s; }
+#eh-side .eh-group.eh-open .eh-grp .eh-chev svg { transform: rotate(90deg); }
+#eh-side .eh-sub { padding-left: 34px; color: var(--eh-fg2); }
+#eh-side .eh-sub:hover { color: var(--eh-fg); }
+#eh-side .eh-sub .eh-i { color: var(--eh-fg3); }
