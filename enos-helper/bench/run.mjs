@@ -35,6 +35,7 @@ await page.goto(base);
 await sleep(800);
 ok(await page.$('#eh-side'), 'sidebar mounted');
 ok(!(await page.$('#eh-chips')), 'no chips on the login page');
+let rows = [];
 const crumbs = async () => page.$eval('#crumbtext', e => e.textContent);
 const ctrl = async key => { await page.keyboard.down('Control'); await page.keyboard.press(key); await page.keyboard.up('Control'); await sleep(150); };
 const trailLen = () => page.$eval('#eh-side .eh-pin', e => (e.textContent.match(/(\d+) step/) || [0, 0])[1] | 0).catch(() => 0);
@@ -50,6 +51,24 @@ const subs = await page.$$eval('#eh-side .eh-sub .eh-t', els => els.map(e => e.t
 ok(subs.join(',') === 'Management,Reports › Queries', 'Projects group opens its entries: ' + subs.join(','));
 ok(await page.$eval('#eh-chips', e => e.textContent.includes('Pin a view')), 'chips bar invites to pin');
 await ctrl('.');
+
+// Une epingle d une version d avant, avec Sign In en pas 1 : nettoyee au chargement.
+await sw.evaluate(async origin => {
+  const k = 'eh:' + origin;
+  await chrome.storage.local.set({ [k]: { pins: [{ name: 'Old procedures', at: 1, trail: [
+    { tag: 'button', text: 'Sign In', title: '', icon: '', n: 0, label: 'Sign In' },
+    { tag: 'span', text: '', title: '', icon: 'fa fa-navicon', n: 0, label: 'navicon' },
+    { tag: 'a', text: 'Management', title: '', icon: '', n: 0, label: 'Projects › Management', menu: 'Projects › Management', act: "go('Projects')" } ] }], recent: [] } });
+}, base.replace(/\/#.*$/, ''));
+await sleep(400);
+await ctrl('.');
+rows = await page.$$eval('#eh-side .eh-row', els => els.map(e => e.title));
+ok(rows.some(t => t === 'Projects › Management'), 'old pin cleaned of Sign In and menu toggle: ' + JSON.stringify(rows));
+await ctrl('.');
+await page.click('#eh-chips .eh-chip'); await sleep(2500);
+ok((await crumbs()) === 'Projects', 'old pin now opens Projects: ' + await crumbs() + ' / ' + await page.evaluate(() => window.pressed.join(',')));
+await sw.evaluate(async origin => { await chrome.storage.local.set({ ['eh:' + origin]: { pins: [], recent: [] } }); }, base.replace(/\/#.*$/, ''));
+await sleep(400);
 
 // Manon navigue a la main : ≡ (bruit), menu Projects › Management (replie), loupe de la 2e ligne, Procedures dans Details, loupe de la 2e procedure.
 await page.click('#toggle_sidemenu_l'); await sleep(200);
@@ -79,7 +98,7 @@ ok((await page.$$eval('#eh-side .eh-steps li', els => els.length)) === 4, 'cance
 await page.$eval('#eh-name', e => { e.value = ''; });
 await page.type('#eh-name', 'Procedure two');
 await page.keyboard.press('Enter'); await sleep(200);
-let rows = await page.$$eval('#eh-side .eh-row', els => els.map(e => e.textContent));
+rows = await page.$$eval('#eh-side .eh-row', els => els.map(e => e.textContent));
 ok(rows.some(t => t.startsWith('Procedure two')), 'pinned under its name');
 ok(!rows.some(t => /SECRET/.test(t)), 'no title text in the names');
 ok(await page.$eval('#eh-chips', e => e.textContent.includes('Procedure two')), 'chip in the orange bar');
@@ -119,7 +138,15 @@ ok((await crumbs()) === 'Projects · mine', 'saved filter applied from the finde
 await page.evaluate(() => { document.querySelectorAll('#sidebar_right li').forEach(l => { if (l.textContent.includes('Procedures')) l.remove(); }); });
 await ctrl('.');
 await page.click('#eh-side .eh-row'); await sleep(12000);
-ok(await page.$eval('#eh-toast', e => !e.hidden && /Could not follow step 3 of 4/.test(e.textContent)), 'missing step reported: ' + await page.$eval('#eh-toast', e => e.textContent));
+ok(await page.$eval('#eh-toast', e => !e.hidden && /Stopped at step 3 of 4/.test(e.textContent)), 'missing step reported: ' + await page.$eval('#eh-toast', e => e.textContent));
+ok((await crumbs()) === 'Projects / Project', 'the view stays where the replay stopped, no jump home: ' + await crumbs());
+
+// Un libelle qui change (badge ajoute) : le pas est retrouve par son action ng-click.
+await page.evaluate(() => { document.querySelectorAll('#sidebar_right li').forEach(l => { if (l.textContent.includes('Billing')) l.append(' (3)'); }); });
+await page.evaluate(() => { const li = document.createElement('li'); li.setAttribute('ng-click', "detail('Procedures')"); li.textContent = 'Procedures (2)'; li.addEventListener('click', e => { e.preventDefault(); window.pressed.push("detail('Procedures')"); document.querySelectorAll('.panel').forEach(p => p.classList.toggle('hidden', p.id !== 'procedures-panel')); document.getElementById('crumbtext').textContent = 'Projects / Procedures'; }); document.querySelector('#sidebar_right ul').append(li); });
+await ctrl('.');
+await page.click('#eh-side .eh-row'); await sleep(5000);
+ok((await crumbs()) === 'Projects / Procedures / Procedure', 'step found by its action after a label change: ' + await crumbs());
 
 // 0.3 : feuille calme (titre sur une ligne, poubelle ecartee), entrees Details depuis la barre, My queries, reprise a l arrivee.
 await page.$$eval('#sidebar-menu a', as => as.find(a => a.textContent === 'Management').click()); await sleep(500);
@@ -129,10 +156,10 @@ ok(await page.$eval('tr:nth-child(3) i.fa-trash', e => parseFloat(getComputedSty
 await page.click('tr:nth-child(3) i.fa-search'); await sleep(600);
 await ctrl('.');
 const tags = await page.$$eval('#eh-side .eh-tag', els => els.map(e => e.textContent));
-ok(tags.join(',') === 'Species,Active Animals,Billing', 'Details entries listed from the record: ' + tags.join(','));
+ok(tags.length === 4 && tags[0] === 'Species' && tags[2].startsWith('Billing'), 'Details entries listed from the record: ' + tags.join(','));
 const qs = await page.$$eval('#eh-side .eh-row', els => els.filter(e => !e.classList.contains('eh-sub') && e.textContent.endsWith('Queries')).map(e => e.textContent));
 ok(qs.length === 3 && qs[0].startsWith('Locations'), 'My queries gathered from every domain: ' + JSON.stringify(qs));
-await page.$$eval('#eh-side .eh-tag', els => els.find(e => e.textContent === 'Billing').click()); await sleep(500);
+await page.$$eval('#eh-side .eh-tag', els => els.find(e => e.textContent.startsWith('Billing')).click()); await sleep(500);
 ok((await crumbs()) === 'Projects / Billing', 'Details entry opened from the sidebar');
 await page.reload(); await sleep(800);
 await page.click('#loginForm button'); await sleep(2500);

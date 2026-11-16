@@ -4,7 +4,7 @@ A Chrome extension that gets you where you work in enos in one click: shortcuts 
 
 ## Install (2 minutes)
 
-1. Download `enos-helper-0.3.0.zip` and unzip it.
+1. Download `enos-helper-0.3.1.zip` and unzip it.
 2. Open `chrome://extensions` and switch on **Developer mode** (top right).
 3. Click **Load unpacked** and pick the unzipped `enos-helper` folder.
 4. Open enos and sign in. Your shortcuts appear in the orange bar next to the search box (empty at first: **Pin a view**). **Ctrl .** (⌘ . on a Mac) or the small tab at the bottom left opens the sidebar; **Ctrl K** opens the finder.
@@ -34,6 +34,11 @@ The sidebar lists the whole left menu of enos with its sub-entries, even the one
 ## What it never does
 
 It never clicks Save, Delete or any button for you unless that click is part of a path you pinned yourself; it never fills a form; nothing leaves your browser.
+
+## 0.3.1
+
+- A shortcut pinned with 0.1 kept « Sign In » as its first step, so opening it went to the home page and stopped. Such steps are now removed from old shortcuts, and a replay that cannot find a step stays where it is instead of going home.
+- Steps are recognised by their enos action (ng-click) first, then by their text: a changed label or badge no longer breaks a shortcut; a menu entry is found by its path (Projects › Management) even when the menu is folded.
 
 ## 0.3
 

@@ -1,4 +1,4 @@
-// enos Helper 0.3
+// enos Helper 0.3.1
 // Ne fait que changer l affichage dans ce navigateur : n ecrit jamais dans enos,
 // n envoie rien, ne touche a aucun formulaire.
 // Dans enos l adresse ne change pas quand on ouvre un projet, une procedure ou une fiche :
@@ -11,7 +11,7 @@
 // section#content, aside#sidebar_right (Details, 350 px), icones fa-* / bsi-* / glyphicon-*.
 (() => {
   if (window.top !== window) return; // jamais dans un cadre interne
-  const VERSION = '0.3.0';
+  const VERSION = '0.3.1';
   const KEY = 'enosHelper';
   const DEFAULTS = { on: true, layout: 'drawer', recentMax: 30, palette: true, autoOpen: false, chips: true, calm: true, forms: false, resume: true };
   const root = document.documentElement;
@@ -79,13 +79,13 @@
         opts = { ...DEFAULTS, ...((r && r[KEY]) || {}) };
         chrome.storage.local.get(SITE, s => {
           const v = (s && s[SITE]) || {};
-          store = { pins: Array.isArray(v.pins) ? v.pins : [], recent: Array.isArray(v.recent) ? v.recent : [] };
+          store = { pins: cleanItems(Array.isArray(v.pins) ? v.pins : []), recent: cleanItems(Array.isArray(v.recent) ? v.recent : []) };
           cb();
         });
       });
       chrome.storage.onChanged.addListener((ch, area) => {
         if (area === 'sync' && ch[KEY]) { opts = { ...DEFAULTS, ...(ch[KEY].newValue || {}) }; apply(); }
-        if (area === 'local' && ch[SITE]) { const v = ch[SITE].newValue || {}; store = { pins: v.pins || [], recent: v.recent || [] }; render(); }
+        if (area === 'local' && ch[SITE]) { const v = ch[SITE].newValue || {}; store = { pins: cleanItems(v.pins || []), recent: cleanItems(v.recent || []) }; render(); }
       });
     } catch (e) { lastError = 'storage: ' + e; cb(); }
   }
@@ -103,6 +103,11 @@
   function topBarOf(el) { if (el.closest('header#content-navbar, header.navbar-fixed-top')) return true; const r = el.getBoundingClientRect(); return r.top < 130 && r.height < 60; }
   // Clics qui ne menent nulle part (menu replie/deplie, plein ecran, verrou, notifications, compte, connexion).
   const NOISE = /^(toggle menu|fullscreen|lock session|get search results|sign in|log ?in|connexion|se connecter|logout|notifications?|received notifications|sent notifications|collapse|select all|\d+)$/i;
+  // Un chemin enregistre par une version d avant peut porter des pas parasites (Sign In, ≡, compte) : on les retire.
+  const noisyStep = st => NOISE.test(st.text || st.title || '') || (st.icon || '').split(/\s+/).some(c => /^(fa|glyphicon|bsi)-(navicon|bars|power-off|user|login-changer2|login-reset)$/.test(c));
+  function cleanItems(items) {
+    return items.filter(it => it && Array.isArray(it.trail)).map(it => ({ ...it, trail: it.trail.filter(st => st && !noisyStep(st)) })).filter(it => it.trail.length);
+  }
   function noise(el, s) {
     if (el.closest('#toggle_sidemenu_l, .navbar-right, .growl-container, .modal-backdrop, #eh-chips')) return true;
     if (NOISE.test(s.text || s.title || '')) return true;
@@ -186,8 +191,13 @@
     return t.filter(x => !/^[\d.,% ]+$/.test(x)).slice(0, 2).join(' | ').slice(0, 100) || txt(row).slice(0, 60);
   }
   const rowLabel = row => { const t = rowCells(row).map(c => txt(c)); return (t.find(refLike) || t[1] || t[0] || '').slice(0, 40); };
-  const sigOf = el => ({ tag: el.tagName.toLowerCase(), text: txt(el).length > 60 ? '' : txt(el).slice(0, 60), title: (el.getAttribute('title') || el.getAttribute('aria-label') || el.getAttribute('placeholder') || '').slice(0, 60), icon: iconOf(el), href: (el.getAttribute('href') || '').slice(0, 80) });
-  const same = (a, b, loose) => a.tag === b.tag && a.text === b.text && a.title === b.title && (loose ? true : a.icon === b.icon) && (a.icon === b.icon || !b.icon || !a.icon);
+  const actOf = el => (el.getAttribute('ng-click') || el.getAttribute('data-ng-click') || el.getAttribute('ui-sref') || '').slice(0, 120);
+  const sigOf = el => ({ tag: el.tagName.toLowerCase(), text: txt(el).length > 60 ? '' : txt(el).slice(0, 60), title: (el.getAttribute('title') || el.getAttribute('aria-label') || el.getAttribute('placeholder') || '').slice(0, 60), icon: iconOf(el), href: (el.getAttribute('href') || '').slice(0, 80), act: actOf(el) });
+  // Meme element : meme balise et, soit la meme action AngularJS (hors $index / $event), soit le meme texte et le meme titre.
+  const actKey = a => (a || '').replace(/\$(index|event|parent)\b/g, '').replace(/\s+/g, '');
+  const same = (a, b, loose) => a.tag === b.tag
+    && ((a.act && b.act && actKey(a.act) === actKey(b.act)) || (a.text === b.text && a.title === b.title))
+    && (loose ? true : a.icon === b.icon) && (a.icon === b.icon || !b.icon || !a.icon);
   function find(s) {
     let scope = [document];
     if (s.row) {
@@ -197,6 +207,7 @@
     }
     let cands = scope.flatMap(sc => $$(ACTIONABLE, sc)).filter(e => !ours(e) && same(sigOf(e), s, true) && (s.row || visible(e) || s.tag === 'li' || s.tag === 'a' || s.menu));
     if (s.href) { const byHref = cands.filter(e => (e.getAttribute('href') || '').slice(0, 80) === s.href); if (byHref.length) cands = byHref; }
+    if (s.act) { const byAct = cands.filter(e => actKey(actOf(e)) === actKey(s.act)); if (byAct.length) cands = byAct; }
     if (!cands.length) return null;
     const exact = cands.filter(e => sigOf(e).icon === s.icon);
     const pool = exact.length ? exact : cands;
@@ -245,10 +256,11 @@
     while (Date.now() - t0 < max) { const el = find(s); if (el) return el; await sleep(120); }
     return null;
   }
-  function goHome() {
-    const home = $$('a, button, [ng-click], i, span').find(e => !ours(e) && (topBarOf(e) || railOf(e)) && /home/i.test(iconOf(e) + ' ' + (e.getAttribute('title') || '') + ' ' + (e.getAttribute('href') || '') + ' ' + txt(e)));
-    if (home) return press(home.closest('a, button, [ng-click]') || home);
-    return false;
+  // Un pas qui est une entree du menu de gauche se retrouve par son chemin de libelles (Projects › Management), meme replie.
+  function findMenuStep(s) {
+    if (!s.menu) return null;
+    const a = menuTree().find(x => x.full === s.menu) || menuTree().find(x => x.label === (s.text || s.title));
+    return a ? a.el : null;
   }
   async function replay(item) {
     if (replaying) return;
@@ -261,9 +273,8 @@
       for (let i = 0; i < steps.length; i++) {
         const s = steps[i];
         toast('Opening ' + item.name + ' · step ' + (i + 1) + ' of ' + steps.length + ' (' + s.label + ')', true);
-        let el = await waitFor(s, i === 0 ? 2500 : 8000);
-        if (!el && i === 0 && goHome()) { await settle(); el = await waitFor(s, 6000); }
-        if (!el) { toast('Could not follow step ' + (i + 1) + ' of ' + steps.length + ' (' + s.label + '). enos may have changed, or the row is not in the list today. Open it by hand once, then pin it again (you can drop steps before pinning).'); return; }
+        let el = findMenuStep(s) || await waitFor(s, i === 0 ? 2500 : 8000);
+        if (!el) { toast('Stopped at step ' + (i + 1) + ' of ' + steps.length + ' (' + s.label + '): not found on this page. The view stays as it is. Open the view by hand once, then pin it again (drop the steps that are not part of the way).', false, 14000); return; }
         press(el);
         await settle();
       }

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "enos Helper",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "One-click shortcuts, a Ctrl K finder and your recent views for enos. Changes nothing in enos: it never writes there and sends nothing anywhere.",
   "permissions": ["storage", "activeTab"],
   "background": { "service_worker": "background.js" },
