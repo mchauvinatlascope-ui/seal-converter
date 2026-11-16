@@ -1,4 +1,4 @@
-// enos Helper 0.3.1
+// enos Helper 0.4
 // Ne fait que changer l affichage dans ce navigateur : n ecrit jamais dans enos,
 // n envoie rien, ne touche a aucun formulaire.
 // Dans enos l adresse ne change pas quand on ouvre un projet, une procedure ou une fiche :
@@ -11,7 +11,7 @@
 // section#content, aside#sidebar_right (Details, 350 px), icones fa-* / bsi-* / glyphicon-*.
 (() => {
   if (window.top !== window) return; // jamais dans un cadre interne
-  const VERSION = '0.3.1';
+  const VERSION = '0.4.0';
   const KEY = 'enosHelper';
   const DEFAULTS = { on: true, layout: 'drawer', recentMax: 30, palette: true, autoOpen: false, chips: true, calm: true, forms: false, resume: true };
   const root = document.documentElement;
@@ -25,7 +25,7 @@
   const $ = (sel, scope = document) => scope.querySelector(sel);
   const $$ = (sel, scope = document) => [...scope.querySelectorAll(sel)];
   const txt = el => (el ? (el.textContent || '').replace(/\s+/g, ' ').trim() : '');
-  const ours = el => !!(el && el.closest && el.closest('#eh-side, #eh-pal, #eh-tab, #eh-toast, #eh-chips'));
+  const ours = el => !!(el && el.closest && el.closest('#eh-side, #eh-pal, #eh-tab, #eh-toast, #eh-chips, #eh-pop'));
   function h(tag, attrs, ...kids) {
     const el = document.createElement(tag);
     for (const [k, v] of Object.entries(attrs || {})) {
@@ -145,8 +145,9 @@
   function viewName() {
     const c = crumb();
     const ref = reference();
-    const base = c || panelTitle() || 'enos';
-    return ref ? base + ' · ' + ref : base;
+    const parts = c.split(' / ').map(x => x.trim()).filter(Boolean);
+    const base = parts[parts.length - 1] || panelTitle() || 'enos';
+    return ref ? base + ' ' + ref : base;
   }
 
   // ------------------------------------------------------------ le chemin de clics
@@ -223,6 +224,7 @@
     if (!s) return;
     if (s.root) trail = [s]; else { trail.push(s); if (trail.length > 14) trail = trail.slice(-14); }
     scheduleVisit();
+    renderChips();
   }, true);
 
   // Quand la page s est calmee apres un clic : la vue en cours va dans « Recent views ».
@@ -237,6 +239,14 @@
     r.unshift({ name, trail: trail.map(s => ({ ...s })), at: Date.now() });
     store.recent = r.slice(0, Math.max(5, Math.min(100, opts.recentMax | 0 || 30)));
     save(); render();
+    hintOnce();
+  }
+  function hintOnce() {
+    let seen = false;
+    try { seen = localStorage.getItem('eh-hint') === '1'; } catch (e) {}
+    if (seen || store.pins.length || trail.length < 2 || !opts.chips) return;
+    try { localStorage.setItem('eh-hint', '1'); } catch (e) {}
+    toast('Use this view often? Pin it with the ★ in the orange bar: it then opens in one click.', false, 9000);
   }
 
   // Rejouer un chemin : chaque pas attend que son element existe, clique, puis attend le calme.
@@ -297,12 +307,49 @@
 
   // ------------------------------------------------------------ epingles
   let naming = null; // { name, steps } : saisie du nom en cours, pas que l on peut retirer
-  function pinHere() {
-    if (!trail.length) { toast('Nothing to pin yet: go to the view you want in enos first (from the left menu), then Pin this view.'); return; }
+  function pinHere(fromBar) {
+    if (!trail.length) { toast('Nothing to pin yet: go to the view you want (left menu, then the row or the Details entry), then click ★.', false, 7000); return; }
     naming = { name: viewName(), steps: trail.map(s => ({ ...s })) };
+    toastEl.hidden = true;
+    if (fromBar) { renderPop(); return; }
     render();
     const i = $('#eh-name'); if (i) { i.focus(); i.select(); }
   }
+  // La petite fenetre sous la barre orange : nommer l epingle, retirer un pas ; ou renommer / deplacer / retirer une puce.
+  const popEl = h('div', { id: 'eh-pop', role: 'dialog', hidden: true });
+  let popChip = null; // epingle dont on gere la puce
+  function closePop() { popEl.hidden = true; popChip = null; if (naming && !sideOpen) naming = null; }
+  function renderPop() {
+    if (!popEl.isConnected) document.body.append(popEl);
+    popEl.hidden = false;
+    if (naming) {
+      popEl.replaceChildren(
+        h('div', { class: 'eh-pop-h' }, icon('star'), h('b', {}, 'Pin this view'), h('button', { type: 'button', class: 'eh-x', title: 'Close', onclick: closePop }, icon('x'))),
+        h('input', { id: 'eh-name', type: 'text', value: naming.name, 'aria-label': 'Name of the shortcut', placeholder: 'Name', oninput: e => { naming.name = e.target.value; }, onkeydown: e => { if (e.key === 'Enter') { confirmPin(); closePop(); } if (e.key === 'Escape') closePop(); } }),
+        h('small', {}, naming.steps.length + ' click' + (naming.steps.length > 1 ? 's' : '') + ' to replay · × removes one'),
+        h('ol', { class: 'eh-steps' }, naming.steps.map((st, i) => h('li', {}, h('span', { class: 'eh-t' }, st.label), h('button', { type: 'button', title: 'Remove this step', onclick: () => { naming.steps.splice(i, 1); renderPop(); } }, icon('x'))))),
+        h('div', { class: 'eh-pop-b' }, h('button', { type: 'button', class: 'eh-btn eh-main', disabled: !naming.steps.length, onclick: () => { confirmPin(); closePop(); } }, 'Pin'), h('button', { type: 'button', class: 'eh-btn', onclick: closePop }, 'Cancel')));
+      const i = $('#eh-name'); if (i) { i.focus(); i.select(); }
+      return;
+    }
+    if (popChip) {
+      const p = popChip, i = store.pins.indexOf(p);
+      const nameIn = h('input', { type: 'text', value: p.name, 'aria-label': 'Shortcut name', onkeydown: e => { if (e.key === 'Enter') { p.name = nameIn.value.trim() || p.name; save(); render(); closePop(); } if (e.key === 'Escape') closePop(); } });
+      popEl.replaceChildren(
+        h('div', { class: 'eh-pop-h' }, icon('starFull'), h('b', {}, p.name), h('button', { type: 'button', class: 'eh-x', title: 'Close', onclick: closePop }, icon('x'))),
+        nameIn,
+        h('small', {}, stepsHint(p)),
+        h('div', { class: 'eh-pop-b' },
+          h('button', { type: 'button', class: 'eh-btn eh-main', onclick: () => { p.name = nameIn.value.trim() || p.name; save(); render(); closePop(); } }, 'Rename'),
+          h('button', { type: 'button', class: 'eh-btn', disabled: i <= 0, title: 'Move left', onclick: () => { [store.pins[i - 1], store.pins[i]] = [store.pins[i], store.pins[i - 1]]; save(); render(); closePop(); } }, '← Move'),
+          h('button', { type: 'button', class: 'eh-btn', disabled: i >= store.pins.length - 1, title: 'Move right', onclick: () => { [store.pins[i + 1], store.pins[i]] = [store.pins[i], store.pins[i + 1]]; save(); render(); closePop(); } }, 'Move →'),
+          h('button', { type: 'button', class: 'eh-btn eh-danger', onclick: () => { store.pins.splice(i, 1); save(); render(); closePop(); toast('Shortcut « ' + p.name + ' » removed.', false, 3000); } }, 'Remove')));
+      nameIn.focus();
+      return;
+    }
+    closePop();
+  }
+  document.addEventListener('pointerdown', e => { if (!popEl.hidden && !ours(e.target)) closePop(); }, true);
   function confirmPin() {
     if (!naming || !naming.steps.length) return;
     const name = (naming.name || '').trim() || viewName();
@@ -393,12 +440,14 @@
   // ------------------------------------------------------------ les puces dans la barre d enos
   const chipsEl = h('div', { id: 'eh-chips', role: 'toolbar', 'aria-label': 'enos Helper shortcuts' });
   function renderChips() {
-    if (!opts.on || !opts.chips || loggedOut()) { chipsEl.remove(); return; }
+    if (!opts.on || !opts.chips || loggedOut()) { chipsEl.remove(); root.classList.remove('eh-chips'); return; }
     if (!chipsEl.isConnected && document.body) document.body.append(chipsEl);
     const pins = store.pins.slice(0, 9);
+    root.classList.add('eh-chips');
     chipsEl.replaceChildren(
-      ...pins.map((p, i) => h('button', { type: 'button', class: 'eh-chip', title: stepsHint(p) + ' · Alt ' + (i + 1), onclick: () => replay(p) }, h('span', {}, p.name))),
-      h('button', { type: 'button', class: 'eh-chip eh-chip-more', title: 'enos Helper (' + mod() + ' .) · ' + mod() + ' K finds', onclick: () => toggleSide() }, icon(pins.length ? 'menu' : 'star'), !pins.length && h('span', {}, 'Pin a view')));
+      h('button', { type: 'button', class: 'eh-chip eh-chip-pin', title: trail.length ? 'Pin this view (' + trail.length + ' click' + (trail.length > 1 ? 's' : '') + ')' : 'Go to a view first, then pin it here', onclick: () => pinHere(true) }, icon('star'), !pins.length && h('span', {}, 'Pin this view')),
+      ...pins.map((p, i) => h('button', { type: 'button', class: 'eh-chip', title: stepsHint(p) + ' · Alt ' + (i + 1) + ' · right click to rename, move or remove', onclick: () => replay(p), oncontextmenu: e => { e.preventDefault(); naming = null; popChip = p; renderPop(); } }, h('span', {}, p.name))),
+      h('button', { type: 'button', class: 'eh-chip eh-chip-more', title: 'Recent views, My queries, the enos menu (' + mod() + ' .) · ' + mod() + ' K finds', onclick: () => toggleSide() }, icon('menu')));
   }
 
   // ------------------------------------------------------------ la barre
@@ -538,6 +587,7 @@
     else if (m && !e.shiftKey && !e.altKey && e.key === '.') { e.preventDefault(); toggleSide(); }
     else if (e.altKey && !m && !e.shiftKey && /^[1-9]$/.test(e.key)) { const p = store.pins[+e.key - 1]; if (p) { e.preventDefault(); closeAll(); replay(p); } }
     else if (e.key === 'Escape' && !palEl.hidden) { closePalette(); }
+    else if (e.key === 'Escape' && !popEl.hidden) { closePop(); }
   }, true);
 
   // ------------------------------------------------------------ pose et retrait
@@ -553,7 +603,7 @@
     root.classList.toggle('eh-drawer', opts.on && opts.layout === 'drawer');
     root.classList.toggle('eh-calm', opts.on && !!opts.calm);
     root.classList.toggle('eh-forms', opts.on && !!opts.forms);
-    if (!opts.on) { sideOpen = false; root.classList.remove('eh-open', 'eh-calm', 'eh-forms'); palEl.hidden = true; chipsEl.remove(); return; }
+    if (!opts.on) { sideOpen = false; root.classList.remove('eh-open', 'eh-calm', 'eh-forms', 'eh-chips'); palEl.hidden = true; popEl.hidden = true; chipsEl.remove(); return; }
     mount();
     if (opts.layout === 'push') toggleSide(true);
     else if (opts.layout === 'none') toggleSide(false);

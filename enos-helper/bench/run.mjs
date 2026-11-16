@@ -49,7 +49,8 @@ ok(groups.join(',') === 'Dashboard,Locations,Animals,Projects,Settings', 'enos m
 await page.$$eval('#eh-side .eh-grp', els => els.find(e => e.textContent.includes('Projects')).click()); await sleep(100);
 const subs = await page.$$eval('#eh-side .eh-sub .eh-t', els => els.map(e => e.textContent));
 ok(subs.join(',') === 'Management,Reports › Queries', 'Projects group opens its entries: ' + subs.join(','));
-ok(await page.$eval('#eh-chips', e => e.textContent.includes('Pin a view')), 'chips bar invites to pin');
+ok(await page.$eval('#eh-chips', e => e.textContent.includes('Pin this view')), 'chips bar invites to pin');
+ok(await page.$eval('#eh-tab', e => getComputedStyle(e).display === 'none'), 'bottom tab hidden while the bar shows');
 await ctrl('.');
 
 // Une epingle d une version d avant, avec Sign In en pas 1 : nettoyee au chargement.
@@ -65,7 +66,7 @@ await ctrl('.');
 rows = await page.$$eval('#eh-side .eh-row', els => els.map(e => e.title));
 ok(rows.some(t => t === 'Projects › Management'), 'old pin cleaned of Sign In and menu toggle: ' + JSON.stringify(rows));
 await ctrl('.');
-await page.click('#eh-chips .eh-chip'); await sleep(2500);
+await page.click('#eh-chips .eh-chip:not(.eh-chip-pin):not(.eh-chip-more)'); await sleep(2500);
 ok((await crumbs()) === 'Projects', 'old pin now opens Projects: ' + await crumbs() + ' / ' + await page.evaluate(() => window.pressed.join(',')));
 await sw.evaluate(async origin => { await chrome.storage.local.set({ ['eh:' + origin]: { pins: [], recent: [] } }); }, base.replace(/\/#.*$/, ''));
 await sleep(400);
@@ -80,29 +81,42 @@ await page.$$eval('#sidebar_right li', lis => lis.find(l => l.textContent.includ
 await page.click('#procedures-panel tr:nth-child(3) i.fa-search'); await sleep(1800);
 ok((await crumbs()) === 'Projects / Procedures / Procedure', 'mock reached the procedure by hand');
 
-// Epingler : les pas, sans le ≡ ; la derniere entree de menu cliquee (Management) est le depart.
-await ctrl('.');
-const n = await trailLen();
-ok(n === 4, 'four steps noted (menu toggle ignored, Management is the start): ' + await page.$eval('#eh-side .eh-pin', e => e.title));
-await page.click('#eh-side .eh-pin'); await sleep(150);
-const suggested = await page.$eval('#eh-name', e => e.value);
-ok(suggested === 'Projects / Procedures / Procedure · ML-2025-0026', 'suggested name from crumb and reference: ' + suggested);
-let steps = await page.$$eval('#eh-side .eh-steps li .eh-t', els => els.map(e => e.textContent));
+// Epingler depuis la barre : ★, nom court propose, pas listes, un pas retire, Entree.
+ok(await page.$eval('#eh-chips .eh-chip-pin', e => /4 clicks/.test(e.title)), 'star chip counts the clicks: ' + await page.$eval('#eh-chips .eh-chip-pin', e => e.title));
+await page.click('#eh-chips .eh-chip-pin'); await sleep(200);
+ok(await page.$eval('#eh-pop', e => !e.hidden), 'pin window opens under the bar');
+const suggested = await page.$eval('#eh-pop #eh-name', e => e.value);
+ok(suggested === 'Procedure ML-2025-0026', 'short name proposed: ' + suggested);
+let steps = await page.$$eval('#eh-pop .eh-steps li .eh-t', els => els.map(e => e.textContent));
 ok(steps[0] === 'Projects › Management' && /search on ML-040014/.test(steps[1]) && steps[2] === 'Procedures' && /search on ML-2025-0026/.test(steps[3]), 'steps readable: ' + JSON.stringify(steps));
-await page.$$eval('#eh-side .eh-steps li button', bs => bs[3].click()); await sleep(100);
-steps = await page.$$eval('#eh-side .eh-steps li .eh-t', els => els.map(e => e.textContent));
+await page.$$eval('#eh-pop .eh-steps li button', bs => bs[3].click()); await sleep(100);
+steps = await page.$$eval('#eh-pop .eh-steps li .eh-t', els => els.map(e => e.textContent));
 ok(steps.length === 3 && steps[2] === 'Procedures', 'a step can be removed by hand');
-await page.$$eval('#eh-side .eh-naming .eh-btn', bs => bs[1].click()); await sleep(100);
-await page.click('#eh-side .eh-pin'); await sleep(150);
-ok((await page.$$eval('#eh-side .eh-steps li', els => els.length)) === 4, 'cancel keeps the full path');
-await page.$eval('#eh-name', e => { e.value = ''; });
-await page.type('#eh-name', 'Procedure two');
+await page.keyboard.press('Escape'); await sleep(100);
+ok(await page.$eval('#eh-pop', e => e.hidden), 'Escape closes the window');
+await page.click('#eh-chips .eh-chip-pin'); await sleep(200);
+ok((await page.$$eval('#eh-pop .eh-steps li', els => els.length)) === 4, 'reopening starts from the full path');
+await page.$eval('#eh-pop #eh-name', e => { e.value = ''; });
+await page.type('#eh-pop #eh-name', 'Procedure two');
 await page.keyboard.press('Enter'); await sleep(200);
+ok(await page.$eval('#eh-pop', e => e.hidden), 'Enter pins and closes');
+await ctrl('.');
 rows = await page.$$eval('#eh-side .eh-row', els => els.map(e => e.textContent));
 ok(rows.some(t => t.startsWith('Procedure two')), 'pinned under its name');
 ok(!rows.some(t => /SECRET/.test(t)), 'no title text in the names');
 ok(await page.$eval('#eh-chips', e => e.textContent.includes('Procedure two')), 'chip in the orange bar');
 await ctrl('.');
+// Clic droit sur la puce : renommer.
+await page.click('#eh-chips .eh-chip:not(.eh-chip-pin):not(.eh-chip-more)', { button: 'right' }); await sleep(200);
+ok(await page.$eval('#eh-pop', e => !e.hidden && /Rename/.test(e.textContent) && /Remove/.test(e.textContent)), 'right click opens rename / move / remove');
+await page.$eval('#eh-pop input', e => { e.value = ''; });
+await page.type('#eh-pop input', 'Proc 2');
+await page.keyboard.press('Enter'); await sleep(200);
+ok(await page.$eval('#eh-chips', e => e.textContent.includes('Proc 2')), 'chip renamed from the bar');
+await page.click('#eh-chips .eh-chip:not(.eh-chip-pin):not(.eh-chip-more)', { button: 'right' }); await sleep(200);
+await page.$eval('#eh-pop input', e => { e.value = ''; });
+await page.type('#eh-pop input', 'Procedure two');
+await page.keyboard.press('Enter'); await sleep(200);
 
 // Depuis l accueil, Alt 1 rejoue : Management direct (menu replie), bonne ligne malgre les compteurs qui changent, Details, procedure.
 await page.$$eval('#sidebar-menu a', as => as.find(a => a.textContent === 'Dashboard').click()); await sleep(500);
@@ -116,7 +130,7 @@ ok(opened, 'toast says opened');
 
 // Un clic de puce depuis une autre vue.
 await page.$$eval('#sidebar-menu a', as => as.find(a => a.textContent === 'Settings').click()); await sleep(500);
-await page.click('#eh-chips .eh-chip'); await sleep(4500);
+await page.click('#eh-chips .eh-chip:not(.eh-chip-pin):not(.eh-chip-more)'); await sleep(4500);
 ok((await crumbs()) === 'Projects / Procedures / Procedure', 'chip replays from another view');
 
 // Ctrl K : une entree repliee du menu (Queries de Projects) et un filtre enregistre.

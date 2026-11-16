@@ -4,7 +4,7 @@ A Chrome extension that gets you where you work in enos in one click: shortcuts 
 
 ## Install (2 minutes)
 
-1. Download `enos-helper-0.3.1.zip` and unzip it.
+1. Download `enos-helper-0.4.0.zip` and unzip it.
 2. Open `chrome://extensions` and switch on **Developer mode** (top right).
 3. Click **Load unpacked** and pick the unzipped `enos-helper` folder.
 4. Open enos and sign in. Your shortcuts appear in the orange bar next to the search box (empty at first: **Pin a view**). **Ctrl .** (⌘ . on a Mac) or the small tab at the bottom left opens the sidebar; **Ctrl K** opens the finder.
@@ -16,8 +16,10 @@ To update: replace the folder with the new one, click the reload arrow on the en
 enos keeps the same address whatever you open, so a shortcut is a path of clicks, not a link. The extension notes your clicks in enos as you go; a click in the left menu starts a new path, and clicks that lead nowhere (the ≡ toggle, Sign In, notifications, your account menu) are ignored.
 
 1. Go where you want the usual way: left menu **Projects › Management**, the magnifier of your project, **Procedures** in Details.
-2. Open the sidebar (Ctrl .) and click **Pin this view**. It lists the steps it noted (`Projects › Management › search on ML-040014 › Procedures`); remove a step with its × if it is not part of the way, give the shortcut a name, for example `Procedures`, and press Enter.
+2. Click the **★** in the orange bar. A small window proposes a name (`Procedures`), lists the clicks it noted (remove one with its × if it is not part of the way), Enter pins.
 3. From now on: click **Procedures** in the orange bar, or press **Alt 1**, or Ctrl K, `proc`, Enter. The extension clicks the same steps for you, one after the other, and tells you when it is there.
+
+Right-click a shortcut in the bar to rename, move or remove it. The ≡ at the end of the bar opens the sidebar: recent views, My queries, the whole enos menu.
 
 Rows are recognised by their reference (ML-040014), so counters that change from one day to the next do not break a shortcut. If a step cannot be found (enos changed, or the row is not in the list that day), the replay stops and says which step.
 
@@ -34,6 +36,14 @@ The sidebar lists the whole left menu of enos with its sub-entries, even the one
 ## What it never does
 
 It never clicks Save, Delete or any button for you unless that click is part of a path you pinned yourself; it never fills a form; nothing leaves your browser.
+
+## 0.4
+
+- **Pin from the bar**: the ★ in the orange bar pins the current view in a small window (name proposed, clicks listed, × removes one, Enter pins). No sidebar needed for the everyday flow.
+- **Right-click a shortcut** in the bar to rename, move left or right, or remove it.
+- Shorter proposed names: `Procedure ML-2026-0096`, `Procedures`, `Projects`.
+- A one-time hint after your first navigation: pin the view you use often.
+- The small tab at the bottom left is hidden while the bar shows the shortcuts (Ctrl . still opens the sidebar).
 
 ## 0.3.1
 
