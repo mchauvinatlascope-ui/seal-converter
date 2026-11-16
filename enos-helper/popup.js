@@ -1,6 +1,6 @@
 const KEY = 'enosHelper';
-const DEFAULTS = { on: true, layout: 'drawer', recentMax: 30, palette: true, autoOpen: false, chips: true };
-const BOOLS = ['on', 'autoOpen', 'palette', 'chips'];
+const DEFAULTS = { on: true, layout: 'drawer', recentMax: 30, palette: true, autoOpen: false, chips: true, calm: true, forms: false, resume: true };
+const BOOLS = ['on', 'autoOpen', 'palette', 'chips', 'calm', 'forms', 'resume'];
 document.getElementById('ver').textContent = 'v' + chrome.runtime.getManifest().version;
 
 function paint(opts) {

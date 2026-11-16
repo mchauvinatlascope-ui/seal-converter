@@ -4,7 +4,7 @@ A Chrome extension that gets you where you work in enos in one click: shortcuts 
 
 ## Install (2 minutes)
 
-1. Download `enos-helper-0.2.0.zip` and unzip it.
+1. Download `enos-helper-0.3.0.zip` and unzip it.
 2. Open `chrome://extensions` and switch on **Developer mode** (top right).
 3. Click **Load unpacked** and pick the unzipped `enos-helper` folder.
 4. Open enos and sign in. Your shortcuts appear in the orange bar next to the search box (empty at first: **Pin a view**). **Ctrl .** (⌘ . on a Mac) or the small tab at the bottom left opens the sidebar; **Ctrl K** opens the finder.
@@ -34,6 +34,14 @@ The sidebar lists the whole left menu of enos with its sub-entries, even the one
 ## What it never does
 
 It never clicks Save, Delete or any button for you unless that click is part of a path you pinned yourself; it never fills a form; nothing leaves your browser.
+
+## 0.3
+
+- **Calm lists** (on by default): long titles on one line (hover to unfold), the bin icon set apart and dimmed, the row under the mouse highlighted. Nothing in the data changes.
+- **Records in reading width** (off by default, try it): fields capped at a reading width, empty fields dimmed, file drop zone reduced.
+- **This record**: the entries of the Details panel (Species, Active Animals, Procedures…) as buttons in the sidebar, one click even when the panel is off screen.
+- **My queries**: the Queries entries of every domain gathered in one list.
+- **Back where you were**: on arrival, a small message offers to reopen the last view.
 
 ## 0.2
 

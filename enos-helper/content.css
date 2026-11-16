@@ -112,3 +112,19 @@ html.eh-busy .eh-chip { opacity: .6; pointer-events: none; }
 #eh-side .eh-sub { padding-left: 34px; color: var(--eh-fg2); }
 #eh-side .eh-sub:hover { color: var(--eh-fg); }
 #eh-side .eh-sub .eh-i { color: var(--eh-fg3); }
+
+/* ----- 0.3 : feuille calme pour les listes d enos (html.eh-calm) : titres sur une ligne, poubelle ecartee et attenuee, lignes aerees */
+html.eh-calm #content table td { max-width: 460px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html.eh-calm #content table td:hover { white-space: normal; overflow: visible; }
+html.eh-calm #content table td [class*="fa-trash"], html.eh-calm #content table td .fa-remove, html.eh-calm #content table td .fa-times { margin-left: 16px !important; opacity: .45; transition: opacity .12s; }
+html.eh-calm #content table td [class*="fa-trash"]:hover, html.eh-calm #content table td .fa-remove:hover, html.eh-calm #content table td .fa-times:hover { opacity: 1; }
+html.eh-calm #content table tr:hover td { background: rgba(0, 0, 0, .025); }
+/* ----- fiches en largeur de lecture (html.eh-forms, a essayer) : champs vides attenues, zone de depot reduite */
+html.eh-forms #content .form-control:not(:focus):placeholder-shown { opacity: .55; }
+html.eh-forms #content .form-group, html.eh-forms #content bsi-document .row { max-width: 1100px; }
+html.eh-forms #content [class*="dropzone"], html.eh-forms #content [class*="upload"] { max-height: 64px !important; overflow: hidden; }
+/* ----- entrees du volet Details et requetes */
+.eh-wrap { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 14px 4px; }
+.eh-tag { font: inherit; font-size: 12px; font-weight: 500; color: var(--eh-fg); background: var(--eh-hover); border: 1px solid var(--eh-line); border-radius: 12px; padding: 3px 10px; cursor: pointer; }
+.eh-tag:hover { border-color: var(--eh-accent); color: var(--eh-accent); }
+#eh-toast .eh-tbtn { font: inherit; font-size: 12.5px; font-weight: 600; color: #1b1d21; background: #fff; border: 0; border-radius: 6px; padding: 4px 10px; cursor: pointer; }

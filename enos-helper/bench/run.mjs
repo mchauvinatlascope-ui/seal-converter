@@ -121,8 +121,29 @@ await ctrl('.');
 await page.click('#eh-side .eh-row'); await sleep(12000);
 ok(await page.$eval('#eh-toast', e => !e.hidden && /Could not follow step 3 of 4/.test(e.textContent)), 'missing step reported: ' + await page.$eval('#eh-toast', e => e.textContent));
 
+// 0.3 : feuille calme (titre sur une ligne, poubelle ecartee), entrees Details depuis la barre, My queries, reprise a l arrivee.
+await page.$$eval('#sidebar-menu a', as => as.find(a => a.textContent === 'Management').click()); await sleep(500);
+ok(await page.$eval('html', e => e.classList.contains('eh-calm')), 'calm sheet on by default');
+ok(await page.$eval('td.long', e => getComputedStyle(e).whiteSpace === 'nowrap' && e.getBoundingClientRect().height < 40), 'long title on one line');
+ok(await page.$eval('tr:nth-child(3) i.fa-trash', e => parseFloat(getComputedStyle(e).marginLeft) >= 16 && parseFloat(getComputedStyle(e).opacity) < 0.6), 'bin icon set apart and dimmed');
+await page.click('tr:nth-child(3) i.fa-search'); await sleep(600);
+await ctrl('.');
+const tags = await page.$$eval('#eh-side .eh-tag', els => els.map(e => e.textContent));
+ok(tags.join(',') === 'Species,Active Animals,Billing', 'Details entries listed from the record: ' + tags.join(','));
+const qs = await page.$$eval('#eh-side .eh-row', els => els.filter(e => !e.classList.contains('eh-sub') && e.textContent.endsWith('Queries')).map(e => e.textContent));
+ok(qs.length === 3 && qs[0].startsWith('Locations'), 'My queries gathered from every domain: ' + JSON.stringify(qs));
+await page.$$eval('#eh-side .eh-tag', els => els.find(e => e.textContent === 'Billing').click()); await sleep(500);
+ok((await crumbs()) === 'Projects / Billing', 'Details entry opened from the sidebar');
+await page.reload(); await sleep(800);
+await page.click('#loginForm button'); await sleep(2500);
+ok(await page.$eval('#eh-toast', e => !e.hidden && /Back to «/.test(e.textContent)).catch(() => false), 'resume offered on arrival: ' + await page.$eval('#eh-toast', e => e.textContent).catch(() => '-'));
+await page.click('#eh-toast .eh-tbtn'); await sleep(4000);
+ok(/^Projects/.test(await crumbs()), 'resume replays the last view: ' + await crumbs());
+await setOpts({ on: true, layout: 'drawer', palette: true, autoOpen: false, recentMax: 30, chips: true, calm: false, forms: false, resume: true }); await sleep(300);
+ok(await page.$eval('html', e => !e.classList.contains('eh-calm')), 'calm sheet can be turned off');
+
 // Reglages : puces coupees, mode « push », extinction.
-await setOpts({ on: true, layout: 'drawer', palette: true, autoOpen: false, recentMax: 30, chips: false }); await sleep(300);
+await setOpts({ on: true, layout: 'drawer', palette: true, autoOpen: false, recentMax: 30, chips: false, calm: true, resume: true }); await sleep(300);
 ok(!(await page.$('#eh-chips')), 'chips can be turned off');
 await setOpts({ on: true, layout: 'push', palette: true, autoOpen: false, recentMax: 30, chips: true }); await sleep(300);
 ok(await page.$eval('body', e => getComputedStyle(e).marginLeft === '248px'), 'push layout pushes the page');

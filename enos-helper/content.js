@@ -1,4 +1,4 @@
-// enos Helper 0.2
+// enos Helper 0.3
 // Ne fait que changer l affichage dans ce navigateur : n ecrit jamais dans enos,
 // n envoie rien, ne touche a aucun formulaire.
 // Dans enos l adresse ne change pas quand on ouvre un projet, une procedure ou une fiche :
@@ -11,9 +11,9 @@
 // section#content, aside#sidebar_right (Details, 350 px), icones fa-* / bsi-* / glyphicon-*.
 (() => {
   if (window.top !== window) return; // jamais dans un cadre interne
-  const VERSION = '0.2.0';
+  const VERSION = '0.3.0';
   const KEY = 'enosHelper';
-  const DEFAULTS = { on: true, layout: 'drawer', recentMax: 30, palette: true, autoOpen: false, chips: true };
+  const DEFAULTS = { on: true, layout: 'drawer', recentMax: 30, palette: true, autoOpen: false, chips: true, calm: true, forms: false, resume: true };
   const root = document.documentElement;
   const isMac = /Mac/.test(navigator.platform);
   const SITE = 'eh:' + location.origin;
@@ -348,6 +348,21 @@
     if (!m) return [];
     return scanActions().filter(a => a.menu).map(a => ({ ...a, full: a.path.concat(a.label).join(' › '), top: a.path[0] || a.label }));
   }
+  // Le volet Details de la fiche ouverte (aside#sidebar_right) : ses entrees, meme quand le volet est hors ecran.
+  function detailEntries() {
+    const right = $('#sidebar_right, aside.sidebar-right');
+    if (!right) return [];
+    const out = [];
+    const seen = new Set();
+    for (const el of $$('li, a, [ng-click], [data-ng-click]', right)) {
+      if (el.querySelector('li, a, [ng-click]')) continue;
+      const label = txt(el);
+      if (!label || label.length > 40 || seen.has(label)) continue;
+      seen.add(label);
+      out.push({ el, label });
+    }
+    return out;
+  }
   function matches(q, a) {
     const hay = (a.label + ' ' + (a.path || []).join(' ')).toLowerCase();
     const words = q.toLowerCase().split(/\s+/).filter(Boolean);
@@ -414,6 +429,8 @@
     const acts = scanActions();
     const found = q ? acts.map(a => [matches(q, a), a]).filter(x => x[0]).sort((a, b) => b[0] - a[0]).slice(0, 14).map(x => x[1]) : [];
     const tree = !q ? acts.filter(a => a.menu).map(a => ({ ...a, top: a.path[0] || a.label })) : [];
+    const details = !q ? detailEntries() : [];
+    const queries = !q ? acts.filter(a => a.menu && /^quer/i.test(a.label)).map(a => ({ ...a, domain: a.path[0] || '' })) : [];
     const tops = [...new Set(tree.map(a => a.top))];
     const tools = (i, arr, p) => h('span', { class: 'eh-mv' },
       h('button', { type: 'button', title: 'Rename', onclick: e => { e.stopPropagation(); const r = e.target.closest('.eh-row'); r.replaceChildren(rename(p)); r.querySelector('input').focus(); } }, icon('pen')),
@@ -443,6 +460,10 @@
       !q && recent.length ? h('h2', {}, 'Recent views') : null,
       !q && recent.length ? recent.map(r => row(r, 'recent', h('span', { class: 'eh-mv' }, h('button', { type: 'button', title: 'Pin as a shortcut', onclick: e => { e.stopPropagation(); pinFromRecent(r); } }, icon('star'))), h('small', {}, when(r.at)))) : null,
       q && recent.length ? [h('h2', {}, 'Recent views'), recent.map(r => row(r, 'recent', h('small', {}, when(r.at))))] : null,
+      details.length ? h('h2', {}, 'This record') : null,
+      details.length ? h('div', { class: 'eh-wrap' }, details.map(d => h('button', { type: 'button', class: 'eh-tag', title: 'Open ' + d.label + ' in the Details panel', onclick: () => { closeAll(); press(d.el); const s = sig(d.el); if (s) { trail.push(s); scheduleVisit(); } } }, d.label))) : null,
+      queries.length ? h('h2', {}, 'My queries') : null,
+      queries.length ? queries.map(a => h('button', { type: 'button', class: 'eh-row', title: a.path.concat(a.label).join(' › '), onclick: () => { closeAll(); openMenuEntry(a); } }, icon('filter'), h('span', { class: 'eh-t' }, a.domain || a.label), h('small', {}, 'Queries'))) : null,
       !q && tops.length ? h('h2', {}, 'enos menu') : null,
       !q && tops.map(t => {
         const kids = tree.filter(a => a.top === t && a.path.length);
@@ -519,12 +540,28 @@
     root.classList.toggle('eh-on', !!opts.on);
     root.classList.toggle('eh-push', opts.on && opts.layout === 'push');
     root.classList.toggle('eh-drawer', opts.on && opts.layout === 'drawer');
-    if (!opts.on) { sideOpen = false; root.classList.remove('eh-open'); palEl.hidden = true; chipsEl.remove(); return; }
+    root.classList.toggle('eh-calm', opts.on && !!opts.calm);
+    root.classList.toggle('eh-forms', opts.on && !!opts.forms);
+    if (!opts.on) { sideOpen = false; root.classList.remove('eh-open', 'eh-calm', 'eh-forms'); palEl.hidden = true; chipsEl.remove(); return; }
     mount();
     if (opts.layout === 'push') toggleSide(true);
     else if (opts.layout === 'none') toggleSide(false);
     else if (opts.autoOpen && !sideOpen) toggleSide(true);
     render();
+  }
+  // A l arrivee sur l accueil (apres connexion ou rechargement) : proposer de rouvrir la derniere vue.
+  let resumed = false;
+  function offerResume() {
+    if (resumed || !opts.on || !opts.resume || loggedOut() || replaying) return;
+    if (!/^#\/?$/.test(location.hash) || trail.length) return;
+    const last = store.recent[0];
+    if (!last || !last.trail || !last.trail.length) { resumed = true; return; }
+    resumed = true;
+    if (!toastEl.isConnected) document.body.append(toastEl);
+    toastEl.replaceChildren(h('span', {}, 'Back to « ' + last.name + ' »?'), h('button', { type: 'button', class: 'eh-tbtn', onclick: () => { toastEl.hidden = true; replay(last); } }, 'Open'), h('button', { type: 'button', title: 'Close', onclick: () => { toastEl.hidden = true; } }, icon('x')));
+    toastEl.hidden = false;
+    clearTimeout(toastT);
+    toastT = setTimeout(() => { toastEl.hidden = true; }, 15000);
   }
   let wasOut = null;
   function tick() {
@@ -533,12 +570,13 @@
     const out = loggedOut();
     if (out !== wasOut) { wasOut = out; if (out) trail = []; renderChips(); }
     else if (!out && opts.chips && !chipsEl.isConnected) renderChips();
+    if (!out && sideMenu()) offerResume();
   }
 
   // Etat de la page pour la fenetre de l extension : structure et libelles de menus, jamais le contenu des tableaux ni tes raccourcis.
   function diagnose() {
     const lines = ['enos Helper ' + VERSION, 'url ' + location.href, 'title ' + (document.title || '').slice(0, 60),
-      'layout ' + opts.layout + ' chips ' + opts.chips + ' open ' + sideOpen + ' pins ' + store.pins.length + ' recent ' + store.recent.length + ' trail ' + trail.length + ' logged out ' + loggedOut() + ' · last error ' + (lastError || 'none'),
+      'layout ' + opts.layout + ' chips ' + opts.chips + ' calm ' + opts.calm + ' forms ' + opts.forms + ' resume ' + opts.resume + ' open ' + sideOpen + ' pins ' + store.pins.length + ' recent ' + store.recent.length + ' trail ' + trail.length + ' logged out ' + loggedOut() + ' · last error ' + (lastError || 'none'),
       'crumb [' + crumb() + '] panel [' + panelTitle() + '] reference found ' + !!reference() + ' navbar ' + !!navbar() + ' side menu ' + !!sideMenu()];
     const attrs = new Map();
     for (const el of $$('*')) for (const a of el.attributes) if (/^(bsi-|data-testid|ng-controller|ui-view|ng-view|ng-app|ng-repeat)/.test(a.name)) attrs.set(a.name, (attrs.get(a.name) || 0) + 1);
@@ -553,6 +591,7 @@
     const content = $('#content, section.content-main');
     if (content) { lines.push('content tree:'); const dump = (el, depth) => { if (!el || depth > 5 || ours(el)) return; lines.push('  '.repeat(depth) + selOf(el) + ' ' + rect(el) + (el.children.length === 0 && txt(el) && txt(el).length < 30 && !el.closest('table') ? ' "' + txt(el) + '"' : '')); for (const c of [...el.children].slice(0, 10)) dump(c, depth + 1); }; dump(content, 0); }
     const right = $('#sidebar_right');
+    if (right) lines.push('details entries ' + detailEntries().map(d => d.label).join(' | '));
     if (right) { lines.push('right panel ' + rect(right) + ' texts ' + $$('*', right).filter(e => e.children.length === 0 && txt(e)).map(e => txt(e).slice(0, 30)).slice(0, 20).join(' | ')); }
     return lines.join('\n');
   }

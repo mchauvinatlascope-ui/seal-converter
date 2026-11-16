@@ -26,6 +26,7 @@
   .panel-heading { margin: 0; padding: 6px 10px; background: #555; color: #fff; font-weight: 400; font-size: 14px; }
   table { border-collapse: collapse; width: 100%; }
   td, th { border-bottom: 1px solid #ddd; padding: 6px 8px; text-align: left; }
+  td.long { width: 180px; }
   .fa { display: inline-block; width: 16px; height: 16px; background: #f26522; cursor: pointer; border-radius: 3px; margin-right: 6px; }
   #sidebar_right { position: fixed; top: 40px; right: -350px; width: 350px; bottom: 0; background: #fff; border-left: 1px solid #ccc; transition: right .1s; }
   #sidebar_right.in { right: 0; }
@@ -74,7 +75,7 @@
         <table>
           <tr><th>Staff</th><th>Title</th><th>Reference</th><th>Assigned</th><th>Actions</th></tr>
           <tr><td>MALAGHAN Workspace</td><td>Breeding: Some Lab</td><td>ML-BRU</td><td id="n1">1088 10.88%</td><td><i class="fa fa-search" ng-click="open('ML-BRU')"></i><i class="fa fa-pencil" ng-click="edit('ML-BRU')"></i></td></tr>
-          <tr><td>MALAGHAN Workspace</td><td>Targeting Follicular Dendritic Cells</td><td>ML-040014</td><td id="n2">672 19.2%</td><td><i class="fa fa-search" ng-click="open('ML-040014')"></i><i class="fa fa-pencil" ng-click="edit('ML-040014')"></i></td></tr>
+          <tr><td>MALAGHAN Workspace</td><td class="long">Targeting Follicular Dendritic Cells to generate longer lasting antibody responses after vaccination and more words to make it wrap</td><td>ML-040014</td><td id="n2">672 19.2%</td><td><i class="fa fa-search" ng-click="open('ML-040014')"></i><i class="fa fa-pencil" ng-click="edit('ML-040014')"></i><i class="fa fa-trash" ng-click="del('ML-040014')"></i></td></tr>
         </table>
       </div>
       <div class="panel hidden" id="project-panel">
