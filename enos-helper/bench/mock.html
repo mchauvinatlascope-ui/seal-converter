@@ -69,6 +69,7 @@
       <div class="panel hidden" id="generic-panel"><h4 class="panel-heading" id="generic-title"></h4></div>
       <div class="panel hidden" id="projects-panel">
         <h4 class="panel-heading">Projects</h4>
+        <div class="filters" bsi-attribute="Reference"><label for="f-ref">Reference</label> <input id="f-ref" type="text" placeholder="Reference"> <button type="button" ng-click="search()"><i class="fa fa-binoculars"></i> Search</button></div>
         <div class="dropdown" id="filters"><a class="dropdown-toggle" ng-click="toggle()">Filter Selection</a>
           <ul class="dropdown-menu" role="menu"><li><a ng-click="filter('mine')">My projects 2026</a></li><li><a ng-click="filter('all')">All</a></li></ul>
         </div>
@@ -127,13 +128,14 @@
       if (fn === 'home') { show(['home-panel'], ''); return; }
       if (fn === 'go') {
         document.querySelectorAll('#sidebar-menu > li').forEach(li => li.classList.toggle('active', li.textContent.includes(arg.split(' ')[0])));
-        if (arg === 'Projects') { location.hash = '#/Project/list/'; show(['projects-panel'], 'Projects'); return; }
+        if (arg === 'Projects') { location.hash = '#/Project/list/'; document.getElementById('f-ref').value = ''; document.querySelectorAll('#projects-panel tr').forEach((tr, i) => { tr.style.display = i <= 1 ? '' : 'none'; }); show(['projects-panel'], 'Projects'); return; }
         if (arg === 'Dashboard') { location.hash = '#/'; show(['home-panel'], ''); return; }
         document.getElementById('generic-title').textContent = arg; show(['generic-panel'], arg); return;
       }
       if (fn === 'open') { document.getElementById('proj-ref').value = arg; show(['project-panel'], 'Projects / Project', true); return; }
       if (fn === 'detail') { show(arg === 'Procedures' ? ['procedures-panel'] : ['project-panel'], 'Projects / ' + arg, arg !== 'Procedures'); return; }
       if (fn === 'proc') { document.getElementById('proc-ref').value = arg; show(['procedure-panel'], 'Projects / Procedures / Procedure'); return; }
+      if (fn === 'search') { const q = document.getElementById('f-ref').value.replace(/\*/g, '').toLowerCase(); document.querySelectorAll('#projects-panel tr').forEach((tr, i) => { if (i === 0) return; const ref = tr.children[2].textContent.toLowerCase(); tr.style.display = (q && ref.includes(q)) || (!q && i === 1) ? '' : 'none'; }); return; }
       if (fn === 'filter') { document.getElementById('filters').classList.remove('open'); document.getElementById('crumbtext').textContent = 'Projects · ' + arg; return; }
     }));
   </script>

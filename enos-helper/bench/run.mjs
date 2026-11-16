@@ -76,26 +76,29 @@ await page.click('#toggle_sidemenu_l'); await sleep(200);
 await page.$$eval('#sidebar-menu > li', lis => lis.find(l => l.textContent.includes('Projects')).querySelector('a').click()); await sleep(200);
 await page.$$eval('#sidebar-menu a', as => as.find(a => a.textContent === 'Management').click()); await sleep(500);
 ok((await crumbs()) === 'Projects', 'projects list open');
+ok(await page.$eval('tr:nth-child(3)', e => e.style.display === 'none'), 'the wanted row is not listed until a filter is typed and Search pressed');
+await page.type('#f-ref', '*040*'); await page.click('#projects-panel button'); await sleep(300);
 await page.click('tr:nth-child(3) i.fa-search'); await sleep(500);
 await page.$$eval('#sidebar_right li', lis => lis.find(l => l.textContent.includes('Procedures')).click()); await sleep(500);
 await page.click('#procedures-panel tr:nth-child(3) i.fa-search'); await sleep(1800);
 ok((await crumbs()) === 'Projects / Procedures / Procedure', 'mock reached the procedure by hand');
 
 // Epingler depuis la barre : ★, nom court propose, pas listes, un pas retire, Entree.
-ok(await page.$eval('#eh-chips .eh-chip-pin', e => /4 clicks/.test(e.title)), 'star chip counts the clicks: ' + await page.$eval('#eh-chips .eh-chip-pin', e => e.title));
+ok(await page.$eval('#eh-chips .eh-chip-pin', e => /5 clicks/.test(e.title)), 'star chip counts the clicks (Search included): ' + await page.$eval('#eh-chips .eh-chip-pin', e => e.title));
 await page.click('#eh-chips .eh-chip-pin'); await sleep(200);
 ok(await page.$eval('#eh-pop', e => !e.hidden), 'pin window opens under the bar');
 const suggested = await page.$eval('#eh-pop #eh-name', e => e.value);
 ok(suggested === 'Procedure ML-2025-0026', 'short name proposed: ' + suggested);
 let steps = await page.$$eval('#eh-pop .eh-steps li .eh-t', els => els.map(e => e.textContent));
-ok(steps[0] === 'Projects › Management' && /search on ML-040014/.test(steps[1]) && steps[2] === 'Procedures' && /search on ML-2025-0026/.test(steps[3]), 'steps readable: ' + JSON.stringify(steps));
-await page.$$eval('#eh-pop .eh-steps li button', bs => bs[3].click()); await sleep(100);
+ok(steps[0] === 'Projects › Management' && steps[1] === 'Search' && /search on ML-040014/.test(steps[2]) && steps[3] === 'Procedures' && /search on ML-2025-0026/.test(steps[4]), 'steps readable: ' + JSON.stringify(steps));
+ok(await page.evaluate(() => { const b = document.querySelector('#eh-chips .eh-chip-pin'); return /5 clicks/.test(b.title); }), 'the typed filter is not a click');
+await page.$$eval('#eh-pop .eh-steps li button', bs => bs[4].click()); await sleep(100);
 steps = await page.$$eval('#eh-pop .eh-steps li .eh-t', els => els.map(e => e.textContent));
-ok(steps.length === 3 && steps[2] === 'Procedures', 'a step can be removed by hand');
+ok(steps.length === 4 && steps[3] === 'Procedures', 'a step can be removed by hand');
 await page.keyboard.press('Escape'); await sleep(100);
 ok(await page.$eval('#eh-pop', e => e.hidden), 'Escape closes the window');
 await page.click('#eh-chips .eh-chip-pin'); await sleep(200);
-ok((await page.$$eval('#eh-pop .eh-steps li', els => els.length)) === 4, 'reopening starts from the full path');
+ok((await page.$$eval('#eh-pop .eh-steps li', els => els.length)) === 5, 'reopening starts from the full path');
 await page.$eval('#eh-pop #eh-name', e => { e.value = ''; });
 await page.type('#eh-pop #eh-name', 'Procedure two');
 await page.keyboard.press('Enter'); await sleep(200);
@@ -123,14 +126,15 @@ await page.$$eval('#sidebar-menu a', as => as.find(a => a.textContent === 'Dashb
 await page.evaluate(() => { window.pressed = []; });
 await page.keyboard.down('Alt'); await page.keyboard.press('1'); await page.keyboard.up('Alt');
 let opened = false;
-for (let i = 0; i < 30 && !opened; i++) { await sleep(200); opened = await page.$eval('#eh-toast', e => !e.hidden && /Opened Procedure two/.test(e.textContent)).catch(() => false); }
+for (let i = 0; i < 60 && !opened; i++) { await sleep(200); opened = await page.$eval('#eh-toast', e => !e.hidden && /Opened Procedure two/.test(e.textContent)).catch(() => false); }
 await sleep(800);
 ok((await crumbs()) === 'Projects / Procedures / Procedure' && (await page.$eval('#proc-ref', e => e.value)) === 'ML-2025-0026' && (await page.evaluate(() => window.pressed.includes("open('ML-040014')"))), 'Alt 1 replayed to the right procedure: ' + await page.evaluate(() => window.pressed.join(',')));
+ok(await page.evaluate(() => window.pressed.includes('search()')) && (await page.$eval('#f-ref', e => e.value)) === '*040*', 'typed filter put back and Search pressed before the row click');
 ok(opened, 'toast says opened');
 
 // Un clic de puce depuis une autre vue.
 await page.$$eval('#sidebar-menu a', as => as.find(a => a.textContent === 'Settings').click()); await sleep(500);
-await page.click('#eh-chips .eh-chip:not(.eh-chip-pin):not(.eh-chip-more)'); await sleep(4500);
+await page.click('#eh-chips .eh-chip:not(.eh-chip-pin):not(.eh-chip-more)'); await sleep(9000);
 ok((await crumbs()) === 'Projects / Procedures / Procedure', 'chip replays from another view');
 
 // Ctrl K : une entree repliee du menu (Queries de Projects) et un filtre enregistre.
@@ -151,19 +155,20 @@ ok((await crumbs()) === 'Projects · mine', 'saved filter applied from the finde
 // Un pas introuvable : message, pas de boucle.
 await page.evaluate(() => { document.querySelectorAll('#sidebar_right li').forEach(l => { if (l.textContent.includes('Procedures')) l.remove(); }); });
 await ctrl('.');
-await page.click('#eh-side .eh-row'); await sleep(12000);
-ok(await page.$eval('#eh-toast', e => !e.hidden && /Stopped at step 3 of 4/.test(e.textContent)), 'missing step reported: ' + await page.$eval('#eh-toast', e => e.textContent));
+await page.click('#eh-side .eh-row'); await sleep(24000);
+ok(await page.$eval('#eh-toast', e => !e.hidden && /Stopped at step 4 of 5/.test(e.textContent)), 'missing step reported: ' + await page.$eval('#eh-toast', e => e.textContent));
 ok((await crumbs()) === 'Projects / Project', 'the view stays where the replay stopped, no jump home: ' + await crumbs());
 
 // Un libelle qui change (badge ajoute) : le pas est retrouve par son action ng-click.
 await page.evaluate(() => { document.querySelectorAll('#sidebar_right li').forEach(l => { if (l.textContent.includes('Billing')) l.append(' (3)'); }); });
 await page.evaluate(() => { const li = document.createElement('li'); li.setAttribute('ng-click', "detail('Procedures')"); li.textContent = 'Procedures (2)'; li.addEventListener('click', e => { e.preventDefault(); window.pressed.push("detail('Procedures')"); document.querySelectorAll('.panel').forEach(p => p.classList.toggle('hidden', p.id !== 'procedures-panel')); document.getElementById('crumbtext').textContent = 'Projects / Procedures'; }); document.querySelector('#sidebar_right ul').append(li); });
 await ctrl('.');
-await page.click('#eh-side .eh-row'); await sleep(5000);
+await page.click('#eh-side .eh-row'); await sleep(9000);
 ok((await crumbs()) === 'Projects / Procedures / Procedure', 'step found by its action after a label change: ' + await crumbs());
 
 // 0.3 : feuille calme (titre sur une ligne, poubelle ecartee), entrees Details depuis la barre, My queries, reprise a l arrivee.
 await page.$$eval('#sidebar-menu a', as => as.find(a => a.textContent === 'Management').click()); await sleep(500);
+await page.type('#f-ref', '*ml*'); await page.click('#projects-panel button'); await sleep(300);
 ok(await page.$eval('html', e => e.classList.contains('eh-calm')), 'calm sheet on by default');
 ok(await page.$eval('td.long', e => getComputedStyle(e).whiteSpace === 'nowrap' && e.getBoundingClientRect().height < 40), 'long title on one line');
 ok(await page.$eval('tr:nth-child(3) i.fa-trash', e => parseFloat(getComputedStyle(e).marginLeft) >= 16 && parseFloat(getComputedStyle(e).opacity) < 0.6), 'bin icon set apart and dimmed');
@@ -178,7 +183,7 @@ ok((await crumbs()) === 'Projects / Billing', 'Details entry opened from the sid
 await page.reload(); await sleep(800);
 await page.click('#loginForm button'); await sleep(2500);
 ok(await page.$eval('#eh-toast', e => !e.hidden && /Back to «/.test(e.textContent)).catch(() => false), 'resume offered on arrival: ' + await page.$eval('#eh-toast', e => e.textContent).catch(() => '-'));
-await page.click('#eh-toast .eh-tbtn'); await sleep(4000);
+await page.click('#eh-toast .eh-tbtn'); await sleep(9000);
 ok(/^Projects/.test(await crumbs()), 'resume replays the last view: ' + await crumbs());
 await setOpts({ on: true, layout: 'drawer', palette: true, autoOpen: false, recentMax: 30, chips: true, calm: false, forms: false, resume: true }); await sleep(300);
 ok(await page.$eval('html', e => !e.classList.contains('eh-calm')), 'calm sheet can be turned off');

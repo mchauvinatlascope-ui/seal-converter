@@ -4,7 +4,7 @@ A Chrome extension that gets you where you work in enos in one click: shortcuts 
 
 ## Install (2 minutes)
 
-1. Download `enos-helper-0.4.0.zip` and unzip it.
+1. Download `enos-helper-0.4.1.zip` and unzip it.
 2. Open `chrome://extensions` and switch on **Developer mode** (top right).
 3. Click **Load unpacked** and pick the unzipped `enos-helper` folder.
 4. Open enos and sign in. Your shortcuts appear in the orange bar next to the search box (empty at first: **Pin a view**). **Ctrl .** (⌘ . on a Mac) or the small tab at the bottom left opens the sidebar; **Ctrl K** opens the finder.
@@ -35,7 +35,12 @@ The sidebar lists the whole left menu of enos with its sub-entries, even the one
 
 ## What it never does
 
-It never clicks Save, Delete or any button for you unless that click is part of a path you pinned yourself; it never fills a form; nothing leaves your browser.
+It never clicks Save, Delete or any button for you unless that click is part of a path you pinned yourself; it never fills a record. The one thing it types is the list filters you had typed yourself when you pinned a shortcut through a list row (then presses Search). Nothing leaves your browser.
+
+## 0.4.1
+
+- A shortcut through a list row (your project in Projects) stopped when the list did not show that row any more: enos lists depend on the filters typed above them (Reference `*ml*`, a status) and on the Search button, and typing is not a click. The filters filled in when you pin are now noted with the shortcut; at replay, if the row is not there, they are put back, Search is pressed, and the list gets up to 15 seconds to load. This is the only case where the extension types into enos: list filters, with the values you had typed yourself.
+- A row is also recognised by any cell that carries its reference.
 
 ## 0.4
 

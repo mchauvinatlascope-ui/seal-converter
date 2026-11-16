@@ -1,4 +1,4 @@
-// enos Helper 0.4
+// enos Helper 0.4.1
 // Ne fait que changer l affichage dans ce navigateur : n ecrit jamais dans enos,
 // n envoie rien, ne touche a aucun formulaire.
 // Dans enos l adresse ne change pas quand on ouvre un projet, une procedure ou une fiche :
@@ -11,7 +11,7 @@
 // section#content, aside#sidebar_right (Details, 350 px), icones fa-* / bsi-* / glyphicon-*.
 (() => {
   if (window.top !== window) return; // jamais dans un cadre interne
-  const VERSION = '0.4.0';
+  const VERSION = '0.4.1';
   const KEY = 'enosHelper';
   const DEFAULTS = { on: true, layout: 'drawer', recentMax: 30, palette: true, autoOpen: false, chips: true, calm: true, forms: false, resume: true };
   const root = document.documentElement;
@@ -169,6 +169,7 @@
     if (row && !/^(th|tr)$/.test(s.tag)) {
       s.row = rowKey(row);
       s.rowLabel = rowLabel(row);
+      s.filters = listFilters(row.closest('table, [role="grid"]'));
       const inRow = $$(ACTIONABLE, row).filter(e => same(sigOf(e), s, true));
       s.n = Math.max(0, inRow.indexOf(el));
     } else {
@@ -180,6 +181,54 @@
     s.menu = el.closest('#sidebar-menu, .sidebar-menu') ? menuPath(el).concat(s.text || s.title).filter(Boolean).join(' › ') : '';
     s.label = (s.menu || s.text || s.title || (s.icon ? s.icon.replace(/^(fa|fas|far|glyphicon|icon|bsi)-/, '') : s.tag)) + (s.row ? ' on ' + (s.rowLabel || s.row) : '');
     return s;
+  }
+  // Les filtres remplis au-dessus d une liste (Reference « *ml* », Status...) : leur libelle et leur valeur, pour les remettre au rejeu.
+  function filterLabel(inp) {
+    const id = inp.id;
+    const lab = (id && $('label[for="' + CSS.escape(id) + '"]')) || null;
+    const holder = inp.closest('[bsi-attribute], [bsi-label], .form-group, .col-sm-1, .col-sm-2, .col-sm-3, .col-sm-4, .col-md-3, .col-md-4, div');
+    const near = lab || (holder && $$('label, span, b, div', holder).find(e => e !== inp && e.children.length === 0 && txt(e) && txt(e).length < 40 && e.compareDocumentPosition(inp) & Node.DOCUMENT_POSITION_FOLLOWING));
+    const attr = inp.closest('[bsi-attribute]');
+    return { label: txt(near) || inp.getAttribute('placeholder') || inp.getAttribute('aria-label') || inp.name || '', attr: attr ? attr.getAttribute('bsi-attribute') : '', name: inp.name || inp.id || '' };
+  }
+  function listFilters(table) {
+    const content = $('#content, section.content-main') || document.body;
+    const out = [];
+    for (const inp of $$('input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="button"]):not([type="submit"]), select', content)) {
+      if (ours(inp) || (table && table.contains(inp)) || inp.closest('table, [role="grid"], #eh-chips') || !visible(inp)) continue;
+      const v = inp.tagName === 'SELECT' ? (inp.selectedIndex > 0 ? inp.options[inp.selectedIndex].text : '') : (inp.value || '').trim();
+      if (!v || inp.closest('.navbar, header, #sidebar_left, #sidebar_right')) continue;
+      if (inp.closest('form') && inp.closest('form').querySelector('[type="password"]')) continue;
+      out.push({ ...filterLabel(inp), value: v.slice(0, 80), select: inp.tagName === 'SELECT' });
+    }
+    return out.slice(0, 8);
+  }
+  function findFilterInput(f) {
+    const content = $('#content, section.content-main') || document.body;
+    const all = $$('input, select', content).filter(inp => !ours(inp) && visible(inp) && !inp.closest('table, [role="grid"]'));
+    if (f.attr) { const a = all.find(inp => inp.closest('[bsi-attribute="' + f.attr.replace(/"/g, '') + '"]')); if (a) return a; }
+    if (f.name) { const n = all.find(inp => (inp.name || inp.id) === f.name); if (n) return n; }
+    return all.find(inp => filterLabel(inp).label === f.label) || null;
+  }
+  // Remettre une valeur dans un champ d enos comme si elle etait tapee (AngularJS ecoute input/change).
+  function setField(inp, f) {
+    if (inp.tagName === 'SELECT') {
+      const o = [...inp.options].find(o => o.text.trim() === f.value);
+      if (!o) return false;
+      inp.value = o.value;
+    } else {
+      const proto = Object.getPrototypeOf(inp);
+      const d = Object.getOwnPropertyDescriptor(proto, 'value') || Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+      if (d && d.set) d.set.call(inp, f.value); else inp.value = f.value;
+    }
+    inp.dispatchEvent(new Event('input', { bubbles: true }));
+    inp.dispatchEvent(new Event('change', { bubbles: true }));
+    inp.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'Enter' }));
+    return true;
+  }
+  function searchButton() {
+    const content = $('#content, section.content-main') || document.body;
+    return $$('button, a, [ng-click], [data-ng-click], i', content).filter(e => !ours(e) && visible(e) && !e.closest('table')).find(e => /^search$/i.test(txt(e) || e.getAttribute('title') || '') || /binocular|fa-search/.test(iconOf(e)) && !e.closest('tr'));
   }
   // Une ligne de tableau : la cellule qui ressemble a une reference (ML-040014), sinon les deux premieres cellules de texte
   // sans chiffres (les compteurs changent d un jour a l autre).
@@ -202,7 +251,8 @@
   function find(s) {
     let scope = [document];
     if (s.row) {
-      const rows = $$('tr, [role="row"]').filter(r => !ours(r) && visible(r) && rowKey(r) === s.row);
+      let rows = $$('tr, [role="row"]').filter(r => !ours(r) && visible(r) && rowKey(r) === s.row);
+      if (!rows.length && refLike(s.row)) rows = $$('td, [role="cell"], [role="gridcell"]').filter(c => !ours(c) && txt(c) === s.row).map(c => c.closest('tr, [role="row"]')).filter(r => r && visible(r));
       if (!rows.length) return null;
       scope = rows;
     }
@@ -283,8 +333,15 @@
       for (let i = 0; i < steps.length; i++) {
         const s = steps[i];
         toast('Opening ' + item.name + ' · step ' + (i + 1) + ' of ' + steps.length + ' (' + s.label + ')', true);
-        let el = findMenuStep(s) || await waitFor(s, i === 0 ? 2500 : 8000);
-        if (!el) { toast('Stopped at step ' + (i + 1) + ' of ' + steps.length + ' (' + s.label + '): not found on this page. The view stays as it is. Open the view by hand once, then pin it again (drop the steps that are not part of the way).', false, 14000); return; }
+        let el = findMenuStep(s) || await waitFor(s, i === 0 ? 2500 : (s.row ? 6000 : 8000));
+        if (!el && s.row) {
+          // La liste n a pas la ligne : les filtres tapes a l epingle sont remis, Search relance, puis on attend la liste.
+          let changed = 0;
+          for (const f of s.filters || []) { const inp = findFilterInput(f); if (inp && setField(inp, f)) changed++; }
+          const btn = searchButton();
+          if (changed || btn) { toast('Opening ' + item.name + ' · step ' + (i + 1) + ' of ' + steps.length + ' (searching the list for ' + (s.rowLabel || s.row) + ')', true); if (btn) press(btn.closest('button, a, [ng-click], [data-ng-click]') || btn); await settle(6000); el = await waitFor(s, 15000); }
+        }
+        if (!el) { toast('Stopped at step ' + (i + 1) + ' of ' + steps.length + ' (' + s.label + '): not found on this page. The view stays as it is.' + (s.row ? ' The row « ' + (s.rowLabel || s.row) + ' » is not in the list: check the list filters, open it by hand once, then pin it again.' : ' Open the view by hand once, then pin it again (drop the steps that are not part of the way).'), false, 14000); return; }
         press(el);
         await settle();
       }
@@ -643,6 +700,7 @@
     for (const el of $$('*')) for (const a of el.attributes) if (/^(bsi-|data-testid|ng-controller|ui-view|ng-view|ng-app|ng-repeat)/.test(a.name)) attrs.set(a.name, (attrs.get(a.name) || 0) + 1);
     lines.push('markers ' + [...attrs.entries()].sort((a, b) => b[1] - a[1]).slice(0, 40).map(([k, v]) => k + '×' + v).join(' '));
     lines.push('frames ' + $$('iframe').length + ' · links ' + $$('a[href]').length + ' · ng-click ' + $$('[ng-click], [data-ng-click]').length + ' · tables ' + $$('table').length + ' · rows ' + $$('tr').length);
+    lines.push('filters ' + listFilters(null).map(f => (f.attr || f.label || f.name) + '=' + f.value.length + ' chars').join(' | '));
     const acts = scanActions();
     lines.push('menu entries ' + acts.length + ' (hidden ' + acts.filter(a => a.hidden).length + '): ' + acts.slice(0, 90).map(a => (a.path.length ? a.path.join('›') + '›' : '') + a.label.slice(0, 30) + (a.hidden ? '*' : '') + ((a.el.getAttribute('href') || '').replace(/[0-9a-f-]{20,}/g, 'ID') ? '=' + (a.el.getAttribute('href') || '').slice(0, 40) : '')).join(' | '));
     const top = navbar();
