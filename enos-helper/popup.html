@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>enos Helper</title>
+<style>
+  :root { --bg:#fff; --fg:#1b1d21; --fg2:#5d626b; --fg3:#8f959f; --line:#e4e4e0; --on:#1b1d21; color-scheme: light; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#1c1e22; --fg:#eceef1; --fg2:#a9afb9; --fg3:#7d8592; --line:#30333a; --on:#eceef1; color-scheme: dark; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; width: 320px; background: var(--bg); color: var(--fg); font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
+  header { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  header b { font-size: 14px; flex: 1; }
+  header span { color: var(--fg2); font-size: 11.5px; }
+  h2 { margin: 0; padding: 12px 14px 2px; font-size: 10.5px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--fg3); }
+  .row { display: flex; align-items: flex-start; gap: 12px; padding: 8px 14px; cursor: pointer; }
+  .row div { flex: 1; }
+  .row small { display: block; color: var(--fg2); font-size: 12px; }
+  .off .row { opacity: .45; pointer-events: none; }
+  input[type="checkbox"] { appearance: none; flex: none; width: 30px; height: 18px; margin: 1px 0 0; border-radius: 9px; background: var(--line); position: relative; cursor: pointer; transition: background .12s; }
+  input[type="checkbox"]::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--bg); transition: transform .12s; }
+  input[type="checkbox"]:checked { background: var(--on); }
+  input[type="checkbox"]:checked::after { transform: translateX(12px); }
+  input[type="checkbox"]:focus-visible { outline: 2px solid #1f6f78; outline-offset: 2px; }
+  select { font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; margin-top: 4px; }
+  footer { margin-top: 6px; padding: 10px 14px 12px; color: var(--fg2); font-size: 11.5px; border-top: 1px solid var(--line); }
+  #state { display: flex; align-items: flex-start; gap: 10px; margin: 10px 14px 0; padding: 9px 11px; border-radius: 8px; background: #f3f3f0; font-size: 12.5px; line-height: 1.4; }
+  @media (prefers-color-scheme: dark) { #state { background: #25282e; } }
+  #state i { flex: none; width: 9px; height: 9px; margin-top: 5px; border-radius: 50%; background: #9aa0a8; }
+  #state.ok i { background: #1f9d5a; } #state.warn i { background: #e0a21b; } #state.off i { background: #c4c7cc; }
+  #state div { flex: 1; } #state b { display: block; font-weight: 600; } #state span { color: var(--fg2); font-size: 12px; }
+  #state button { margin: 6px 6px 0 0; font: inherit; font-size: 12px; font-weight: 600; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 3px 9px; cursor: pointer; }
+  #state button:hover { border-color: #b9bcc1; }
+  #state[hidden] { display: none; }
+  #diag { display: none; margin: 8px 14px 0; width: calc(100% - 28px); height: 150px; font: 10.5px ui-monospace, Menlo, Consolas, monospace; border: 1px solid var(--line); border-radius: 6px; padding: 6px; color: var(--fg); background: var(--bg); resize: vertical; }
+  #diag.show { display: block; }
+  #tools { display: flex; align-items: center; gap: 10px; margin: 4px 14px 0; font-size: 11.5px; color: var(--fg2); }
+  #tools button { flex: none; font: inherit; font-size: 12px; font-weight: 600; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 3px 9px; cursor: pointer; }
+</style>
+</head>
+<body>
+  <header><b>enos Helper</b><span id="ver"></span><input type="checkbox" id="on" aria-label="enos Helper on"></header>
+  <div id="state" hidden><i></i><div><b></b><span></span></div></div>
+  <textarea id="diag" readonly aria-label="Diagnostic"></textarea>
+  <div id="all">
+    <h2>Layout</h2>
+    <label class="row" for="layout"><div>Sidebar<small>Shortcuts, finder and recent pages.</small>
+      <select id="layout">
+        <option value="drawer">Drawer: a small tab at the bottom left, Ctrl . opens it</option>
+        <option value="push">Always open (pushes enos to the right; may not fit)</option>
+        <option value="none">Hidden: only the Ctrl K finder</option>
+      </select></div></label>
+    <label class="row" for="autoOpen"><div>Open the drawer on arrival<small>The drawer shows when a page loads; close it with its × or Ctrl .</small></div><input type="checkbox" id="autoOpen"></label>
+    <label class="row" for="palette"><div>Ctrl K finder<small>Finds your shortcuts, recent views and entries of the enos menus. Enter opens.</small></div><input type="checkbox" id="palette"></label>
+    <h2>Your lists</h2>
+    <div id="tools"><button type="button" id="forget">Forget all shortcuts and recent views</button><span>Kept in this browser only.</span></div>
+  </div>
+  <footer>Shortcuts replay your own clicks in enos. Nothing is written to enos or sent anywhere.</footer>
+  <script src="popup.js"></script>
+</body>
+</html>

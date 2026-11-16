@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en" ng-app="enos">
+<head>
+<meta charset="utf-8">
+<title>enos</title>
+<style>
+  body { margin: 0; font: 14px "Open Sans", system-ui; background: #e9e9e9; }
+  .topbar { position: fixed; top: 0; left: 0; right: 0; height: 40px; background: #f26522; color: #fff; display: flex; align-items: center; gap: 14px; padding: 0 16px; }
+  .topbar .brand { font-weight: 700; font-size: 22px; }
+  .topbar a { color: inherit; cursor: pointer; }
+  .crumbs { font-weight: 600; }
+  .rail { position: fixed; top: 40px; left: 0; bottom: 0; width: 58px; background: #3a3a3a; display: flex; flex-direction: column; align-items: center; padding-top: 10px; gap: 20px; }
+  .rail i { display: block; width: 22px; height: 22px; background: #bbb; border-radius: 4px; cursor: pointer; }
+  .rail i.active { background: #f26522; }
+  .work { position: absolute; top: 40px; left: 58px; right: 0; bottom: 0; display: flex; }
+  .panel { background: #fff; margin: 8px; flex: 1; }
+  .panel h4 { margin: 0; padding: 6px 10px; background: #555; color: #fff; font-weight: 400; font-size: 14px; }
+  table { border-collapse: collapse; width: 100%; }
+  td, th { border-bottom: 1px solid #ddd; padding: 6px 8px; text-align: left; }
+  .fa { display: inline-block; width: 16px; height: 16px; background: #f26522; cursor: pointer; border-radius: 3px; margin-right: 6px; }
+  .details { width: 260px; flex: none; }
+  .details li { list-style: none; padding: 10px; border-bottom: 1px solid #ddd; cursor: pointer; }
+  .details ul { margin: 0; padding: 0; }
+  .hidden { display: none; }
+  .form label { display: block; font-weight: 600; margin: 10px 10px 2px; }
+  .form input { margin: 0 10px; width: 300px; }
+  .grid-stack { padding: 12px; }
+  .widget { background: #fff; padding: 10px; margin: 8px; }
+  .dropdown-menu { display: none; position: absolute; background: #fff; color: #222; border: 1px solid #ccc; padding: 6px 0; list-style: none; margin: 0; }
+  .dropdown.open .dropdown-menu { display: block; }
+  .dropdown-menu li a { display: block; padding: 4px 14px; color: #222; }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <span class="brand">enos</span>
+    <a ng-click="menu()"><i class="fa fa-bars"></i> ≡</a>
+    <a ng-click="home()" title="Home"><i class="fa fa-home"></i></a>
+    <span class="crumbs" id="crumbs">Home</span>
+    <div class="dropdown" id="dd"><a class="dropdown-toggle" ng-click="toggle()">Reports</a>
+      <ul class="dropdown-menu" role="menu"><li><a ng-click="go('reports.export')">Export</a></li></ul>
+    </div>
+  </div>
+  <div class="rail">
+    <i class="fa fa-home" title="Home" ng-click="home()"></i>
+    <i class="fa fa-building" title="Locations" ng-click="rail('Locations')"></i>
+    <i class="fa fa-paw" title="Animals" ng-click="rail('Animals')"></i>
+    <i class="fa fa-flask" title="Projects" ng-click="rail('Projects')"></i>
+    <i class="fa fa-cogs" title="Settings" ng-click="rail('Settings')"></i>
+  </div>
+  <div class="work" id="work">
+    <div class="panel" id="home-panel">
+      <h4>Home</h4>
+      <div class="grid-stack"><div class="widget" bsi-widget bsi-entity="Activity">To do list</div><div class="widget" bsi-widget>My query</div></div>
+    </div>
+    <div class="panel hidden" id="projects-panel">
+      <h4>Projects</h4>
+      <div class="dropdown" id="filters"><a class="dropdown-toggle" ng-click="toggle()">Filter Selection</a>
+        <ul class="dropdown-menu" role="menu"><li><a ng-click="filter('mine')">My projects 2026</a></li><li><a ng-click="filter('all')">All</a></li></ul>
+      </div>
+      <table>
+        <tr><th>Staff</th><th>Title</th><th>Reference</th><th>Actions</th></tr>
+        <tr><td>MALAGHAN Workspace</td><td>Breeding: Some Lab</td><td>ML-BRU</td><td><i class="fa fa-search" ng-click="open('ML-BRU')"></i><i class="fa fa-pencil" ng-click="edit('ML-BRU')"></i></td></tr>
+        <tr><td>MALAGHAN Workspace</td><td>Targeting Follicular Dendritic Cells</td><td>ML-040014</td><td><i class="fa fa-search" ng-click="open('ML-040014')"></i><i class="fa fa-pencil" ng-click="edit('ML-040014')"></i></td></tr>
+      </table>
+    </div>
+    <div class="panel hidden" id="project-panel">
+      <h4>Project</h4>
+      <div class="form"><label>Title</label><input readonly value="Targeting Follicular Dendritic Cells"><label>Reference</label><input readonly id="proj-ref" value=""></div>
+    </div>
+    <div class="panel details hidden" id="details-panel">
+      <h4>Details</h4>
+      <ul>
+        <li ng-click="detail('Species')"><i class="fa fa-paw"></i>Species</li>
+        <li ng-click="detail('Active Animals')"><i class="fa fa-paw"></i>Active Animals</li>
+        <li ng-click="detail('Procedures')"><i class="fa fa-file"></i>Procedures</li>
+        <li ng-click="detail('Billing')"><i class="fa fa-money"></i>Billing</li>
+      </ul>
+    </div>
+    <div class="panel hidden" id="procedures-panel">
+      <h4>Procedures</h4>
+      <table>
+        <tr><th>Reference</th><th>Title</th><th>Actions</th></tr>
+        <tr><td>ML-2025-0025</td><td>Procedure one</td><td><i class="fa fa-search" ng-click="proc('ML-2025-0025')"></i></td></tr>
+        <tr><td>ML-2025-0026</td><td>Procedure two</td><td><i class="fa fa-search" ng-click="proc('ML-2025-0026')"></i></td></tr>
+      </table>
+    </div>
+    <div class="panel hidden" id="procedure-panel">
+      <h4>Procedure</h4>
+      <div class="form"><label>Title</label><input readonly value="SECRET procedure title"><label>Reference</label><input readonly id="proc-ref" value=""></div>
+    </div>
+  </div>
+  <script>
+    // Simule enos : l adresse ne change jamais ; les volets s affichent selon les clics ; un delai imite le serveur.
+    window.pressed = [];
+    const show = (ids, crumb) => setTimeout(() => {
+      document.querySelectorAll('.panel').forEach(p => p.classList.toggle('hidden', !ids.includes(p.id)));
+      document.getElementById('crumbs').textContent = crumb;
+    }, 250);
+    document.querySelectorAll('[ng-click]').forEach(el => el.addEventListener('click', e => {
+      e.preventDefault();
+      const act = el.getAttribute('ng-click');
+      window.pressed.push(act);
+      const m = act.match(/^(\w+)\((?:'(.*)')?\)$/);
+      const [fn, arg] = [m[1], m[2]];
+      if (fn === 'toggle') { el.parentElement.classList.toggle('open'); return; }
+      if (fn === 'home') { show(['home-panel'], 'Home'); return; }
+      if (fn === 'rail') { document.querySelectorAll('.rail i').forEach(i => i.classList.toggle('active', i.title === arg)); show(arg === 'Projects' ? ['projects-panel'] : ['home-panel'], arg); return; }
+      if (fn === 'open') { document.getElementById('proj-ref').value = arg; show(['project-panel', 'details-panel'], 'Projects / Project'); return; }
+      if (fn === 'detail') { show(arg === 'Procedures' ? ['procedures-panel'] : ['project-panel', 'details-panel'], 'Projects / ' + arg); return; }
+      if (fn === 'proc') { document.getElementById('proc-ref').value = arg; show(['procedure-panel'], 'Projects / Procedures / Procedure'); return; }
+      if (fn === 'filter') { document.getElementById('filters').classList.remove('open'); document.getElementById('crumbs').textContent = 'Projects · ' + arg; return; }
+    }));
+  </script>
+</body>
+</html>

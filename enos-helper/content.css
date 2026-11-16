@@ -1,0 +1,93 @@
+/* enos Helper 0.1 : la barre, l onglet et le chercheur. Rien d enos n est restyle. */
+#eh-side, #eh-tab, #eh-pal {
+  --eh-bg: #ffffff; --eh-fg: #1b1d21; --eh-fg2: #5d626b; --eh-fg3: #8f959f; --eh-line: #e4e4e0; --eh-hover: #f3f3f0; --eh-accent: #1f6f78; --eh-shadow: 0 8px 30px rgba(20, 22, 26, .18);
+  font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; color: var(--eh-fg); box-sizing: border-box; text-align: left; letter-spacing: 0;
+}
+@media (prefers-color-scheme: dark) {
+  #eh-side, #eh-tab, #eh-pal { --eh-bg: #1c1e22; --eh-fg: #eceef1; --eh-fg2: #a9afb9; --eh-fg3: #7d8592; --eh-line: #30333a; --eh-hover: #25282e; --eh-accent: #6fc3cc; --eh-shadow: 0 8px 30px rgba(0, 0, 0, .5); }
+}
+#eh-side *, #eh-pal * { box-sizing: border-box; }
+.eh-i { display: inline-flex; flex: none; width: 16px; height: 16px; }
+.eh-i svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ----- la barre */
+#eh-side {
+  position: fixed; top: 0; left: 0; bottom: 0; z-index: 2147483000; width: 248px; display: flex; flex-direction: column;
+  background: var(--eh-bg); border-right: 1px solid var(--eh-line); overflow: auto; overscroll-behavior: contain;
+  transform: translateX(-100%); transition: transform .16s ease; visibility: hidden;
+}
+html.eh-open #eh-side { transform: none; visibility: visible; }
+html.eh-drawer.eh-open #eh-side { box-shadow: var(--eh-shadow); }
+html.eh-push body { margin-left: 248px !important; }
+#eh-side header { display: flex; align-items: center; gap: 8px; padding: 12px 12px 8px 14px; }
+#eh-side header b { flex: 1; font-size: 14px; }
+#eh-side .eh-x { border: 0; background: none; color: var(--eh-fg3); padding: 4px; border-radius: 6px; cursor: pointer; display: inline-flex; }
+#eh-side .eh-x:hover { background: var(--eh-hover); color: var(--eh-fg); }
+#eh-side h2 { margin: 12px 14px 2px; font-size: 10.5px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--eh-fg3); }
+.eh-search { display: flex; align-items: center; gap: 8px; margin: 0 12px; padding: 6px 9px; border: 1px solid var(--eh-line); border-radius: 7px; background: var(--eh-bg); color: var(--eh-fg3); }
+.eh-search:focus-within { border-color: var(--eh-accent); }
+.eh-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; color: var(--eh-fg); font: inherit; padding: 0; margin: 0; -webkit-appearance: none; appearance: none; }
+.eh-search input::placeholder { color: var(--eh-fg3); }
+#eh-side .eh-pin { display: flex; align-items: center; gap: 8px; margin: 10px 12px 0; padding: 6px 9px; border: 1px solid var(--eh-line); border-radius: 7px; background: var(--eh-bg); color: var(--eh-fg); font: inherit; font-weight: 600; cursor: pointer; text-align: left; }
+#eh-side .eh-pin:hover { background: var(--eh-hover); }
+#eh-side .eh-pin.eh-on { color: var(--eh-accent); border-color: transparent; background: var(--eh-hover); }
+#eh-side .eh-pin .eh-i { color: inherit; }
+#eh-side .eh-row, #eh-pal .eh-it { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 14px; border: 0; background: none; color: var(--eh-fg); font: inherit; text-decoration: none; cursor: pointer; text-align: left; }
+#eh-side .eh-row:hover, #eh-side .eh-row:focus-visible { background: var(--eh-hover); outline: none; }
+#eh-side .eh-row.eh-here { color: var(--eh-accent); }
+#eh-side .eh-row.eh-dim { color: var(--eh-fg2); }
+#eh-side .eh-row .eh-i { color: var(--eh-fg3); }
+#eh-side .eh-row.eh-here .eh-i { color: var(--eh-accent); }
+.eh-t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#eh-side .eh-row small, #eh-pal .eh-it small { flex: none; color: var(--eh-fg3); font-size: 11px; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#eh-side .eh-mv { display: none; flex: none; gap: 0; }
+#eh-side .eh-row:hover .eh-mv, #eh-side .eh-row:focus-within .eh-mv { display: inline-flex; }
+#eh-side .eh-mv button { border: 0; background: none; color: var(--eh-fg3); padding: 2px; border-radius: 4px; cursor: pointer; display: inline-flex; }
+#eh-side .eh-mv button:hover { color: var(--eh-fg); background: var(--eh-bg); }
+#eh-side .eh-mv button:disabled { opacity: .3; cursor: default; }
+#eh-side .eh-row:hover .eh-mv + small, #eh-side .eh-row:hover small { display: none; }
+.eh-empty { margin: 4px 14px 6px; color: var(--eh-fg2); font-size: 12px; line-height: 1.4; }
+#eh-side footer { margin-top: auto; padding: 10px 14px 12px; color: var(--eh-fg3); font-size: 11px; border-top: 1px solid var(--eh-line); }
+
+/* ----- l onglet sur le bord gauche (barre en tiroir) */
+#eh-tab { display: none; position: fixed; left: 0; top: 40%; z-index: 2147482999; width: 22px; height: 96px; padding: 0; border: 1px solid var(--eh-line); border-left: 0; border-radius: 0 7px 7px 0; background: var(--eh-bg); color: var(--eh-fg3); cursor: pointer; box-shadow: 0 2px 8px rgba(20, 22, 26, .12); opacity: .75; transition: opacity .12s, width .12s; }
+#eh-tab:hover { opacity: 1; color: var(--eh-fg); width: 26px; }
+#eh-tab span { display: block; writing-mode: vertical-rl; transform: rotate(180deg); font-size: 11px; font-weight: 600; letter-spacing: .04em; white-space: nowrap; }
+html.eh-drawer:not(.eh-open) #eh-tab { display: block; }
+
+/* ----- le chercheur Ctrl K */
+#eh-pal { position: fixed; inset: 0; z-index: 2147483001; background: rgba(20, 22, 26, .28); display: flex; align-items: flex-start; justify-content: center; padding-top: 12vh; }
+#eh-pal[hidden] { display: none; }
+#eh-pal > * { width: min(560px, calc(100vw - 32px)); }
+#eh-pal .eh-search { margin: 0; padding: 10px 14px; border-radius: 10px 10px 0 0; border-bottom: 0; font-size: 15px; box-shadow: var(--eh-shadow); }
+#eh-pal .eh-search input { font-size: 15px; }
+#eh-pal .eh-list { max-height: 50vh; overflow: auto; background: var(--eh-bg); border: 1px solid var(--eh-line); border-top: 1px solid var(--eh-line); box-shadow: var(--eh-shadow); }
+#eh-pal .eh-it { padding: 8px 14px; }
+#eh-pal .eh-it.eh-sel { background: var(--eh-hover); }
+#eh-pal .eh-k { flex: none; width: 64px; font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--eh-fg3); }
+#eh-pal footer { padding: 7px 14px; background: var(--eh-bg); border: 1px solid var(--eh-line); border-top: 0; border-radius: 0 0 10px 10px; color: var(--eh-fg3); font-size: 11px; box-shadow: var(--eh-shadow); }
+#eh-pal .eh-empty { padding: 10px 0; }
+
+/* ----- l onglet est en bas du rail d enos (le rail garde ses icones en haut) */
+#eh-tab { top: auto; bottom: 48px; }
+html.eh-busy #eh-side, html.eh-busy #eh-tab { pointer-events: none; }
+
+/* ----- nommer une epingle */
+.eh-naming { margin: 10px 12px 0; padding: 8px 9px; border: 1px solid var(--eh-line); border-radius: 7px; }
+.eh-naming small { display: block; color: var(--eh-fg2); font-size: 11.5px; line-height: 1.35; margin-bottom: 6px; overflow: hidden; text-overflow: ellipsis; }
+.eh-naming input, #eh-side .eh-row input { width: 100%; font: inherit; color: var(--eh-fg); background: var(--eh-bg); border: 1px solid var(--eh-line); border-radius: 6px; padding: 5px 8px; margin: 0; outline: none; }
+.eh-naming input:focus, #eh-side .eh-row input:focus { border-color: var(--eh-accent); }
+.eh-naming div { display: flex; gap: 6px; margin-top: 8px; }
+.eh-btn { font: inherit; font-weight: 600; color: var(--eh-fg); background: var(--eh-bg); border: 1px solid var(--eh-line); border-radius: 6px; padding: 4px 11px; cursor: pointer; }
+.eh-btn:hover { border-color: var(--eh-fg3); }
+.eh-btn.eh-main { color: #fff; background: var(--eh-accent); border-color: var(--eh-accent); }
+#eh-side .eh-pin small { margin-left: auto; font-weight: 500; color: var(--eh-fg3); }
+
+/* ----- message pendant le rejeu */
+#eh-toast { position: fixed; left: 50%; top: 14px; transform: translateX(-50%); z-index: 2147483002; display: flex; align-items: center; gap: 10px; max-width: min(640px, calc(100vw - 32px)); padding: 9px 12px; border-radius: 9px; background: #1b1d21; color: #eceef1; font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; box-shadow: 0 8px 30px rgba(20, 22, 26, .3); }
+#eh-toast[hidden] { display: none; }
+#eh-toast button { border: 0; background: none; color: #a9afb9; padding: 2px; cursor: pointer; display: inline-flex; }
+#eh-toast button:hover { color: #fff; }
+#eh-toast .eh-i svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.6; }
+.eh-spin { flex: none; width: 14px; height: 14px; border: 2px solid rgba(255, 255, 255, .25); border-top-color: #fff; border-radius: 50%; animation: eh-spin .8s linear infinite; }
+@keyframes eh-spin { to { transform: rotate(360deg); } }
