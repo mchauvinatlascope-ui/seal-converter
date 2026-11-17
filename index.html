@@ -45,7 +45,7 @@
             <div class="head-actions">
               <label class="btn">
                 Add files
-                <input type="file" id="convert-files" multiple accept=".docx,.html,.htm,.txt,.md,.csv,.tsv,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/html,text/plain" hidden>
+                <input type="file" id="convert-files" multiple accept=".docx,.pdf,.html,.htm,.txt,.md,.csv,.tsv,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf,text/html,text/plain" hidden>
               </label>
               <label class="btn">
                 Add a folder
@@ -64,7 +64,7 @@
           <div class="empty" id="convert-empty">
             <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M14 6h14l10 10v24a2 2 0 0 1-2 2H14a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M28 6v10h10" fill="none" stroke="currentColor" stroke-width="2"/><path d="M18 26h12M18 32h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
             <p class="empty-title">Drop files or a whole folder here</p>
-            <p class="empty-note">.docx, .html and .txt, subfolders included. Nothing leaves your browser.</p>
+            <p class="empty-note">.docx, .pdf, .html and .txt, subfolders included. Nothing leaves your browser.</p>
           </div>
           <details class="paste-box">
             <summary>Or paste a document</summary>
@@ -162,12 +162,13 @@
   </main>
 
   <footer class="foot">
-    <span>v1.3.0</span>
+    <span>v1.4.0</span>
   </footer>
 
   <script src="js/seal.js"></script>
   <script src="js/detect.js"></script>
   <script src="js/parse.js"></script>
+  <script src="js/pdf.js"></script>
   <script src="js/edit.js"></script>
   <script src="js/copy.js"></script>
   <script src="js/check.js"></script>

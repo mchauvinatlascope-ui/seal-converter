@@ -32,7 +32,7 @@
   show(location.hash.slice(1));
 })();
 
-// Opening files: Word through mammoth, a saved web page as it is, plain text in the box.
+// Opening files: Word through mammoth, PDF through pdf.js, a saved web page as it is, plain text in the box.
 const Files = (function () {
   // mammoth.js is 620 kB, so it loads the first time a Word file is opened.
   let mammothReady = null;
@@ -56,7 +56,54 @@ const Files = (function () {
     return result.value;
   }
 
-  return { readDocx };
+  // pdf.js is 1.4 MB with its worker, so it loads the first time a PDF is opened.
+  let pdfjsReady = null;
+  function loadPdfjs() {
+    pdfjsReady = pdfjsReady || new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'vendor/pdf.min.js';
+      s.onload = () => {
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdf.worker.min.js';
+        resolve(window.pdfjsLib);
+      };
+      s.onerror = () => { pdfjsReady = null; reject(new Error('Could not load the PDF reader.')); };
+      document.head.appendChild(s);
+    });
+    return pdfjsReady;
+  }
+
+  // Every word with its place, size and font, page by page; Pdf.toHtml rebuilds the document.
+  async function readPdf(file) {
+    const pdfjs = await loadPdfjs();
+    const pdf = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
+    const pages = [];
+    for (let n = 1; n <= pdf.numPages; n++) {
+      const page = await pdf.getPage(n);
+      const view = page.getViewport({ scale: 1 });
+      // The fonts, with their names, only reach this side once the page has been read through.
+      await page.getOperatorList();
+      const content = await page.getTextContent();
+      const items = content.items.filter((it) => typeof it.str === 'string').map((it) => {
+        const [a, b, , d, x, y] = it.transform;
+        const font = page.commonObjs.has(it.fontName) ? page.commonObjs.get(it.fontName) : null;
+        const name = (font && font.name) || (content.styles[it.fontName] || {}).fontFamily || '';
+        return {
+          text: it.str,
+          x, y,
+          w: it.width,
+          size: Math.hypot(a, b) || Math.abs(d),
+          bold: /bold|black|heavy|semibold|demibold/i.test(name),
+          italic: /italic|oblique/i.test(name),
+        };
+      });
+      pages.push({ width: view.width, height: view.height, items });
+    }
+    const html = Pdf.toHtml(pages);
+    if (!html) throw new Error('This PDF has no text to read, it is probably a scan.');
+    return html;
+  }
+
+  return { readDocx, readPdf };
 })();
 
 // Convert: a queue of documents on the left, the Seal version on the right.
@@ -131,7 +178,7 @@ const Files = (function () {
     const done = documents.filter((d) => d.done).length;
     progress.hidden = documents.length === 0 && !skippedFiles;
     progress.textContent = `${done} of ${documents.length} copied`
-      + (skippedFiles ? `, ${skippedFiles} file(s) ignored (not .docx, .html or .txt)` : '');
+      + (skippedFiles ? `, ${skippedFiles} file(s) ignored (not .docx, .pdf, .html or .txt)` : '');
     nextBtn.hidden = !documents.some((d) => !d.done && d !== current);
     const pending = documents.filter((d) => d.html === null && !d.error).length;
     allBtn.hidden = pending === 0;
@@ -242,11 +289,13 @@ const Files = (function () {
 
   async function readFile(file) {
     if (/\.docx$/i.test(file.name)) return Files.readDocx(file);
+    if (/\.pdf$/i.test(file.name)) return Files.readPdf(file);
     return file.text();
   }
 
   function kindOf(name) {
     if (/\.docx$/i.test(name)) return 'html';
+    if (/\.pdf$/i.test(name)) return 'html';
     if (/\.html?$/i.test(name)) return 'html';
     if (/\.(txt|md|csv|tsv)$/i.test(name)) return 'text';
     return null;

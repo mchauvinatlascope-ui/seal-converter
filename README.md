@@ -24,7 +24,9 @@ open index.html   # or double-click the file
 
 ## Convert a batch of documents
 
-Drop your files on the Documents panel, or click *Add files*. A whole folder works too, through *Add a folder* or by dropping it: subfolders are followed, and anything that is not a document is skipped. Word (.docx), a saved or exported web page (.html) and plain text (.txt) all work, and *Or paste a document* takes a paste from Word, SharePoint or a web page.
+Drop your files on the Documents panel, or click *Add files*. A whole folder works too, through *Add a folder* or by dropping it: subfolders are followed, and anything that is not a document is skipped. Word (.docx), PDF (.pdf), a saved or exported web page (.html) and plain text (.txt) all work, and *Or paste a document* takes a paste from Word, SharePoint or a web page.
+
+A PDF is read from the position of its words: bigger text becomes a heading, a line that runs to the right edge is joined with the next one, words aligned in columns become a table, and page numbers or a header repeated on every page are left out. A scanned PDF has no text to read and is reported as such.
 
 *Leave out the title block* drops what sits before the first heading, the document name, its reference and its version, which Seal records itself. Untick it to keep them. Changing it converts the list again.
 
