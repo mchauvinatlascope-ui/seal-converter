@@ -4,7 +4,7 @@ A Chrome extension that makes Seal calmer, easier to read and easier to write in
 
 ## Install (2 minutes)
 
-1. Download `seal-helper-2.0.1.zip` and unzip it.
+1. Download `seal-helper-2.1.0.zip` and unzip it.
 2. Open `chrome://extensions` and switch on **Developer mode** (top right).
 3. Click **Load unpacked** and pick the unzipped `seal-helper` folder.
 4. Open Seal. Click the extension icon (puzzle piece, then pin Seal Helper) to switch each setting on or off.
@@ -13,7 +13,11 @@ To update: replace the folder with the new one, then click the reload arrow on t
 
 ## If you see no change
 
-Click the extension icon on a Seal tab: the first card says whether Seal Helper is **active on this tab**, **paused**, or whether the tab **needs a reload** after an update (one button does it). After replacing the folder, always press the reload arrow on the Seal Helper card in `chrome://extensions`, then reload Seal. The sidebar shows its version (v2.0.1) at the bottom.
+Click the extension icon on a Seal tab: the first card says whether Seal Helper is **active on this tab**, **paused**, or whether the tab **needs a reload** after an update (one button does it). After replacing the folder, always press the reload arrow on the Seal Helper card in `chrome://extensions`, then reload Seal. The sidebar shows its version (v2.1.0) at the bottom.
+
+## 2.1
+
+- **The converter inside Seal**: copy a whole protocol in Word (or a web page, Google Docs), press Ctrl V in a Seal record, and it arrives in the lab protocol format of seal-converter, written by the same engine: chapters I, II, sections a, b, steps renumbered, values in blue, the title block left to Seal. It applies when the paste has headings or at least three steps; a shorter paste keeps its own layout. The message offers **Keep the Word layout** (same content, original structure), **Paste as it was** and **Undo**. Switch it off under Writing, *Lab protocol format*. The converter page remains the place to open .docx and .pdf files, migrate many documents and check that nothing was lost.
 
 ## 2.0.1
 

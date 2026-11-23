@@ -8,11 +8,11 @@
   const KEY = 'sealHelper';
   const LOCAL = 'sealHelperWrite';   // reglages d affichage, snippets, ce qu on a appris de Seal
   const BENCH = 'sealHelperBench';   // coches de paillasse, par fiche
-  const DEFAULTS = { on: true, wbar: true, paste: true, values: true, slash: true };
-  const VERSION = '2.0.1';
+  const DEFAULTS = { on: true, wbar: true, paste: true, proto: true, values: true, slash: true };
+  const VERSION = '2.1.0';
   const root = document.documentElement;
   const isMac = /Mac/.test(navigator.platform);
-  const Seal = window.Seal, Detect = window.Detect, Parse = window.Parse, Edit = window.Edit, Mix = window.Mix;
+  const Seal = window.Seal, Detect = window.Detect, Parse = window.Parse, Edit = window.Edit, Mix = window.Mix, Copy = window.Copy;
   let opts = { ...DEFAULTS };
   let local = { view: { size: 'm', width: 'seal', face: 'seal', focus: false, sticky: false }, snippets: [], sealSlash: false };
   let benchAll = {};
@@ -225,21 +225,37 @@
     if (!ed || !e.clipboardData) return;
     const html = e.clipboardData.getData('text/html');
     if (!needsCleaning(html)) return;
-    let res = null;
+    let res = null, proto = null;
     try { res = cleanHtml(html, { values: isOn('values') }); } catch (err) { console.warn('[Seal Helper] clean paste', err); return; }
     if (!res.html) return;
+    if (isOn('proto')) { try { proto = protocolHtml(html); } catch (err) { console.warn('[Seal Helper] protocol paste', err); } }
     const text = e.clipboardData.getData('text/plain') || plainOf(res.html);
     e.preventDefault(); e.stopImmediatePropagation();
     noteSelection();
-    insertHtml(res.html, text, { fresh: true }).then(ok => {
+    const raw = ['Paste as it was', async () => { undo(); await wait(120); noteSelection(); await insertHtml(html, text); }];
+    const said = r => { const s = r.stats; return [s.chapters && plural(s.chapters, 'chapter'), s.steps && plural(s.steps, 'step'), s.subs && plural(s.subs, 'sub-step'), s.tables && plural(s.tables, 'table'), s.values && plural(s.values, 'value') + ' marked'].filter(Boolean).join(', '); };
+    const layout = () => insertHtml(res.html, text).then(ok => { if (ok) toast('Pasted with the Word layout' + (said(res) ? ': ' + said(res) : '') + '.', 'ok', 9000, [['Undo', () => undo()], raw]); });
+    insertHtml((proto || res).html, text, { fresh: true }).then(ok => {
       if (!ok) return;
-      const s = res.stats;
-      const parts = [s.steps && plural(s.steps, 'step'), s.subs && plural(s.subs, 'sub-step'), s.tables && plural(s.tables, 'table'), s.values && plural(s.values, 'value') + ' marked'].filter(Boolean);
-      toast('Pasted clean' + (parts.length ? ': ' + parts.join(', ') : '') + '.', 'ok', 9000, [
-        ['Undo', () => undo()],
-        ['Paste as it was', async () => { undo(); await wait(120); noteSelection(); await insertHtml(html, text); }]]);
+      if (proto) toast('Pasted in the lab protocol format' + (said(proto) ? ': ' + said(proto) : '') + '.', 'ok', 12000, [
+        ['Undo', () => undo()], ['Keep the Word layout', async () => { undo(); await wait(120); noteSelection(); await layout(); }], raw]);
+      else toast('Pasted clean' + (said(res) ? ': ' + said(res) : '') + '.', 'ok', 9000, [['Undo', () => undo()], raw]);
     });
   }, true);
+  // Un protocole entier (des titres, ou au moins trois etapes) : le format du labo, celui de seal-converter,
+  // chapitres I, II, sections a, b, etapes renumerotees, valeurs en bleu, bloc de titre laisse a Seal.
+  function protocolHtml(html) {
+    const blocks = Parse.htmlToBlocks(html);
+    const items = blocks.filter(b => b.kind === 'item' || (b.kind === 'para' && (b.depth || 0) > 0)).length;
+    if (!blocks.some(b => b.kind === 'heading') && items < 3) return null;
+    let doc = Parse.blocksToDoc(blocks, { dropHeader: true });
+    let out = doc && !doc.error ? Seal.document(doc) : '';
+    if (!out) { doc = Parse.blocksToDoc(blocks); out = doc && !doc.error ? Seal.document(doc) : ''; }
+    if (!out) return null;
+    out = Copy.sealHtml(out);
+    const n = re => (out.match(re) || []).length;
+    return { html: out, stats: { chapters: n(/<h2[\s>]/g), steps: n(/<li[\s>]/g), subs: 0, tables: n(/<table[\s>]/g), values: n(/data-native-color="blue"/g) } };
+  }
 
   // ------------------------------------------------------------ message en bas, avec actions
   let toastTimer = 0;

@@ -30,7 +30,7 @@ async function open(file, waitFor) {
   await page.goto('file://' + path.join(here, file));
   if (waitFor) await page.waitForFunction(waitFor, null, { timeout: 30000 });
   await page.addStyleTag({ content: readFileSync(path.join(ext, 'content.css'), 'utf8') + readFileSync(path.join(ext, 'write.css'), 'utf8').replace(/chrome-extension:\/\/__MSG_@@extension_id__/g, 'file://' + ext) });
-  for (const f of ['engine/seal.js', 'engine/detect.js', 'engine/parse.js', 'engine/edit.js', 'engine/mix.js', 'write.js']) await page.addScriptTag({ content: readFileSync(path.join(ext, f), 'utf8') });
+  for (const f of ['engine/seal.js', 'engine/detect.js', 'engine/parse.js', 'engine/edit.js', 'engine/mix.js', 'engine/copy.js', 'write.js']) await page.addScriptTag({ content: readFileSync(path.join(ext, f), 'utf8') });
   await page.waitForTimeout(200);
   return page;
 }
@@ -63,9 +63,16 @@ for (const [name, file, ED, waitFor] of [['plain', 'plain.html', '[data-native-d
   await page.click('#sh-wbar .sh-wb >> nth=0'); await page.waitForTimeout(200);
   ok('Bold', /<(strong|b)>CXCR5/.test(await html(page, ED)));
   // 4. collage Word nettoye
-  await caretEnd(page, P); await page.keyboard.press('Enter'); await page.waitForTimeout(150);
+  await caretEnd(page, P); await page.keyboard.press('Enter'); await page.waitForTimeout(800); // l editeur regroupe sinon Entree et collage dans la meme annulation
   await paste(page, WORD, 'plain'); await page.waitForTimeout(500);
   let out = await html(page, ED);
+  const t0 = await page.evaluate(() => document.querySelector('#sh-wtoast')?.textContent || '');
+  ok('protocol paste: lab format by default', /lab protocol format/.test(t0) && /<h2[^>]*>I\. /.test(out) && /Vortex before adding/.test(out) && /Bcl6/.test(out), t0);
+  if (name === 'prosemirror') console.log('     ' + out.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').replace(/-{20,}/g, '[rule]').slice(60, 420));
+  await page.screenshot({ path: path.join(shots, name + '-0-protocol.png') });
+  await page.click('#sh-wtoast button:has-text("Keep the Word layout")'); await page.waitForTimeout(900);
+  out = await html(page, ED);
+  ok('Keep the Word layout replaces it', !/<h2[^>]*>I\. /.test(out) && (out.match(/Vortex before adding/g) || []).length === 1);
   ok('clean paste: nested sub-steps', /<li>(<p>)?Fix cells[\s\S]*?<ol[^>]*>\s*<li>(<p>)?Vortex before adding[\s\S]*?Protect from light/.test(out));
   ok('clean paste: bullet list kept as bullets', /<ul[^>]*>\s*<li>(<p>)?Keep on ice/.test(out));
   ok('clean paste: table rebuilt', /<table[\s\S]*Bcl6[\s\S]*AF647/.test(out) && !/Mso/.test(out));
