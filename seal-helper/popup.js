@@ -1,5 +1,6 @@
 const KEY = 'sealHelper';
-const DEFAULTS = { on: true, side: true, home: true, appmenu: false, props: true, doc: true, dates: true, info: true, quiet: true, slot: true, readnb: true };
+const DEFAULTS = { on: true, side: true, home: true, appmenu: false, props: true, doc: true, dates: true, info: true, quiet: true, slot: true, readnb: true, wbar: true, paste: true, values: true, slash: true };
+document.getElementById('ver').textContent = 'v' + chrome.runtime.getManifest().version;
 const IDS = Object.keys(DEFAULTS);
 
 function paint(opts) {
@@ -45,7 +46,7 @@ chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
     else if (!r.workspace) showState('ok', 'Active on this tab · v' + r.v, 'The new layout shows on lab pages and records.');
     else if (!r.shown) showState('warn', 'Running but hidden · v' + r.v, 'Reload the tab; if it stays hidden, send a screenshot.',
       { label: 'Reload the tab', run: () => { chrome.tabs.reload(tab.id); window.close(); } });
-    else showState('ok', 'Active on this tab · v' + r.v, 'Sidebar, Today, New menu and navigation arrows are on.',
+    else showState('ok', 'Active on this tab · v' + r.v, 'Sidebar, Today, New menu and the writing bar are on.',
       { label: 'Diagnostic', run: () => chrome.tabs.sendMessage(tab.id, { sh: 'diag' }, d => {
         const ta = document.getElementById('diag'); ta.value = (d && d.text) || 'No answer from the page.'; ta.classList.add('show'); ta.select();
         try { navigator.clipboard.writeText(ta.value); } catch (e) {}

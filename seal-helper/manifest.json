@@ -1,21 +1,67 @@
 {
   "manifest_version": 3,
   "name": "Seal Helper",
-  "version": "1.9.0",
-  "description": "A calmer, easier to read Seal. Changes how Seal looks in your browser only; it never writes to Seal and sends nothing anywhere.",
-  "permissions": ["storage", "activeTab"],
+  "version": "2.0.0",
+  "description": "A calmer Seal that is easier to read and to write in. Writes only where your cursor is, when you ask; sends nothing anywhere.",
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
   "content_scripts": [
     {
-      "matches": ["https://us.platform.seal.run/o/malaghan/*"],
-      "css": ["content.css"],
-      "js": ["content.js"],
+      "matches": [
+        "https://us.platform.seal.run/o/malaghan/*"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://us.platform.seal.run/o/malaghan/*"
+      ],
+      "css": [
+        "write.css"
+      ],
+      "js": [
+        "engine/seal.js",
+        "engine/detect.js",
+        "engine/parse.js",
+        "engine/edit.js",
+        "engine/mix.js",
+        "write.js"
+      ],
+      "run_at": "document_idle"
     }
   ],
   "action": {
     "default_title": "Seal Helper",
     "default_popup": "popup.html",
-    "default_icon": { "16": "icons/16.png", "32": "icons/32.png", "48": "icons/48.png", "128": "icons/128.png" }
+    "default_icon": {
+      "16": "icons/16.png",
+      "32": "icons/32.png",
+      "48": "icons/48.png",
+      "128": "icons/128.png"
+    }
   },
-  "icons": { "16": "icons/16.png", "32": "icons/32.png", "48": "icons/48.png", "128": "icons/128.png" }
+  "icons": {
+    "16": "icons/16.png",
+    "32": "icons/32.png",
+    "48": "icons/48.png",
+    "128": "icons/128.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "fonts/*.woff2"
+      ],
+      "matches": [
+        "https://us.platform.seal.run/*"
+      ]
+    }
+  ]
 }

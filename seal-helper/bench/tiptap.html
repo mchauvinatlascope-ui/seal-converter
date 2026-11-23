@@ -1,0 +1,15 @@
+<!doctype html><html><head><meta charset="utf-8"><title>TipTap fixture</title>
+<style>body{margin:0;font:14px/1.6 system-ui} main{padding:20px 40px} .ProseMirror{outline:none;min-height:300px} table{border-collapse:collapse} td,th{border:1px solid #ccc;padding:2px 8px;min-width:40px}</style></head>
+<body><main><div data-native-document-root><div id="ed"></div></div></main>
+<script type="module">
+import { Editor, Mark } from 'https://esm.sh/@tiptap/core@2.6.6';
+import StarterKit from 'https://esm.sh/@tiptap/starter-kit@2.6.6';
+import Table from 'https://esm.sh/@tiptap/extension-table@2.6.6';
+import TableRow from 'https://esm.sh/@tiptap/extension-table-row@2.6.6';
+import TableCell from 'https://esm.sh/@tiptap/extension-table-cell@2.6.6';
+import TableHeader from 'https://esm.sh/@tiptap/extension-table-header@2.6.6';
+const Blue = Mark.create({ name: 'blue', parseHTML: () => [{ tag: 'span[data-native-color]' }], renderHTML: () => ['span', { 'data-native-color': 'blue', style: 'color: rgb(45, 114, 210);' }, 0] });
+window.editor = new Editor({ element: document.getElementById('ed'), extensions: [StarterKit, Table, TableRow, TableCell, TableHeader, Blue],
+  content: '<h2>Staining</h2><ol><li><p>Mash spleens through a 70 µm strainer.</p></li><li><p>Stain CXCR5 first, 30 min at 4 °C in 50 µL.</p></li></ol><p>Notes go here.</p>' });
+window.ready = true;
+</script></body></html>

@@ -1,10 +1,10 @@
 # Seal Helper
 
-A Chrome extension that makes Seal calmer and easier to read. It only changes how Seal looks in your own browser: it never writes to Seal and sends nothing anywhere.
+A Chrome extension that makes Seal calmer, easier to read and easier to write in. Navigation and reading only change how Seal looks in your own browser. Since 2.0 it also helps you write: it writes to a record only where your cursor is, when you ask (a button, a shortcut, Ctrl V), through Seal's own editor, so Seal records it as your edit and Ctrl Z undoes it. It sends nothing anywhere.
 
 ## Install (2 minutes)
 
-1. Download `seal-helper-1.9.0.zip` and unzip it.
+1. Download `seal-helper-2.0.0.zip` and unzip it.
 2. Open `chrome://extensions` and switch on **Developer mode** (top right).
 3. Click **Load unpacked** and pick the unzipped `seal-helper` folder.
 4. Open Seal. Click the extension icon (puzzle piece, then pin Seal Helper) to switch each setting on or off.
@@ -13,7 +13,22 @@ To update: replace the folder with the new one, then click the reload arrow on t
 
 ## If you see no change
 
-Click the extension icon on a Seal tab: the first card says whether Seal Helper is **active on this tab**, **paused**, or whether the tab **needs a reload** after an update (one button does it). After replacing the folder, always press the reload arrow on the Seal Helper card in `chrome://extensions`, then reload Seal. The sidebar shows its version (v1.9.0) at the bottom.
+Click the extension icon on a Seal tab: the first card says whether Seal Helper is **active on this tab**, **paused**, or whether the tab **needs a reload** after an update (one button does it). After replacing the folder, always press the reload arrow on the Seal Helper card in `chrome://extensions`, then reload Seal. The sidebar shows its version (v2.0.0) at the bottom.
+
+## 2.0: writing
+
+A bar sits at the bottom of every record. While you read it offers **Bench** and **Aa**; once your cursor is in the text it adds the writing tools. Each one can be switched off in the extension menu, under Writing.
+
+- **Value, Clear, B, I**: select words, then press **Value** to put them in Seal's blue bold (press again inside a value to remove it), or **Clear** to drop the formatting. A small bubble with the same buttons follows the selection.
+- **Clean paste**: Ctrl V from Word, Excel, Google Docs or a web page keeps headings, steps with their sub-steps, bullets, tables, bold, italic and links, and marks volumes, times and temperatures in blue. A message says what was kept and offers **Undo** and **Paste as it was**. Ctrl Shift V always pastes Seal's own way.
+- **Blocks** (the button, Ctrl J, or type `/` at the start of a word): **Antibody mix** calculated from a panel pasted from Excel (samples, excess, µL per test, the buffer to top up with, Brilliant Stain Buffer as an option), **Table**, **Buffer recipe**, **Deviation** with date and time, **Date**, **Time**, section outlines for **Flow staining**, **ELISA**, **qPCR** and **Mouse cohort**, and **My snippets**: select a passage, Blocks, *Save the selection as a snippet*, and it is one word away next time. Snippets stay in this browser.
+- **µ °C ±**: lab symbols in one click.
+- **Bench mode**: the steps of the record as a checklist you can read from a metre away. Tick a step (the time is noted), start a timer from a duration written in the step, note a deviation on the step where it happened. Ticks stay in this browser; **Add run log to the record** writes a dated table (step, done at, deviation) where your cursor is.
+- **Aa, reading comfort**: text size, page width, typeface (Seal, Atkinson Hyperlegible, serif), a focus mode without the sidebar and panels, table headers kept in view. Only you see these settings; nothing is written to the record, and colleagues see Seal as usual.
+
+What it does not do: headings and list types are left to Seal's own buttons; a typeface or text colour that everyone would see is not possible, because Seal does not store one.
+
+If something is refused, a message says "Seal did not accept this here" and nothing is changed. The **Diagnostic** button of the extension menu now ends with a few lines about the editor (structure only, no record content): paste them to report a problem.
 
 ## 1.9
 
@@ -158,7 +173,7 @@ Click the extension icon on a Seal tab: the first card says whether Seal Helper 
 - **My work** and **To publish**: full pages, filter by name or by type (Experiments, Documents, Projects), changes grouped by day, empty changes hidden.
 - **Record header and outline**: the key fields of a record (ID, owner, dates, status) under its title bar, and its headings on the right when the screen is wide enough.
 
-Every line clicks the matching Seal line for you, so opening, rights and publishing stay Seal's own.
+Every line clicks the matching Seal line for you, so opening, rights and publishing stay Seal's own. The extension never publishes, signs or changes a status by itself.
 
 **Clean up**
 - **Clean documents**: change bars show on hover only, lines of dashes become a thin rule, the first table row reads as a header.

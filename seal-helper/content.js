@@ -1,6 +1,6 @@
-// Seal Helper 0.7
-// Ne fait que changer l affichage dans ce navigateur : n ecrit jamais dans Seal,
-// n envoie rien, ne touche pas au texte d un document.
+// Seal Helper : navigation et lecture.
+// Ce fichier ne fait que changer l affichage dans ce navigateur : il n ecrit jamais dans Seal,
+// n envoie rien, ne touche pas au texte d un document. L ecriture (2.0) vit a part, dans write.js.
 // La nouvelle barre et les pages Home / My work / To publish relisent les listes
 // que Seal a deja chargees (volets Views, Entities, Changes) et, au clic, cliquent
 // pour toi sur la ligne Seal d origine : la navigation reste celle de Seal.
@@ -14,7 +14,7 @@
   const isMac = /Mac/.test(navigator.platform);
   let opts = { ...DEFAULTS };
   const isOn = k => opts.on && opts[k];
-  const VERSION = '1.9.0';
+  const VERSION = '2.0.0';
 
   // Ecran de passage : quand on doit recharger la page (fiche -> cahier, cahier -> fiche), un ecran
   // calme au nom de la destination couvre le depart, le rechargement et les sauts de l appli,
@@ -2102,7 +2102,7 @@
   });
   try { chrome.runtime.onMessage.addListener((m, sender, reply) => {
     if (!m || !/^(status|diag|forget)$/.test(m.sh)) return;
-    if (m.sh === 'diag') { let text = ''; try { text = diagnose(); } catch (e) { text = 'diag failed: ' + e; } reply({ text }); return; }
+    if (m.sh === 'diag') { let text = ''; try { text = diagnose(); } catch (e) { text = 'diag failed: ' + e; } try { if (window.SealHelperWrite) text += '\n' + window.SealHelperWrite.diag(); } catch (e) { text += '\nwrite diag failed: ' + e; } reply({ text }); return; }
     if (m.sh === 'forget') {
       learnedWay = '';
       try { chrome.storage.local.remove(WAY_KEY); } catch (e) {}

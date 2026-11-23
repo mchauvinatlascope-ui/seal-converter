@@ -1,0 +1,139 @@
+/* Seal Helper 2.0 : ecrire. Nos elements portent la classe .sh (jetons de content.css, sombre compris)
+   et vivent sous <html>, jamais dans le document de Seal. */
+
+@font-face { font-family: "SH Atkinson"; font-weight: 400; font-style: normal; font-display: swap; src: url("chrome-extension://__MSG_@@extension_id__/fonts/atkinson-hyperlegible-400.woff2") format("woff2"); }
+@font-face { font-family: "SH Atkinson"; font-weight: 700; font-style: normal; font-display: swap; src: url("chrome-extension://__MSG_@@extension_id__/fonts/atkinson-hyperlegible-700.woff2") format("woff2"); }
+
+/* ---------------------------------------------------------------- barre d ecriture */
+#sh-wbar {
+  position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%); z-index: 1420;
+  display: flex; align-items: center; gap: 2px; max-width: calc(100vw - 24px);
+  padding: 4px 6px; background: var(--sh-bg); border: 1px solid var(--sh-line); border-radius: 10px;
+  box-shadow: 0 8px 24px -8px rgba(20, 22, 30, .28); white-space: nowrap;
+}
+#sh-wbubble {
+  position: fixed; z-index: 1425; display: flex; gap: 2px; padding: 3px;
+  background: var(--sh-bg); border: 1px solid var(--sh-line); border-radius: 8px; box-shadow: 0 6px 18px -6px rgba(20, 22, 30, .3);
+}
+.sh .sh-wb {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 28px; height: 28px; padding: 0 8px;
+  border-radius: 6px; font-size: 12.5px; font-weight: 500; color: var(--sh-ink); white-space: nowrap;
+}
+.sh .sh-wb:hover { background: var(--sh-hover); }
+.sh .sh-wb b { font-weight: 700; } .sh .sh-wb i { font-style: italic; font-family: Georgia, "Times New Roman", serif; font-size: 14px; }
+.sh .sh-wb.val { color: #2d72d2; font-weight: 700; }
+.sh .sh-wb.accent { color: var(--sh-violet); font-weight: 600; }
+html.sh-dark .sh .sh-wb.val { color: #8fb4f0; }
+#sh-wbar .sh-wsep { width: 1px; height: 16px; margin: 0 5px; background: var(--sh-line); flex: none; }
+#sh-wbar .sh-wcount { margin-left: 8px; padding-right: 6px; font-size: 11.5px; color: var(--sh-ink3); font-variant-numeric: tabular-nums; }
+
+/* ---------------------------------------------------------------- message */
+#sh-wtoast {
+  position: fixed; left: 50%; bottom: 62px; transform: translateX(-50%); z-index: 1600;
+  display: flex; align-items: center; gap: 12px; max-width: min(640px, calc(100vw - 32px));
+  padding: 9px 12px 9px 14px; border-radius: 9px; background: #1b1d21; color: #fff; font-size: 13px; font-weight: 500;
+  box-shadow: 0 10px 30px -10px rgba(20, 20, 20, .5);
+}
+#sh-wtoast.warn { background: #3b2a06; color: #fde7b5; }
+#sh-wtoast.ok { background: #0f3d2a; color: #d9f3e5; }
+#sh-wtoast button { flex: none; color: inherit; font-weight: 650; padding: 2px 8px; border-radius: 5px; border: 1px solid rgba(255, 255, 255, .35); white-space: nowrap; }
+#sh-wtoast button:hover { border-color: rgba(255, 255, 255, .8); }
+
+/* ---------------------------------------------------------------- menus et fenetres */
+.sh.sh-wpop {
+  position: fixed; z-index: 1550; width: 300px; max-height: min(440px, calc(100vh - 16px)); overflow-y: auto;
+  display: flex; flex-direction: column; gap: 8px; padding: 12px;
+  background: var(--sh-bg); border: 1px solid var(--sh-line); border-radius: 10px; box-shadow: 0 12px 32px -10px rgba(20, 22, 30, .35);
+}
+.sh.sh-wpop.wide { width: 420px; max-height: min(640px, calc(100vh - 16px)); }
+.sh.sh-wpop[data-kind="blocks"] { padding: 5px; gap: 0; }
+.sh.sh-wpop h3 { margin: 0; font-size: 13.5px; font-weight: 650; }
+.sh-wpop .sh-wgrp { font-size: 10.5px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--sh-ink3); padding: 9px 8px 3px; }
+.sh-wpop .sh-wq { font-size: 11.5px; color: var(--sh-ink3); padding: 5px 8px 2px; }
+.sh-wpop .sh-wmi { display: flex; align-items: baseline; gap: 10px; padding: 5px 8px; border-radius: 6px; cursor: pointer; }
+.sh-wpop .sh-wmi span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sh-wpop .sh-wmi small { flex: none; font-size: 11.5px; color: var(--sh-ink3); }
+.sh-wpop .sh-wmi.on { background: var(--sh-violetbg, #efeafb); }
+.sh-wpop .sh-wmi .sh-wdel { flex: none; width: 18px; height: 18px; border-radius: 4px; text-align: center; color: var(--sh-ink3); font-size: 14px; line-height: 16px; }
+.sh-wpop .sh-wmi .sh-wdel:hover { color: var(--sh-ink); background: var(--sh-hover); }
+.sh-wpop .sh-wf { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; font-size: 11.5px; color: var(--sh-ink2); }
+.sh-wpop .sh-wrow { display: flex; gap: 8px; align-items: flex-end; }
+.sh-wpop input[type="number"], .sh-wpop input[type="text"], .sh-wpop textarea {
+  width: 100%; font: 13px var(--sh-ui); color: var(--sh-ink); background: var(--sh-bg); border: 1px solid var(--sh-line); border-radius: 6px; padding: 5px 7px;
+}
+.sh-wpop textarea { font: 12px/1.45 var(--sh-mono); resize: vertical; tab-size: 12; }
+.sh-wpop input:focus, .sh-wpop textarea:focus { outline: 2px solid var(--sh-focus); outline-offset: -1px; }
+.sh-wpop .sh-wcheck { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--sh-ink); cursor: pointer; flex: 1; }
+.sh-wpop .sh-wcheck input { accent-color: #6d4bd1; margin: 0; }
+.sh-wpop .sh-wnote, #sh-bench .sh-wnote { margin: 0; font-size: 11.5px; color: var(--sh-ink3); }
+.sh-wpop .sh-wact { display: flex; justify-content: flex-end; gap: 8px; position: sticky; bottom: -12px; margin: 0 -12px -12px; padding: 8px 12px 12px; background: var(--sh-bg); }
+.sh.sh-wpop .sh-wact button { height: 28px; padding: 0 12px; border: 1px solid var(--sh-line); border-radius: 7px; font-size: 12.5px; font-weight: 550; }
+.sh.sh-wpop .sh-wact button.pri { background: var(--sh-ink); color: var(--sh-bg); border-color: var(--sh-ink); }
+.sh-wpop .sh-wprev { font-size: 12.5px; color: var(--sh-ink2); border-top: 1px solid var(--sh-line); padding-top: 8px; overflow-x: auto; }
+.sh-wpop .sh-wprev p { margin: 0 0 6px; }
+.sh-wpop .sh-wprev table { border-collapse: collapse; width: 100%; color: var(--sh-ink); }
+.sh-wpop .sh-wprev td, .sh-wpop .sh-wprev th { border: 1px solid var(--sh-line); padding: 2px 7px; text-align: left; font-weight: 400; }
+.sh-wpop .sh-wprev [data-native-color="blue"] { color: #2d72d2 !important; }
+.sh-wpop .sh-wwarn { color: var(--sh-amber); }
+.sh-wpop .sh-wsym { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.sh.sh-wpop[data-kind="symbols"] { width: 268px; padding: 6px; }
+.sh.sh-wpop .sh-wsym button { height: 30px; border-radius: 6px; text-align: center; font-size: 14px; }
+.sh.sh-wpop .sh-wsym button:hover { background: var(--sh-hover); }
+.sh-wpop .sh-wseg { display: flex; border: 1px solid var(--sh-line); border-radius: 7px; overflow: hidden; }
+.sh.sh-wpop .sh-wseg button { flex: 1; text-align: center; padding: 4px 4px; font-size: 12px; color: var(--sh-ink); border-left: 1px solid var(--sh-line); }
+.sh.sh-wpop .sh-wseg button:first-child { border-left: 0; }
+.sh.sh-wpop .sh-wseg button[aria-pressed="true"] { background: var(--sh-ink); color: var(--sh-bg); }
+
+/* ---------------------------------------------------------------- confort de lecture : affichage seul.
+   :is(...) vise le document de Seal ; le plus haut seulement, pour ne pas cumuler. */
+html.sh-v-size-s :is([data-native-document-editor], [data-testid="native-document-editor"], [data-native-document-root]):not(:is([data-native-document-editor], [data-testid="native-document-editor"], [data-native-document-root]) *) { zoom: .9; }
+html.sh-v-size-l :is([data-native-document-editor], [data-testid="native-document-editor"], [data-native-document-root]):not(:is([data-native-document-editor], [data-testid="native-document-editor"], [data-native-document-root]) *) { zoom: 1.18; }
+html.sh-v-width-read :is([data-native-document-editor], [data-testid="native-document-editor"], [data-native-document-root]):not(:is([data-native-document-editor], [data-testid="native-document-editor"], [data-native-document-root]) *) { max-width: 720px !important; margin-left: auto !important; margin-right: auto !important; }
+html.sh-v-width-full :is([data-native-document-editor], [data-testid="native-document-editor"], [data-native-document-root]) { max-width: none !important; width: 100% !important; }
+html.sh-v-face-atk :is([data-native-document-editor], [data-testid="native-document-editor"], [data-native-document-root]) :not(code):not(pre):not(kbd):not(svg):not(svg *) { font-family: "SH Atkinson", "Atkinson Hyperlegible", Verdana, sans-serif !important; }
+html.sh-v-face-serif :is([data-native-document-editor], [data-testid="native-document-editor"], [data-native-document-root]) :not(code):not(pre):not(kbd):not(svg):not(svg *) { font-family: Charter, "Iowan Old Style", Georgia, "Times New Roman", serif !important; }
+html.sh-v-sticky :is([data-native-document-editor], [data-testid="native-document-editor"], [data-native-document-root]) table tr:first-child > * { position: sticky; top: 0; z-index: 1; background: var(--color-bg0, #fff); box-shadow: 0 1px 0 rgba(0, 0, 0, .12); }
+/* Mode concentre : la barre, le plan et les volets de Seal s effacent ; ils reviennent des qu on le quitte. */
+html.sh-v-focus #sh-side, html.sh-v-focus #sh-outline { display: none !important; }
+html.sh-v-focus [data-testid="nav-panel-layout-slot"] { width: 0 !important; min-width: 0 !important; overflow: hidden !important; }
+html.sh-v-focus [data-side-panel="open"], html.sh-v-focus nav[aria-label="Entity panels"] { display: none !important; }
+
+/* ---------------------------------------------------------------- mode paillasse */
+#sh-bench {
+  position: fixed; inset: 0; z-index: 1430; display: flex; flex-direction: column;
+  background: var(--sh-bg); font-size: 16px; line-height: 1.5;
+}
+#sh-bench.with-side { left: 248px; }
+#sh-bench header, #sh-bench footer { display: flex; align-items: center; gap: 12px; padding: 10px 28px; border-bottom: 1px solid var(--sh-line); font-size: 13px; flex-wrap: wrap; }
+#sh-bench footer { border-bottom: 0; border-top: 1px solid var(--sh-line); color: var(--sh-ink2); }
+#sh-bench footer .sh-wnote { flex: 1; text-align: right; }
+#sh-bench header b { font-size: 14px; font-weight: 650; }
+#sh-bench .sh-bpill { font-size: 11.5px; font-weight: 600; color: var(--sh-violet); background: var(--sh-violetbg, #efeafb); border-radius: 10px; padding: 1px 9px; }
+#sh-bench .sh-btimers { flex: 1; display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
+#sh-bench .sh-btimer { font: 600 12px var(--sh-mono); color: var(--sh-violet); background: var(--sh-violetbg, #efeafb); border-radius: 6px; padding: 2px 9px; }
+#sh-bench .sh-btimer.up { color: var(--sh-amber); background: var(--sh-amberbg); }
+#sh-bench .sh-bbtn { height: 30px; padding: 0 12px; border: 1px solid var(--sh-line); border-radius: 7px; font-size: 12.5px; font-weight: 550; color: var(--sh-ink); }
+#sh-bench .sh-bbtn.pri { background: var(--sh-ink); color: var(--sh-bg); border-color: var(--sh-ink); }
+#sh-bench .sh-bbtn[disabled] { opacity: .4; cursor: default; }
+#sh-bench .sh-bsteps { flex: 1; overflow-y: auto; padding: 14px 28px 24px; display: flex; flex-direction: column; max-width: 980px; width: 100%; margin: 0 auto; }
+#sh-bench .sh-bstep { display: grid; grid-template-columns: 26px 1fr auto; gap: 4px 12px; align-items: start; padding: 10px 10px; border-top: 1px solid var(--sh-line2); border-radius: 8px; }
+#sh-bench .sh-bstep:first-of-type { border-top-color: transparent; }
+#sh-bench .sh-bstep.sub { margin-left: 34px; }
+#sh-bench .sh-bstep.cur { background: var(--sh-side); border-top-color: transparent; }
+#sh-bench .sh-bstep.cur .sh-btx { font-weight: 600; }
+#sh-bench .sh-bstep.done .sh-btx { color: var(--sh-ink3); }
+#sh-bench .sh-bbox { width: 22px; height: 22px; margin-top: 1px; border: 1.5px solid #b9bcc2; border-radius: 5px; text-align: center; color: #fff; font-size: 14px; font-weight: 700; line-height: 19px; }
+#sh-bench .sh-bstep.done .sh-bbox { background: #1f7a4a; border-color: #1f7a4a; }
+#sh-bench .sh-btx { cursor: pointer; min-width: 0; overflow-wrap: anywhere; }
+#sh-bench .sh-val { color: #2d72d2; font-weight: 700; }
+html.sh-dark #sh-bench .sh-val { color: #8fb4f0; }
+#sh-bench .sh-bstep.done .sh-val { color: inherit; font-weight: 600; }
+#sh-bench .sh-bside { display: flex; align-items: center; gap: 12px; font-size: 12.5px; padding-top: 3px; white-space: nowrap; }
+#sh-bench .sh-btime { font: 12px var(--sh-mono); color: var(--sh-ink3); }
+#sh-bench .sh-blink { color: var(--sh-violet); font-weight: 600; font-size: 12.5px; }
+#sh-bench .sh-blink:hover { text-decoration: underline; }
+#sh-bench .sh-bdev { grid-column: 2 / 4; display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--sh-amber); }
+#sh-bench .sh-bnote { flex: 1; max-width: 520px; font: 13px var(--sh-ui); color: var(--sh-ink); background: var(--sh-amberbg); border: 1px solid transparent; border-radius: 6px; padding: 4px 9px; }
+#sh-bench .sh-bnote:focus { outline: 2px solid var(--sh-focus); outline-offset: -1px; }
+
+@media print { #sh-wbar, #sh-wbubble, #sh-wtoast, .sh.sh-wpop, #sh-bench { display: none !important; } }
