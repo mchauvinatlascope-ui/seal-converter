@@ -137,3 +137,14 @@ html.sh-dark #sh-bench .sh-val { color: #8fb4f0; }
 #sh-bench .sh-bnote:focus { outline: 2px solid var(--sh-focus); outline-offset: -1px; }
 
 @media print { #sh-wbar, #sh-wbubble, #sh-wtoast, .sh.sh-wpop, #sh-bench { display: none !important; } }
+
+/* ---------------------------------------------------------------- 2.2 : rechercher, controler */
+::highlight(sh-find) { background-color: #fde68a; color: #1b1d21; }
+::highlight(sh-find-cur) { background-color: #f59e0b; color: #1b1d21; }
+.sh-wpop .sh-fcount { flex: none; min-width: 62px; text-align: right; font-size: 11.5px; color: var(--sh-ink3); font-variant-numeric: tabular-nums; align-self: center; }
+.sh.sh-wpop[data-kind="find"] { width: 330px; }
+.sh.sh-wpop[data-kind="find"] .sh-wact { flex-wrap: wrap; }
+.sh.sh-wpop[data-kind="find"] .sh-wact button { padding: 0 9px; }
+.sh.sh-wpop .sh-wcheckrow { display: block; width: 100%; padding: 6px 8px; border-radius: 6px; font-size: 12.5px; line-height: 1.4; color: var(--sh-ink); white-space: normal; }
+.sh.sh-wpop .sh-wcheckrow:hover:not([disabled]) { background: var(--sh-hover); }
+.sh.sh-wpop .sh-wcheckrow[disabled] { cursor: default; }

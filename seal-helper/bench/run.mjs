@@ -114,6 +114,24 @@ for (const [name, file, ED, waitFor] of [['plain', 'plain.html', '[data-native-d
   await page.click('#sh-wbar .sh-wb:has-text("µ °C ±")'); await page.click('.sh-wsym button:has-text("≥")'); await page.waitForTimeout(150);
   ok('symbol typed', /≥/.test(await html(page, ED)));
   await page.keyboard.press('Escape');
+  // 9b. rechercher et remplacer : le remplacement contient le mot cherche, il ne doit pas boucler
+  const before = ((await html(page, ED)).match(/CXCR5/g) || []).length;
+  await page.keyboard.press('Control+h'); await page.waitForSelector('.sh-wpop[data-kind="find"]');
+  await page.fill('.sh-wpop[data-kind="find"] input[aria-label="Find"]', 'cxcr5'); await page.waitForTimeout(150);
+  const count = await page.evaluate(() => document.querySelector('.sh-fcount').textContent);
+  ok('find counts the matches, case ignored', count === '1 of ' + before, count + ' / ' + before);
+  await page.screenshot({ path: path.join(shots, name + '-7-find.png') });
+  await page.fill('.sh-wpop[data-kind="find"] input[aria-label="Replace with"]', 'CXCR5 (L138D7)');
+  await page.click('.sh-wpop[data-kind="find"] button.pri'); await page.waitForTimeout(600);
+  out = (await html(page, ED)).replace(/<[^>]+>/g, '');
+  ok('replace all', (out.match(/CXCR5 \(L138D7\)/g) || []).length === before && (out.match(/CXCR5/g) || []).length === before, (out.match(/CXCR5 \(L138D7\)/g) || []).length + ' of ' + before);
+  await page.keyboard.press('Escape');
+  // 9c. controle avant publication
+  await page.click('#sh-wbar .sh-wb:has-text("Check")'); await page.waitForSelector('.sh-wpop[data-kind="check"]');
+  const flagged = await page.evaluate(() => document.querySelector('.sh-wpop[data-kind="check"]').textContent);
+  ok('check flags the half-empty table', /mostly empty/.test(flagged), flagged.slice(0, 200));
+  await page.screenshot({ path: path.join(shots, name + '-8-check.png') });
+  await page.keyboard.press('Escape');
   // 10. confort
   await page.click('#sh-wbar .sh-wb:has-text("Aa")'); await page.click('.sh-wseg button:has-text("Large")'); await page.click('.sh-wseg button:has-text("Atkinson")');
   await page.waitForTimeout(150);

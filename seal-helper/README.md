@@ -4,7 +4,7 @@ A Chrome extension that makes Seal calmer, easier to read and easier to write in
 
 ## Install (2 minutes)
 
-1. Download `seal-helper-2.1.0.zip` and unzip it.
+1. Download `seal-helper-2.2.0.zip` and unzip it.
 2. Open `chrome://extensions` and switch on **Developer mode** (top right).
 3. Click **Load unpacked** and pick the unzipped `seal-helper` folder.
 4. Open Seal. Click the extension icon (puzzle piece, then pin Seal Helper) to switch each setting on or off.
@@ -13,7 +13,12 @@ To update: replace the folder with the new one, then click the reload arrow on t
 
 ## If you see no change
 
-Click the extension icon on a Seal tab: the first card says whether Seal Helper is **active on this tab**, **paused**, or whether the tab **needs a reload** after an update (one button does it). After replacing the folder, always press the reload arrow on the Seal Helper card in `chrome://extensions`, then reload Seal. The sidebar shows its version (v2.1.0) at the bottom.
+Click the extension icon on a Seal tab: the first card says whether Seal Helper is **active on this tab**, **paused**, or whether the tab **needs a reload** after an update (one button does it). After replacing the folder, always press the reload arrow on the Seal Helper card in `chrome://extensions`, then reload Seal. The sidebar shows its version (v2.2.0) at the bottom.
+
+## 2.2
+
+- **Find and replace** in the open record: the **Find** button of the bar, or Ctrl H (⌘⇧H on a Mac). Every match is highlighted and counted, Enter goes to the next one, **Replace** and **Replace all** type the new text for you (Ctrl Z undoes each one). Words split by a change of formatting in the middle are not matched.
+- **Check** in the bar, before you publish: sections with nothing under their heading, template hints left in place, TODO / TBC / ???, deviations without text, tables that are mostly empty, bench ticks not yet written as a run log, a record still called Untitled. Click a line to go there. It only reads; Seal's review stays Seal's.
 
 ## 2.1
 

@@ -9,7 +9,7 @@
   const LOCAL = 'sealHelperWrite';   // reglages d affichage, snippets, ce qu on a appris de Seal
   const BENCH = 'sealHelperBench';   // coches de paillasse, par fiche
   const DEFAULTS = { on: true, wbar: true, paste: true, proto: true, values: true, slash: true };
-  const VERSION = '2.1.0';
+  const VERSION = '2.2.0';
   const root = document.documentElement;
   const isMac = /Mac/.test(navigator.platform);
   const Seal = window.Seal, Detect = window.Detect, Parse = window.Parse, Edit = window.Edit, Mix = window.Mix, Copy = window.Copy;
@@ -399,6 +399,9 @@
     if (e.key === 'Escape' && pop) { closePop(); return; }
     if (e.key === 'Escape' && benchOpen) { closeBench(); return; }
     const inEd = !!editorOf(e.target);
+    if (e.key.toLowerCase() === 'h' && !e.altKey && (isMac ? e.metaKey && e.shiftKey : e.ctrlKey && !e.shiftKey) && isOn('wbar') && docRoot()) {
+      e.preventDefault(); e.stopImmediatePropagation(); openFind(); return;
+    }
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'j' && isOn('wbar') && (inEd || cur.ed)) {
       e.preventDefault(); e.stopImmediatePropagation(); if (inEd) noteSelection(); openBlocks(false); return;
     }
@@ -491,6 +494,121 @@
   function openSymbols(anchor) {
     if (pop && pop.kind === 'symbols') return closePop();
     openPop('symbols', h('div', { class: 'sh-wsym' }, SYMBOLS.map(s => h('button', { type: 'button', onmousedown: keep, onclick: () => insertText(s) }, s))), anchor, { above: true });
+  }
+
+  // ------------------------------------------------------------ rechercher et remplacer dans la fiche
+  // Les occurrences sont peintes par l API Highlight (rien n est ecrit dans le document) ; un
+  // remplacement selectionne l occurrence puis tape le nouveau texte, comme le ferait le clavier.
+  let find = null; // { q, rep, cs, hits: [Range], idx }
+  const hl = (name, ranges) => { try { if (!window.Highlight || !CSS.highlights) return; if (ranges && ranges.length) CSS.highlights.set(name, new Highlight(...ranges)); else CSS.highlights.delete(name); } catch (e) {} };
+  function findHits(q, cs) {
+    const doc = docRoot(); const out = [];
+    if (!doc || !q) return out;
+    const needle = cs ? q : q.toLowerCase();
+    const w = document.createTreeWalker(doc, NodeFilter.SHOW_TEXT);
+    for (let n = w.nextNode(); n && out.length < 2000; n = w.nextNode()) {
+      if (n.parentElement.closest('.sh')) continue;
+      const hay = cs ? n.nodeValue : n.nodeValue.toLowerCase();
+      for (let i = hay.indexOf(needle); i >= 0; i = hay.indexOf(needle, i + needle.length)) { const r = document.createRange(); r.setStart(n, i); r.setEnd(n, i + needle.length); out.push(r); }
+    }
+    return out;
+  }
+  function paintFind(scroll) {
+    if (!find) { hl('sh-find'); hl('sh-find-cur'); return; }
+    find.hits = findHits(find.q, find.cs);
+    find.idx = find.hits.length ? Math.max(0, Math.min(find.idx, find.hits.length - 1)) : 0;
+    hl('sh-find', find.hits); hl('sh-find-cur', find.hits.length ? [find.hits[find.idx]] : null);
+    const c = $('.sh-wpop[data-kind="find"] .sh-fcount'); if (c) c.textContent = !find.q ? '' : find.hits.length ? (find.idx + 1) + ' of ' + find.hits.length : 'Not found';
+    if (scroll && find.hits.length) { const el = find.hits[find.idx].startContainer.parentElement; if (el && el.scrollIntoView) el.scrollIntoView({ block: 'center' }); }
+  }
+  async function replaceHit(range, text) {
+    const ed = editorOf(range.startContainer); if (!ed) return false;
+    ed.focus({ preventScroll: true });
+    const sel = document.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+    cur = { ed, range: range.cloneRange() };
+    await wait(30);
+    let ok = false;
+    try { ok = text ? document.execCommand('insertText', false, text) : document.execCommand('delete'); } catch (e) {}
+    await wait(25);
+    return ok;
+  }
+  async function replaceOne(all) {
+    if (!find || !find.hits.length) return;
+    const input = $('.sh-wpop[data-kind="find"] input');
+    if (!editorOf(find.hits[find.idx].startContainer)) return toast('This record is not being edited: press Edit in Seal first.', 'info');
+    let done = 0;
+    if (all) { // de la derniere a la premiere : ce qui precede ne bouge pas, et un remplacement qui contient le mot n est jamais repris
+      for (let i = Math.min(find.hits.length, 500) - 1; i >= 0; i--) { const hits = findHits(find.q, find.cs); if (!hits[i]) continue; if (await replaceHit(hits[i], find.rep)) done++; }
+    } else if (await replaceHit(find.hits[find.idx], find.rep)) done = 1;
+    paintFind(!all);
+    if (input) input.focus();
+    if (all) toast(done ? plural(done, 'replacement') + ' made. Ctrl Z undoes them one by one.' : 'Seal did not accept the replacement here.', done ? 'ok' : 'warn', 6000);
+    else if (!done) toast('Seal did not accept the replacement here.', 'warn');
+  }
+  function openFind() {
+    if (!docRoot()) return;
+    const start = selText().trim();
+    find = { q: oneBlock(start) && start.length < 80 ? start : (find ? find.q : ''), rep: find ? find.rep : '', cs: find ? find.cs : false, hits: [], idx: 0 };
+    const q = h('input', { type: 'text', value: find.q, placeholder: 'Find in this record', 'aria-label': 'Find' });
+    const rep = h('input', { type: 'text', value: find.rep, placeholder: 'Replace with', 'aria-label': 'Replace with' });
+    const step = d => { if (!find.hits.length) return; find.idx = (find.idx + d + find.hits.length) % find.hits.length; paintFind(true); };
+    q.addEventListener('input', () => { find.q = q.value; find.idx = 0; paintFind(true); });
+    rep.addEventListener('input', () => { find.rep = rep.value; });
+    const el = h('form', { onsubmit: e => { e.preventDefault(); step(1); }, onkeydown: e => { if (e.key === 'Enter' && e.shiftKey) { e.preventDefault(); step(-1); } } },
+      h('h3', {}, 'Find and replace'),
+      h('div', { class: 'sh-wrow' }, q, h('span', { class: 'sh-fcount' })),
+      rep,
+      h('label', { class: 'sh-wcheck' }, h('input', { type: 'checkbox', checked: find.cs, onchange: e => { find.cs = e.target.checked; find.idx = 0; paintFind(true); } }), 'Match case'),
+      h('div', { class: 'sh-wact' }, h('button', { type: 'button', onclick: () => step(-1) }, 'Previous'), h('button', { type: 'submit' }, 'Next'),
+        h('button', { type: 'button', onclick: () => replaceOne(false) }, 'Replace'), h('button', { type: 'button', class: 'pri', onclick: () => replaceOne(true) }, 'Replace all')));
+    openPop('find', el, { left: innerWidth - 340, right: innerWidth - 20, top: 60, bottom: 60 }, { onclose: () => { hl('sh-find'); hl('sh-find-cur'); } });
+    q.focus(); q.select(); paintFind(true);
+  }
+
+  // ------------------------------------------------------------ controle avant publication (lecture seule)
+  const HEAD = 'h1, h2, h3, h4, [data-native-block-type="h1"], [data-native-block-type="h2"], [data-native-block-type="h3"]';
+  function checkRecord() {
+    const doc = docRoot(); const out = [];
+    if (!doc) return out;
+    const add = (msg, el) => out.push({ msg, el });
+    const title = ($('[data-title-text]') ? $('[data-title-text]').textContent : '').replace(/\s+/g, ' ').trim();
+    if (/^(untitled|new (experiment|protocol|project|record))\b/i.test(title) || /^untitled/i.test(document.title)) add('The record is still called “' + (title || 'Untitled') + '”.', $('[data-title-text]'));
+    // Titre sans rien dessous
+    let curH = null, has = false;
+    const closeH = () => { if (curH && !has && !between(curH)) add('Nothing written under “' + short(curH.textContent.replace(/\s+/g, ' ').trim(), 50) + '”.', curH); };
+    const between = hd => { // une image ou un tableau juste apres le titre compte comme du contenu
+      for (let n = hd.nextElementSibling; n && !n.matches(HEAD) && !$(HEAD, n); n = n.nextElementSibling) if (n.matches('img, table') || $('img, table', n)) return true;
+      return false;
+    };
+    const w = document.createTreeWalker(doc, NodeFilter.SHOW_TEXT);
+    for (let n = w.nextNode(); n; n = w.nextNode()) {
+      const p = n.parentElement; if (!p || p.closest('.sh') || !n.nodeValue.trim()) continue;
+      const hd = p.closest(HEAD);
+      if (hd) { if (hd !== curH) { closeH(); curH = hd; has = false; } }
+      else {
+        has = true;
+        const t = n.nodeValue.trim();
+        if (/^\((the question this experiment answers|tissue, groups|markers, fluorochromes|steps with times|cytometer, settings|gating strategy|what the data show|samples, dilutions|standards, blanks|coating, blocking|reader, wavelength|samples, extraction|kit, input|targets, reference|instrument and programme|strain, sex|day 0, treatments|immunisation, dosing|tissues collected)/i.test(t)) add('A template hint is still there: “' + short(t, 44) + '”.', p);
+        else if (/\b(TODO|TBD|TBC|XXX)\b|\?\?\?/.test(t)) add('To finish: “' + short(t, 50) + '”.', p);
+        else if (/^Deviation \([^)]*\):\s*$/.test(p.textContent.trim())) add('A deviation has no text.', p);
+      }
+    }
+    closeH();
+    for (const t of $$('table', doc)) {
+      const cells = $$('td', t); const blank = cells.filter(c => !c.textContent.trim()).length;
+      if (cells.length >= 4 && blank / cells.length > 0.5) add('A table is mostly empty (' + blank + ' of ' + cells.length + ' cells).', t);
+    }
+    if (benchCount()) add('Bench mode has ticks or deviations that are not in the record yet (Add run log).', null);
+    return out;
+  }
+  function openCheck(anchor) {
+    if (pop && pop.kind === 'check') return closePop();
+    const list = checkRecord();
+    const flash = el => { if (!el) return; el.scrollIntoView({ block: 'center', behavior: 'smooth' }); const r = document.createRange(); r.selectNodeContents(el); hl('sh-find-cur', [r]); setTimeout(() => hl('sh-find-cur'), 2500); };
+    openPop('check', h('div', {}, h('h3', {}, 'Before you publish'),
+      list.length ? list.slice(0, 30).map(it => h('button', { type: 'button', class: 'sh-wcheckrow', disabled: !it.el, onclick: () => flash(it.el) }, it.msg))
+        : h('p', { class: 'sh-wnote' }, 'Nothing to flag: no empty section, no leftover hint, no half-empty table.'),
+      h('p', { class: 'sh-wnote' }, 'A reading aid only: it changes nothing and does not replace Seal\'s review.')), anchor, { above: true });
   }
 
   // ------------------------------------------------------------ confort de lecture (affichage seul)
@@ -660,9 +778,11 @@
           btn('Clear', 'Remove the formatting of the selection', clearFormat), sep(),
           btn('Table', 'Insert a table', () => { noteSelection(); openTable(); }),
           btn('µ °C ±', 'Lab symbols', e => openSymbols(e.currentTarget)),
-          btn('Blocks', 'Mix, templates, snippets, date (' + (isMac ? '⌘J' : 'Ctrl J') + (isOn('slash') && !local.sealSlash ? ', or type /' : '') + ')', () => { noteSelection(); openBlocks(false); }), sep()] : null,
+          btn('Blocks', 'Mix, templates, snippets, date (' + (isMac ? '⌘J' : 'Ctrl J') + (isOn('slash') && !local.sealSlash ? ', or type /' : '') + ')', () => { noteSelection(); openBlocks(false); }),
+          btn('Find', 'Find and replace in this record (' + (isMac ? '⌘⇧H' : 'Ctrl H') + ')', openFind), sep()] : null,
         logs ? btn('Add run log', 'Write the ticks and deviations of bench mode where your cursor is', addRunLog, 'accent') : null,
         btn('Bench', 'Bench mode: tick the steps, time them, note a deviation', openBench),
+        btn('Check', 'Before you publish: empty sections, leftover hints, half-empty tables', e => openCheck(e.currentTarget)),
         btn('Aa', 'Reading comfort: size, width, typeface, focus', e => openView(e.currentTarget)),
         local.view.focus ? btn('Exit focus', 'Show the sidebar and panels again', () => setView({ focus: false })) : null,
         h('span', { class: 'sh-wcount', title: 'Words in this record' }, words.toLocaleString('en-NZ') + ' words'));
