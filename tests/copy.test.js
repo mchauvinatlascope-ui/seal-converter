@@ -40,3 +40,9 @@ test('plain text of a whole document keeps the separator line', () => {
   const html = Seal.document([{ title: 'Day 0', sections: [{ title: 'Injection', steps: ['Inject.'] }] }]);
   assert.equal(Copy.plainText(html), `${'-'.repeat(184)}\nI. Day 0\na. Injection\n1. Inject.`);
 });
+
+test('a link keeps its href for Seal, and its address in plain text', () => {
+  const html = '<ol><li class="x">See the <a href="https://example.org/sop?a=1&amp;b=2">staining SOP</a>.</li><li><a href="https://example.org/b">https://example.org/b</a></li></ol>';
+  assert.equal(Copy.sealHtml(html), html.replace(' class="x"', ''));
+  assert.equal(Copy.plainText(html), '1. See the staining SOP (https://example.org/sop?a=1&b=2).\n2. https://example.org/b');
+});

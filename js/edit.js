@@ -2,6 +2,7 @@
 // format on a range of characters, and write it out again as Seal HTML.
 //
 // A run is { text, b, i, v }: bold, italic, and v for a value in blue bold.
+// A run may also carry href: the buttons never touch it, so a link stays a link.
 // Values are detected once, when the protocol is imported; after that the
 // buttons decide, so nothing re-colours itself behind the user's back.
 (function (root) {
@@ -9,7 +10,20 @@
 
   const KINDS = ['v', 'b', 'i'];
 
+  // One <a> around the runs that lead to the same place, formatting inside it.
   function renderRuns(runs) {
+    let html = '';
+    for (let k = 0; k < runs.length;) {
+      const href = runs[k].href || '';
+      const group = [];
+      while (k < runs.length && (runs[k].href || '') === href) group.push(runs[k++]);
+      const inner = renderPlain(group);
+      html += href && inner ? `<a href="${Seal.esc(href)}">${inner}</a>` : inner;
+    }
+    return html;
+  }
+
+  function renderPlain(runs) {
     let html = '';
     for (let k = 0; k < runs.length;) {
       const r = runs[k];

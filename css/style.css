@@ -353,6 +353,8 @@ label.btn { display: inline-flex; align-items: center; }
 .seal-sample li { margin-bottom: 6px; }
 .preview-body img { max-width: 100%; height: auto; margin: 6px 0; border: 1px solid var(--line); border-radius: 6px; }
 /* The 184 dash separator is wider than the card: show it as a single clipped line */
+/* A link is underlined, which tells it apart from a value in blue bold */
+.preview-body a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; cursor: text; }
 .preview-body p { margin: 0 0 8px; }
 .preview-body p.sep { margin: 0; white-space: nowrap; overflow: hidden; color: var(--muted); letter-spacing: -0.05em; }
 

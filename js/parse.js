@@ -7,7 +7,8 @@
 //   { kind: 'para', runs }                    a paragraph from HTML
 //   { kind: 'item', runs }                    a list item (always a step)
 //   { kind: 'table', head: [runs] | null, rows: [[runs]] }
-// and a run is a piece of text with its formatting: { text, b, i }.
+// and a run is a piece of text with its formatting: { text, b, i },
+// plus href when the text is a link in the source.
 (function (root) {
   const Seal = root.Seal || require('./seal.js');
   const Detect = root.Detect || require('./detect.js');
@@ -83,7 +84,37 @@
     return looksLikeTitle(runsText(runs)) && runs.every((r) => r.b || !r.text.trim());
   }
 
-  // Runs to Seal HTML: values in blue bold, then bold and italic kept from the source.
+  // A web address written out in the text. What closes the sentence is not part of it.
+  const URL_TEXT = /https?:\/\/[^\s<>"]+/g;
+  function findUrls(text) {
+    return Array.from(String(text).matchAll(URL_TEXT), (m) => {
+      const url = m[0].replace(/[.,;:!?)\]'’”]+$/, '');
+      return { start: m.index, end: m.index + url.length, url };
+    });
+  }
+
+  // Only links that still lead somewhere once in Seal: the web and e-mail.
+  // A bookmark inside the Word file or a path on a shared drive would be dead there.
+  function safeHref(href) {
+    let h = String(href || '').trim();
+    // Google Docs wraps every link in a redirect.
+    const wrapped = h.match(/^https?:\/\/www\.google\.com\/url\?(?:.*&)?q=([^&]+)/);
+    if (wrapped) { try { h = decodeURIComponent(wrapped[1]); } catch (e) { /* keep the wrapper */ } }
+    return /^(?:https?:\/\/|mailto:)\S+$/i.test(h) ? h : '';
+  }
+
+  // A title that holds a link, as HTML; null when it holds none and plain text will do.
+  function titleHtml(runs) {
+    if (!runs.some((r) => r.href)) return null;
+    const html = runs.map((r) => {
+      const t = Seal.esc(r.text.replace(/\s+/g, ' '));
+      return r.href && t.trim() ? `<a href="${Seal.esc(r.href)}">${t}</a>` : t;
+    }).join('');
+    return html.trim().replace(/:$/, '');
+  }
+
+  // Runs to Seal HTML: values in blue bold, then bold and italic kept from the source,
+  // and links kept as links.
   function runsToHtml(runs) {
     // One space at most, even across runs ("50 " + " µL").
     let prevSpace = true;
@@ -99,9 +130,15 @@
     // Formatting of every character, then values on top.
     const fmt = [];
     clean.forEach((r, n) => {
-      for (let k = 0; k < r.text.length; k++) fmt.push({ b: !!r.b, i: !!r.i, v: r.v ? `kept${n}` : -1 });
+      for (let k = 0; k < r.text.length; k++) fmt.push({ b: !!r.b, i: !!r.i, v: r.v ? `kept${n}` : -1, h: r.href || '' });
     });
+    // An address typed in full becomes a link too, and its digits are not values.
+    const inUrl = new Array(text.length).fill(false);
+    for (const u of findUrls(text)) {
+      for (let k = u.start; k < u.end; k++) { inUrl[k] = true; if (!fmt[k].h) fmt[k].h = u.url; }
+    }
     Detect.findValues(text).forEach((v, n) => {
+      for (let k = v.start; k < v.end; k++) if (inUrl[k]) return;
       for (let k = v.start; k < v.end; k++) if (fmt[k].v === -1) fmt[k].v = n;
     });
 
@@ -110,21 +147,32 @@
     while (k < end) {
       const f = fmt[k];
       let j = k + 1;
-      while (j < end && fmt[j].v === f.v && fmt[j].i === f.i && (f.v !== -1 || fmt[j].b === f.b)) j++;
+      while (j < end && fmt[j].v === f.v && fmt[j].i === f.i && fmt[j].h === f.h && (f.v !== -1 || fmt[j].b === f.b)) j++;
       const piece = text.slice(k, j);
       let h = f.v !== -1 ? Seal.value(piece) : Seal.esc(piece);
       if (f.v === -1 && f.b && piece.trim()) h = `<strong>${h}</strong>`;
-      pieces.push({ html: h, i: f.i && !!piece.trim() });
+      pieces.push({ html: h, i: f.i && !!piece.trim(), h: f.h });
       k = j;
     }
     // One <em> around a whole italic remark, values inside it included.
+    const italics = (list) => {
+      let html = '';
+      for (let n = 0; n < list.length; n++) {
+        if (!list[n].i) { html += list[n].html; continue; }
+        let inner = '';
+        while (n < list.length && list[n].i) inner += list[n++].html;
+        html += `<em>${inner}</em>`;
+        n--;
+      }
+      return html;
+    };
+    // One <a> around everything that leads to the same place.
     let html = '';
-    for (let n = 0; n < pieces.length; n++) {
-      if (!pieces[n].i) { html += pieces[n].html; continue; }
-      let inner = '';
-      while (n < pieces.length && pieces[n].i) inner += pieces[n++].html;
-      html += `<em>${inner}</em>`;
-      n--;
+    for (let n = 0; n < pieces.length;) {
+      const h = pieces[n].h;
+      const group = [];
+      while (n < pieces.length && pieces[n].h === h) group.push(pieces[n++]);
+      html += h ? `<a href="${Seal.esc(h)}">${italics(group)}</a>` : italics(group);
     }
     return html;
   }
@@ -206,12 +254,12 @@
       if (html) target().push({ type: 'para', html });
     };
     const newChapter = (runs) => {
-      chapter = { title: titleText(runs), blocks: [], sections: [] };
+      chapter = { title: titleText(runs), titleHtml: titleHtml(runs), blocks: [], sections: [] };
       chapters.push(chapter);
       section = null;
     };
     const newSection = (runs) => {
-      section = { title: titleText(runs), blocks: [] };
+      section = { title: titleText(runs), titleHtml: titleHtml(runs), blocks: [] };
       ensureChapter().sections.push(section);
     };
     const started = () => chapters.some((c) => c.title || c.sections.length);
@@ -232,7 +280,7 @@
         }
         target().push({
           type: 'table',
-          head: block.head ? block.head.map((c) => Seal.bold(titleText(c))) : null,
+          head: block.head ? block.head.map((c) => (c.some((r) => r.href) ? `<strong>${titleHtml(c)}</strong>` : Seal.bold(titleText(c)))) : null,
           rows: block.rows.map((row) => row.map(cellToHtml)),
         });
         afterTable = true;
@@ -362,16 +410,17 @@
     return el.getAttribute && el.getAttribute('data-native-color') === 'blue';
   }
 
-  function inlineRuns(node, b = false, i = false, out = [], v = false) {
+  function inlineRuns(node, b = false, i = false, out = [], v = false, href = '') {
     for (const child of node.childNodes) {
-      if (child.nodeType === 3) out.push({ text: child.nodeValue, b, i, v });
+      if (child.nodeType === 3) out.push({ text: child.nodeValue, b, i, v, href });
       else if (child.nodeType === 1) {
         const tag = child.tagName;
         if (/^(UL|OL|TABLE|STYLE|SCRIPT)$/.test(tag)) continue;
-        if (tag === 'BR') out.push({ text: ' ', b, i, v });
-        else if (tag === 'SUP') out.push({ text: scriptText(child.textContent, SUP, '^'), b, i, v });
-        else if (tag === 'SUB') out.push({ text: scriptText(child.textContent, SUB, '_'), b, i, v });
-        else inlineRuns(child, b || isBoldEl(child), i || isItalicEl(child), out, v || isValueEl(child));
+        const link = tag === 'A' ? safeHref(child.getAttribute('href')) : '';
+        if (tag === 'BR') out.push({ text: ' ', b, i, v, href });
+        else if (tag === 'SUP') out.push({ text: scriptText(child.textContent, SUP, '^'), b, i, v, href });
+        else if (tag === 'SUB') out.push({ text: scriptText(child.textContent, SUB, '_'), b, i, v, href });
+        else inlineRuns(child, b || isBoldEl(child), i || isItalicEl(child), out, v || isValueEl(child), link || href);
       }
     }
     return out;
@@ -466,7 +515,7 @@
     return /^\s*</.test(text) && /<\/(p|div|h[1-6]|li|td|table|span)>/i.test(text);
   }
 
-  const Parse = { textToBlocks, htmlToBlocks, blocksToDoc, runsToHtml, runsFromElement, readMarker, looksLikeHtml };
+  const Parse = { textToBlocks, htmlToBlocks, blocksToDoc, runsToHtml, runsFromElement, readMarker, looksLikeHtml, safeHref };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Parse;
   else root.Parse = Parse;

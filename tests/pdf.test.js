@@ -88,3 +88,23 @@ test('a document title in the biggest size on one line only, chapters in the nex
   ])]);
   assert.equal(html, '<h1>Cell staining</h1><h2>1. Staining</h2><p>Add 50 µL of antibody mix.</p><h2>2. Washing</h2><p>Wash twice.</p>');
 });
+
+test('words under a link rectangle take its address, a longer piece is cut at its edge', () => {
+  const items = Pdf.applyLinks([
+    word('See the', 72, 700), word('staining SOP', 120, 700), word('first.', 200, 700),
+    // One piece of 20 characters, 110 wide: the link covers "datasheet" only.
+    word('Read the datasheet .', 72, 680),
+    word('Not here', 120, 660),
+  ], [
+    { url: 'https://example.org/sop', rect: [119, 697, 187, 711] },
+    // The rectangle is a little off, as it is when letters differ in width.
+    { url: 'https://example.org/d', rect: [72 + 7.6 * 5.5, 677, 72 + 16.4 * 5.5, 691] },
+  ]);
+  assert.deepEqual(items.map((it) => [it.text, it.href || '']), [
+    ['See the', ''], ['staining SOP', 'https://example.org/sop'], ['first.', ''],
+    ['Read the ', ''], ['datasheet', 'https://example.org/d'], [' .', ''],
+    ['Not here', ''],
+  ]);
+  assert.equal(Pdf.toHtml([page(items.slice(0, 3))]),
+    '<p>See the <a href="https://example.org/sop">staining SOP</a> first.</p>');
+});

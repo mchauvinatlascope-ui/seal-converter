@@ -1,7 +1,7 @@
 // A PDF is a sheet of positioned words, not a document: this rebuilds lines,
 // paragraphs, headings and simple tables from where the text sits on the page.
 //
-// Input: pages = [{ width, height, items: [{ text, x, y, w, size, bold, italic }] }]
+// Input: pages = [{ width, height, items: [{ text, x, y, w, size, bold, italic, href? }] }]
 // with PDF coordinates (origin bottom left, y grows upwards), as read by pdf.js.
 // Output: HTML that the rest of the app reads like a saved web page.
 (function (root) {
@@ -13,7 +13,58 @@
   const GLYPH_BULLET = /^[-●○◦▪■□➢►]\s*/;
   const PAGE_NUMBER = /^(?:page\s*)?\d{1,4}(?:\s*(?:of|\/|-)\s*\d{1,4})?$/i;
 
-  const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+  // In a PDF a link is a rectangle laid over the page, apart from the text.
+  // links = [{ url, rect: [x1, y1, x2, y2] }]: the words under a rectangle take its address.
+  // A piece of text that only partly sits under it is cut where the rectangle ends,
+  // on whole words: letters are not all the same width, so the cut is only known roughly.
+  function applyLinks(items, links) {
+    if (!links || !links.length) return items;
+    const out = [];
+    for (const it of items) {
+      const w = it.w || 0;
+      const mid = it.y + 0.3 * (it.size || 0);
+      const over = links.filter((l) => {
+        const [x1, y1, x2, y2] = l.rect;
+        return l.url && mid >= Math.min(y1, y2) && mid <= Math.max(y1, y2)
+          && Math.min(it.x + w, Math.max(x1, x2)) - Math.max(it.x, Math.min(x1, x2)) > 0;
+      });
+      const n = it.text ? it.text.length : 0;
+      if (!over.length || !n || !w) { out.push(it); continue; }
+      // Which characters each rectangle covers, taking every character as equally wide.
+      const hrefs = new Array(n).fill('');
+      for (const l of over) {
+        const a = Math.min(l.rect[0], l.rect[2]), b = Math.max(l.rect[0], l.rect[2]);
+        for (let k = 0; k < n; k++) {
+          const cx = it.x + (k + 0.5) * w / n;
+          if (cx >= a && cx <= b) hrefs[k] = l.url;
+        }
+      }
+      // A word goes where most of its letters go; a space is linked between two linked words.
+      const words = Array.from(it.text.matchAll(/\S+/g), (m) => ({ from: m.index, to: m.index + m[0].length }));
+      for (const word of words) {
+        const count = new Map();
+        for (let k = word.from; k < word.to; k++) count.set(hrefs[k], (count.get(hrefs[k]) || 0) + 1);
+        const [best, votes] = Array.from(count).sort((a, b) => b[1] - a[1])[0];
+        word.href = votes * 2 > word.to - word.from ? best : '';
+        for (let k = word.from; k < word.to; k++) hrefs[k] = word.href;
+      }
+      words.forEach((word, i) => {
+        const next = words[i + 1];
+        const between = next && next.href === word.href ? word.href : '';
+        for (let k = word.to; k < (next ? next.from : n); k++) hrefs[k] = between;
+      });
+      for (let k = 0; k < (words.length ? words[0].from : n); k++) hrefs[k] = '';
+      for (let k = 0; k < n;) {
+        let j = k + 1;
+        while (j < n && hrefs[j] === hrefs[k]) j++;
+        out.push({ ...it, text: it.text.slice(k, j), x: it.x + k * w / n, w: (j - k) * w / n, href: hrefs[k] || undefined });
+        k = j;
+      }
+    }
+    return out;
+  }
   const round = (n, step = 0.5) => Math.round(n / step) * step;
   const hasMarker = (text) => NUMBER.test(text) || LETTER.test(text) || ROMAN.test(text) || BULLET.test(text);
 
@@ -43,7 +94,7 @@
           if (gap > 1.2 * line.size) line.cols.push([]);
           else if (gap > 0.18 * line.size && !/\s$/.test(prev.text) && !/^\s/.test(text)) text = ' ' + text;
         }
-        line.cols[line.cols.length - 1].push({ text, b: !!it.bold, i: !!it.italic, x: it.x });
+        line.cols[line.cols.length - 1].push({ text, b: !!it.bold, i: !!it.italic, x: it.x, href: it.href || '' });
         prev = it;
       }
       line.cols = line.cols.filter((c) => c.length);
@@ -89,10 +140,13 @@
     let html = '';
     for (const r of runs) {
       if (!r.text) continue;
-      let t = esc(r.text);
+      // The spaces at the edges of a link stay outside it.
+      const [, left, core, right] = r.href ? r.text.match(/^(\s*)([\s\S]*?)(\s*)$/) : [null, '', r.text, ''];
+      let t = esc(core);
       if (r.b) t = `<strong>${t}</strong>`;
       if (r.i) t = `<em>${t}</em>`;
-      html += t;
+      if (r.href && core) t = `<a href="${esc(r.href)}">${t}</a>`;
+      html += left + t + right;
     }
     return html;
   }
@@ -221,7 +275,7 @@
     return out.join('');
   }
 
-  const Pdf = { toHtml, linesOf };
+  const Pdf = { toHtml, linesOf, applyLinks };
   if (typeof module !== 'undefined' && module.exports) module.exports = Pdf;
   else root.Pdf = Pdf;
 })(this);

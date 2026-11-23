@@ -38,6 +38,12 @@
       if (slash && /^(h[1-6]|p|li|tr)$/.test(name)) { out += '\n'; continue; }
       if (name === 'br') out += '\n';
     }
+    // A link keeps its address in plain text, unless the address is already what is written.
+    out = out.replace(/<a\b[^>]*\bhref="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi, (all, href, inner) => {
+      const shown = decode(inner.replace(/<[^>]+>/g, '')).trim();
+      const url = decode(href);
+      return shown === url || `mailto:${shown}` === url ? inner : `${inner} (${href})`;
+    });
     return decode(out.replace(/<img[^>]*>/gi, '[image]').replace(/<[^>]+>/g, ''))
       .replace(/[ \t]+\n/g, '\n')
       .replace(/\n{3,}/g, '\n\n')

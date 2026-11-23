@@ -96,7 +96,12 @@ const Files = (function () {
           italic: /italic|oblique/i.test(name),
         };
       });
-      pages.push({ width: view.width, height: view.height, items });
+      // Links are rectangles over the page; the words under them take the address.
+      const annotations = await page.getAnnotations().catch(() => []);
+      const links = annotations
+        .filter((a) => a.subtype === 'Link' && (a.url || a.unsafeUrl) && Array.isArray(a.rect))
+        .map((a) => ({ url: a.url || a.unsafeUrl, rect: a.rect }));
+      pages.push({ width: view.width, height: view.height, items: Pdf.applyLinks(items, links) });
     }
     const html = Pdf.toHtml(pages);
     if (!html) throw new Error('This PDF has no text to read, it is probably a scan.');

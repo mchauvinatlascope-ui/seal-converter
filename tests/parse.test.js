@@ -188,3 +188,42 @@ test('the title block can be left out', () => {
   assert.equal(html.includes('PROTOCOL RECORD'), false);
   assert.match(html, /^<p>-{184}<\/p><h2>I\. Design<\/h2>/);
 });
+
+const A = (href, inner) => `<a href="${href}">${inner}</a>`;
+const link = (text, href, b = false, i = false) => ({ text, b, i, href });
+
+test('a link in the source stays a link, with the text around it', () => {
+  const html = Parse.runsToHtml([run('Follow the '), link('staining SOP', 'https://example.org/sop?id=4&v=2'), run(' before starting.')]);
+  assert.equal(html, `Follow the ${A('https://example.org/sop?id=4&amp;v=2', 'staining SOP')} before starting.`);
+});
+
+test('bold, italic and a value keep their formatting inside a link', () => {
+  const html = Parse.runsToHtml([link('Buffer, ', 'https://example.org/b', true), link('50 mL', 'https://example.org/b'), run(' '), link('see note', 'https://example.org/n', false, true)]);
+  assert.equal(html, `${A('https://example.org/b', `<strong>Buffer, </strong>${B('50 mL')}`)} ${A('https://example.org/n', '<em>see note</em>')}`);
+});
+
+test('an address typed in full becomes a link, its digits are not values, the full stop stays out', () => {
+  assert.equal(fromText('Order from https://example.org/item/1:200/5 mL.'),
+    `<ol><li>Order from ${A('https://example.org/item/1:200/5', 'https://example.org/item/1:200/5')} ${B('mL')}.</li></ol>`.replace(B('mL'), 'mL'));
+  assert.equal(Parse.runsToHtml([run('See (https://example.org/a), then spin 5 min.')]),
+    `See (${A('https://example.org/a', 'https://example.org/a')}), then spin ${B('5 min')}.`);
+});
+
+test('only web and e-mail links are kept, and a Google Docs redirect is unwrapped', () => {
+  assert.equal(Parse.safeHref('#_Toc12345'), '');
+  assert.equal(Parse.safeHref('file:///S:/lab/sop.docx'), '');
+  assert.equal(Parse.safeHref('javascript:alert(1)'), '');
+  assert.equal(Parse.safeHref(' mailto:lab@example.org '), 'mailto:lab@example.org');
+  assert.equal(Parse.safeHref('https://www.google.com/url?q=https://example.org/a%3Fb%3D1&sa=D&ust=1'), 'https://example.org/a?b=1');
+});
+
+test('a link in a title or in a table header is kept', () => {
+  const blocks = [
+    { kind: 'heading', level: 1, runs: [run('Reagents, '), link('supplier list', 'https://example.org/s')] },
+    { kind: 'table', head: [[run('Antibody', true)], [link('Datasheet', 'https://example.org/d', true)]], rows: [[[run('CD4')], [link('open', 'https://example.org/cd4')]]] },
+  ];
+  assert.equal(Seal.document(Parse.blocksToDoc(blocks)),
+    `${SEP}<h2>I. Reagents, ${A('https://example.org/s', 'supplier list')}</h2>`
+    + `<table><tr><th><strong>Antibody</strong></th><th><strong>${A('https://example.org/d', 'Datasheet')}</strong></th></tr>`
+    + `<tr><td>CD4</td><td>${A('https://example.org/cd4', 'open')}</td></tr></table>`);
+});

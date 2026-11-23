@@ -66,3 +66,12 @@ test('formatting part of an existing run splits it', () => {
 test('text is escaped in the preview too', () => {
   assert.equal(Edit.renderRuns([{ text: 'Keep <5 min & cold' }]), 'Keep &lt;5 min &amp; cold');
 });
+
+test('a link survives the buttons: formatting goes inside it', () => {
+  const runs = [{ text: 'See the ' }, { text: 'staining SOP', href: 'https://example.org/sop' }, { text: ' first.' }];
+  assert.equal(Edit.renderRuns(runs), 'See the <a href="https://example.org/sop">staining SOP</a> first.');
+  const bolded = Edit.setFormat(runs, 4, 16, 'b', true);
+  assert.equal(Edit.renderRuns(bolded),
+    'See <strong>the</strong> <a href="https://example.org/sop"><strong>staining</strong> SOP</a> first.');
+  assert.equal(Edit.renderRuns(Edit.clearFormat(bolded, 0, 26)), 'See the <a href="https://example.org/sop">staining SOP</a> first.');
+});

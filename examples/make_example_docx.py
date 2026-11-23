@@ -31,8 +31,13 @@ def para(*runs, style=None, numbered=False):
         if numbered:
             ppr += '<w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr>'
         ppr += '</w:pPr>'
-    body = ''.join(r if r.startswith('<w:r>') else run(r) for r in runs)
+    body = ''.join(r if r.startswith('<w:') else run(r) for r in runs)
     return f'<w:p>{ppr}{body}</w:p>'
+
+
+def link(text, rel_id):
+    """A hyperlink to the address stored under rel_id in the document relationships."""
+    return f'<w:hyperlink r:id="{rel_id}">{run(text)}</w:hyperlink>'
 
 
 def small_png(width=96, height=64):
@@ -87,6 +92,7 @@ body = ''.join([
     para(run('Dilute '), run('OVA', b=True), run(' to 1 mg/mL in sterile PBS.'), numbered=True),
     para(run('Mix 1:1 with '), run('alum', b=True), run(' for 30 min at RT '), run('(vortex every 10 min)', i=True), run('.'), numbered=True),
     para(run('Keep on ice — use within 2 h.'), numbered=True),
+    para(run('Record the lot number in the '), link('reagent register', 'rId4'), run('.'), numbered=True),
     para('Day 0', style='Heading1'),
     para('Immunisation', style='Heading2'),
     para(run('1. Inject 50 µL subcutaneously in each hock, 2 times, 10 min apart.')),
@@ -134,6 +140,7 @@ doc_rels = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationsh
 <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
 <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>
 <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/photo.png"/>
+<Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://example.org/reagent-register?lab=demo&amp;year=2026" TargetMode="External"/>
 </Relationships>'''
 
 out = os.path.join(HERE, 'example-protocol.docx')

@@ -56,12 +56,13 @@
   }
 
   // A chapter always comes with the separator paragraph before it.
-  function chapter(n, title) {
-    return `${separator()}<h2>${roman(n)}. ${esc(title)}</h2>`;
+  // titleHtml is given when the title holds a link, which plain text would lose.
+  function chapter(n, title, titleHtml) {
+    return `${separator()}<h2>${roman(n)}. ${titleHtml || esc(title)}</h2>`;
   }
 
-  function section(n, title) {
-    return `<h3>${letter(n)}. ${esc(title)}</h3>`;
+  function section(n, title, titleHtml) {
+    return `<h3>${letter(n)}. ${titleHtml || esc(title)}</h3>`;
   }
 
   // Each step is HTML already built with value(), bold(), note() and esc().
@@ -115,12 +116,12 @@
     let n = 0;
     return chapters.map((ch) => {
       const parts = [];
-      if (ch.title) parts.push(chapter(++n, ch.title));
+      if (ch.title) parts.push(chapter(++n, ch.title, ch.titleHtml));
       if (ch.intro) parts.push(paragraph(ch.intro));
       if (ch.steps && ch.steps.length) parts.push(steps(ch.steps));
       parts.push(blocks(ch.blocks));
       (ch.sections || []).forEach((sec, j) => {
-        parts.push(section(j + 1, sec.title));
+        parts.push(section(j + 1, sec.title, sec.titleHtml));
         if (sec.steps && sec.steps.length) parts.push(steps(sec.steps));
         parts.push(blocks(sec.blocks));
       });

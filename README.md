@@ -41,6 +41,7 @@ What the reader does with a document:
 - Headings numbered `1.`, `2.`, `3.` through the document become chapters, and their sub numbers (`5.1`, `5.2`) sections. Steps that start with a number are left alone, because their numbering restarts in every part.
 - In plain text, `I.`, `II.` also mark chapters, `a.`, `b.` sections, and a short line with no value, no final punctuation and no action verb at the start is read as a section. Tab separated lines become a table.
 - A bench sheet table whose columns are `#`, `STEP` and `DONE` becomes a numbered list of steps.
+- Links stay links: a hyperlink in a Word file, a web page or a PDF keeps its address, and a web address written out in full becomes one. Only web and e-mail links are kept, since a bookmark inside the file or a path on a shared drive would lead nowhere from Seal.
 - Values with units turn blue, em dashes become commas, superscripts such as 10⁶ and 4 °C are kept, and the original numbering is dropped because Seal numbers everything again.
 
 The list survives closing the tab: the documents already converted, your corrections and the ticks come back next time, held in this browser alone and never sent anywhere. *Clear the list* empties it. A document whose text was too heavy to keep is listed again but needs its file a second time.
