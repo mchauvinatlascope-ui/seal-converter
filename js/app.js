@@ -465,6 +465,35 @@ const Files = (function () {
   }
   pasteBox.addEventListener('input', showPasted);
 
+  // A paste from Word, SharePoint or a web page carries HTML next to its plain text.
+  // A text box only takes the plain text, which loses links, bold, lists and tables,
+  // so a rich paste becomes a document of the list, read like a saved page.
+  const RICH = /<(?:p|h[1-6]|li|td|table|b|strong|a|ul|ol)[\s>]/i;
+  function addPasted(source, kind) {
+    const taken = new Set(documents.map((d) => d.name));
+    let name = 'Pasted document';
+    for (let n = 2; taken.has(name); n++) name = `Pasted document ${n}`;
+    const doc = { name, folder: '', file: null, kind, source, html: null, issues: null, done: false, error: null };
+    documents.push(doc);
+    open(doc);
+  }
+  document.addEventListener('paste', (e) => {
+    if (!card.offsetParent || !e.clipboardData) return; // another tab is showing
+    const target = e.target && e.target.closest ? e.target : null;
+    const inBox = target === pasteBox;
+    // Typing fields and the preview keep their own paste.
+    if (!inBox && target && target.closest('input, textarea, select, [contenteditable="true"]')) return;
+    const html = e.clipboardData.getData('text/html');
+    const text = e.clipboardData.getData('text/plain');
+    if (html && RICH.test(html)) {
+      e.preventDefault();
+      addPasted(html, 'html');
+    } else if (!inBox && text.trim()) {
+      e.preventDefault();
+      addPasted(text, 'text');
+    }
+  });
+
   let depth = 0;
   card.addEventListener('dragenter', (e) => { e.preventDefault(); depth++; card.classList.add('dragging'); });
   card.addEventListener('dragover', (e) => e.preventDefault());
