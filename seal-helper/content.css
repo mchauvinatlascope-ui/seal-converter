@@ -653,3 +653,6 @@ html.sh-dark #sh-page .sh-nbl-card, html.sh-dark #sh-page .sh-nbl-row, html.sh-d
 html.sh-dark #sh-page .sh-nbl-table th { background: #23262a; color: #a9a9a3; border-color: #2e3236; }
 html.sh-dark #sh-page .sh-nbl-table td, html.sh-dark #sh-page .sh-nbl-bar { border-color: #2e3236; }
 html.sh-dark #sh-page .sh-nbl-link, html.sh-dark #sh-page .sh-nbl-live { color: #7fb0ff; }
+
+/* 2.0.1 : extension neuve, le cahier pas encore lu */
+#sh-side .sh-hint { margin: 0; padding: 0 10px 4px 34px; font-size: 11.5px; color: var(--sh-ink3); }

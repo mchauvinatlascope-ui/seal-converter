@@ -14,7 +14,7 @@
   const isMac = /Mac/.test(navigator.platform);
   let opts = { ...DEFAULTS };
   const isOn = k => opts.on && opts[k];
-  const VERSION = '2.0.0';
+  const VERSION = '2.0.1';
 
   // Ecran de passage : quand on doit recharger la page (fiche -> cahier, cahier -> fiche), un ecran
   // calme au nom de la destination couvre le depart, le rechargement et les sauts de l appli,
@@ -1177,7 +1177,14 @@
           create ? h('button', { type: 'button', class: 'sh-edit', title: create.label, 'aria-label': create.label, onclick: () => openCreate(create.key) }, icon('plus')) : null));
       }
     }
-    if (!appSections.length) scroll.append(h('div', { class: 'sh-group sh-first' }, 'Lab'));
+    // Extension neuve (ou reinstallee) : elle n a pas encore lu le cahier. Un clic l y emmene, et ses sections arrivent ici.
+    if (!appSections.length && !atNotebook()) {
+      scroll.append(h('div', { class: 'sh-group sh-first' }, 'Lab notebook'));
+      scroll.append(h('button', { type: 'button', class: 'sh-row', title: 'Opens the lab notebook page once; its sections (Projects, Experiments, Protocols…) then show here', onclick: () => { page = null; guideOpened = true; loadNotebook(null); } },
+        icon('home'), h('span', { class: 'sh-t' }, 'Open the lab notebook')));
+      scroll.append(h('p', { class: 'sh-hint' }, 'Its sections will show here once it has opened.'));
+    }
+    if (!appSections.length) scroll.append(h('div', { class: 'sh-group' + (atNotebook() ? ' sh-first' : '') }, 'Lab'));
     if (!appSections.length) for (const sc of lab) {
       const v = resolve(sc, d.views);
       const row = h('div', { class: 'sh-sc' + (v || sc.path ? '' : ' unset') },

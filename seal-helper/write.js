@@ -9,7 +9,7 @@
   const LOCAL = 'sealHelperWrite';   // reglages d affichage, snippets, ce qu on a appris de Seal
   const BENCH = 'sealHelperBench';   // coches de paillasse, par fiche
   const DEFAULTS = { on: true, wbar: true, paste: true, values: true, slash: true };
-  const VERSION = '2.0.0';
+  const VERSION = '2.0.1';
   const root = document.documentElement;
   const isMac = /Mac/.test(navigator.platform);
   const Seal = window.Seal, Detect = window.Detect, Parse = window.Parse, Edit = window.Edit, Mix = window.Mix;
