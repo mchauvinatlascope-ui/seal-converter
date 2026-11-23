@@ -64,8 +64,11 @@ for (const [name, file, ED, waitFor] of [['plain', 'plain.html', '[data-native-d
   ok('Bold', /<(strong|b)>CXCR5/.test(await html(page, ED)));
   // 4. collage Word nettoye
   await caretEnd(page, P); await page.keyboard.press('Enter'); await page.waitForTimeout(800); // l editeur regroupe sinon Entree et collage dans la meme annulation
+  await page.evaluate(() => { window.__given = []; document.addEventListener('paste', e => window.__given.push(e.clipboardData.getData('text/html')), true); });
   await paste(page, WORD, 'plain'); await page.waitForTimeout(500);
   let out = await html(page, ED);
+  const same = await page.evaluate(w => { const app = Copy.sealHtml(Seal.document(Parse.blocksToDoc(Parse.htmlToBlocks(w), { dropHeader: true }))); return window.__given[window.__given.length - 1] === app; }, WORD);
+  ok('protocol paste: the HTML handed to the editor is the converter page\'s, byte for byte', same);
   const t0 = await page.evaluate(() => document.querySelector('#sh-wtoast')?.textContent || '');
   ok('protocol paste: lab format by default', /lab protocol format/.test(t0) && /<h2[^>]*>I\. /.test(out) && /Vortex before adding/.test(out) && /Bcl6/.test(out), t0);
   if (name === 'prosemirror') console.log('     ' + out.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').replace(/-{20,}/g, '[rule]').slice(60, 420));
