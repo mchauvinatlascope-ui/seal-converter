@@ -160,6 +160,15 @@ for (const [name, file, ED, waitFor] of [['plain', 'plain.html', '[data-native-d
   out = await html(page, ED);
   ok('run log written at the cursor', /Run log, [\s\S]*Done at[\s\S]*lysed 3 min/.test(out) && !(await page.$('#sh-bench')));
   await page.screenshot({ path: path.join(shots, name + '-6-end.png'), fullPage: true });
+  { // essai des formats : l extension dit ce que l editeur a garde
+    await caretEnd(page, ED + ' h2'); await page.keyboard.press('Enter'); await page.waitForTimeout(800);
+    await page.keyboard.press('Control+j'); await page.waitForSelector('.sh-wpop[data-kind="blocks"]');
+    await page.keyboard.type('formatting'); await page.keyboard.press('Enter'); await page.waitForTimeout(1500);
+    const line = (await diag(page)).split('\n').pop();
+    const kept = (line.match(/kept: ([^|]*)/) || [, ''])[1], lost = (line.match(/lost: ([^|]*)/) || [, ''])[1];
+    // TipTap StarterKit n a ni souligne ni indice : ils doivent sortir « lost » ; un contenteditable nu garde presque tout.
+    ok('format test reads back what the editor kept', /heading 2/.test(kept) && /bullets/.test(kept) && /table/.test(kept) && (name === 'plain' ? /underline/.test(kept) : /underline/.test(lost) && /subscript/.test(lost) && /value/.test(kept)), 'kept: ' + kept.slice(0, 150) + ' | lost: ' + lost.slice(0, 120));
+  }
   if (name === 'plain') { // Ctrl+S presse Publish, jamais Approve
     await page.keyboard.press('Control+s'); await page.waitForTimeout(200);
     const r = await page.evaluate(() => [window.__pub || 0, window.__approve || 0]);

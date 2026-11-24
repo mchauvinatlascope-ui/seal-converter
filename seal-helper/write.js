@@ -9,7 +9,7 @@
   const LOCAL = 'sealHelperWrite';   // reglages d affichage, snippets, ce qu on a appris de Seal
   const BENCH = 'sealHelperBench';   // coches de paillasse, par fiche
   const DEFAULTS = { on: true, wbar: true, paste: true, proto: true, values: true, slash: true, pubkey: true };
-  const VERSION = '2.4.1';
+  const VERSION = '2.5.0';
   const root = document.documentElement;
   const isMac = /Mac/.test(navigator.platform);
   const Seal = window.Seal, Detect = window.Detect, Parse = window.Parse, Edit = window.Edit, Mix = window.Mix, Copy = window.Copy;
@@ -320,6 +320,7 @@
       { g: 'Blocks', t: 'Deviation', s: 'dated note', run: () => insertHtml(`<p><strong>Deviation (${esc(today())}, ${clock()}):</strong> </p>`) },
       { g: 'Blocks', t: 'Date', s: today(), run: () => insertText(today()) },
       { g: 'Blocks', t: 'Time', s: clock(), run: () => insertText(clock()) },
+      { g: 'Blocks', t: 'Formatting test', s: 'what Seal keeps (test record)', title: 'Inserts one line per format, then reads back what Seal kept. Use it in a test record; Ctrl Z removes it.', run: formatTest },
       ...TEMPLATES.map(([t, s, list]) => ({ g: 'Experiment templates', t, s: list.length + ' sections', title: s, run: () => insertHtml(sectionHtml(list)) })),
       ...snips.map((sn, n) => ({ g: 'My snippets', t: sn.name, s: 'saved ' + sn.date, run: () => insertHtml(sn.html, sn.text), del: () => { local.snippets.splice(n, 1); saveLocal(); } })),
       ...(selText().trim() ? [{ g: 'My snippets', t: 'Save the selection as a snippet…', s: '', run: openSaveSnippet }] : []),
@@ -502,6 +503,49 @@
       h('div', { class: 'sh-wact' }, h('button', { type: 'button', onclick: closePop }, 'Cancel'), h('button', { type: 'submit', class: 'pri' }, 'Insert mix')));
     openPop('mix', el, caretRect() || $('#sh-wbar'));
     calc(); panel.focus();
+  }
+  // Essai des formats : une ligne par format, inseree comme un collage, puis relue dans la fiche.
+  // Le resultat (quels formats Seal a gardes, sous quelle balise) va dans le Diagnostic : il decide du ruban.
+  const FORMATS = [
+    ['underline', '<p><u>SHT underline</u></p>', (el, cs) => !!el.closest('u') || /underline/.test(cs.textDecorationLine)],
+    ['strike', '<p><s>SHT strike</s></p>', (el, cs) => !!el.closest('s, strike, del') || /line-through/.test(cs.textDecorationLine)],
+    ['subscript', '<p>CO<sub>SHT subscript</sub></p>', (el, cs) => !!el.closest('sub') || cs.verticalAlign === 'sub'],
+    ['superscript', '<p>10<sup>SHT superscript</sup></p>', (el, cs) => !!el.closest('sup') || cs.verticalAlign === 'super'],
+    ['highlight', '<p><mark style="background-color: rgb(255, 235, 59);">SHT highlight</mark></p>', (el, cs, base) => !!el.closest('mark') || (cs.backgroundColor !== base.backgroundColor && !/rgba\(0, 0, 0, 0\)|transparent/.test(cs.backgroundColor))],
+    ['red text', '<p><span style="color: rgb(200, 30, 30);">SHT red text</span></p>', (el, cs, base) => cs.color !== base.color],
+    ['code', '<p><code>SHT code</code></p>', el => !!el.closest('code, pre')],
+    ['centre', '<p style="text-align: center;">SHT centre</p>', (el, cs) => cs.textAlign === 'center'],
+    ['heading 1', '<h1>SHT heading 1</h1>', el => !!el.closest('h1, [data-native-block-type="h1"]')],
+    ['heading 2', '<h2>SHT heading 2</h2>', el => !!el.closest('h2, [data-native-block-type="h2"]')],
+    ['heading 3', '<h3>SHT heading 3</h3>', el => !!el.closest('h3, [data-native-block-type="h3"]')],
+    ['heading 4', '<h4>SHT heading 4</h4>', el => !!el.closest('h4, [data-native-block-type="h4"]')],
+    ['bullets', '<ul><li>SHT bullets</li></ul>', el => !!el.closest('ul') || /bullet|ul|unordered/i.test((el.closest('[data-native-block-type]') || el).getAttribute('data-native-block-type') || '')],
+    ['numbered', '<ol><li>SHT numbered<ol><li>SHT nested</li></ol></li></ol>', el => !!el.closest('ol') || /number|ol|ordered|step/i.test((el.closest('[data-native-block-type]') || el).getAttribute('data-native-block-type') || '')],
+    ['nested', '', el => !!(el.closest('li') && el.closest('li').parentElement.closest('li')) || !!(el.closest('[data-native-block-type]') && el.closest('[data-native-block-type]').parentElement.closest('[data-native-block-type]'))],
+    ['checklist', '<ul><li><input type="checkbox">SHT checklist</li></ul>', el => !!(el.closest('li, [data-native-block-type]') && $('input[type="checkbox"], [role="checkbox"]', el.closest('li, [data-native-block-type]')))],
+    ['quote', '<blockquote><p>SHT quote</p></blockquote>', el => !!el.closest('blockquote, [data-native-block-type*="quote"]')],
+    ['link', '<p><a href="https://example.org/">SHT link</a></p>', el => !!el.closest('a')],
+    ['value', '<p>' + Seal.value('SHT value') + '</p>', el => !!el.closest('[data-native-color="blue"]')],
+    ['table', '<table><tr><th>SHT table</th><th>B</th></tr><tr><td>1</td><td>2</td></tr></table>', el => !!el.closest('table, [role="table"], [data-native-block-type*="table"]')],
+  ];
+  async function formatTest() {
+    const html = '<p><strong>Formatting test (Seal Helper): delete me</strong></p>' + FORMATS.map(f => f[1]).join('');
+    if (!await insertHtml(html)) return;
+    await wait(700);
+    const ed = cur.ed; const base = getComputedStyle(ed);
+    const found = {}; const w = document.createTreeWalker(ed, NodeFilter.SHOW_TEXT);
+    for (let n = w.nextNode(); n; n = w.nextNode()) { const m = n.nodeValue.match(/SHT ([a-z0-9 ]+)/); if (m && !found[m[1].trim()]) found[m[1].trim()] = n.parentElement; }
+    const kept = [], lost = [], chains = [];
+    for (const [name, , test] of FORMATS) {
+      const el = found[name];
+      if (!el) { lost.push(name + ' (text gone)'); continue; }
+      let ok = false; try { ok = test(el, getComputedStyle(el), base); } catch (e) {}
+      (ok ? kept : lost).push(name);
+      const chain = []; for (let x = el; x && x !== ed && chain.length < 5; x = x.parentElement) chain.push(x.tagName.toLowerCase() + (x.getAttribute('data-native-block-type') ? '[' + x.getAttribute('data-native-block-type') + ']' : ''));
+      chains.push(name + '=' + chain.join('<'));
+    }
+    local.caps = { at: today(), way: lastInsert, kept, lost, chains }; saveLocal();
+    toast('Seal kept ' + kept.length + ' of ' + FORMATS.length + ' formats. Now open the extension menu, Diagnostic, and paste it to me. Ctrl Z removes the test.', 'ok', 15000, [['Undo', () => undo()]]);
   }
   const SYMBOLS = ['µ', '°C', '°', '±', '×', '÷', '→', '←', '≥', '≤', '≈', '≠', 'α', 'β', 'γ', 'δ', 'ε', 'κ', 'λ', 'Δ', '⁺', '⁻', '²', '³', '⁶', '₂', '½', '‰'];
   function openSymbols(anchor) {
@@ -925,6 +969,8 @@
     out.push('header buttons ' + (heads.slice(0, 30).join(' | ') || 'none seen') + ' || publish found: ' + (pb ? labelsOf(pb)[0] : 'no') + ' || change found: ' + (changeButton() ? 'yes' : 'no')
       + ' || publish waiting: ' + (publishWaiting() ? labelsOf(publishWaiting())[0] : 'no') + ' || sign block: ' + (signBlock() ? 'yes' : 'no')
       + ' || page buttons saying publish/sign: ' + ($$('button, [role="button"], a').filter(x => shown(x) && labelsOf(x).some(t => /publish|sign/i.test(t))).map(x => labelsOf(x)[0] + (usable(x) ? '' : ' (off)')).slice(0, 12).join(' | ') || 'none'));
+    const c = local.caps;
+    out.push(c ? 'format test ' + c.at + ' via ' + c.way + ' | kept: ' + c.kept.join(', ') + ' | lost: ' + c.lost.join(', ') + ' | ' + c.chains.join(' ; ') : 'format test not run (Blocks, Formatting test, in a test record)');
     return out.join('\n');
   }
   window.SealHelperWrite = { diag, cleanHtml, readSteps, version: VERSION };
