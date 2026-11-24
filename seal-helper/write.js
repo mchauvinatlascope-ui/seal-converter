@@ -9,7 +9,7 @@
   const LOCAL = 'sealHelperWrite';   // reglages d affichage, snippets, ce qu on a appris de Seal
   const BENCH = 'sealHelperBench';   // coches de paillasse, par fiche
   const DEFAULTS = { on: true, wbar: true, paste: true, proto: true, values: true, slash: true, pubkey: true };
-  const VERSION = '2.4.0';
+  const VERSION = '2.4.1';
   const root = document.documentElement;
   const isMac = /Mac/.test(navigator.platform);
   const Seal = window.Seal, Detect = window.Detect, Parse = window.Parse, Edit = window.Edit, Mix = window.Mix, Copy = window.Copy;
@@ -402,10 +402,15 @@
     // Ctrl+S : le bouton Publish de Seal, presse pour toi. Rien d autre : si Seal demande une confirmation, elle reste a toi.
     if (e.key.toLowerCase() === 's' && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && isOn('pubkey') && !e.repeat) {
       const b = publishButton();
-      if (b) { e.preventDefault(); e.stopImmediatePropagation(); pressSeal(b); toast('Publish pressed for you. Seal takes it from here.', 'ok', 3500); return; }
+      if (b) { e.preventDefault(); e.stopImmediatePropagation(); try { b.scrollIntoView({ block: 'center' }); } catch (err) {} pressSeal(b); toast('Publish pressed for you. Seal takes it from here.', 'ok', 3500); return; }
+      const waiting = publishWaiting() || (onChangePage() ? signBlock() : null);
+      if (waiting) { // Seal attend encore quelque chose (le sens de la signature, une revue) : on y va, on ne le remplit pas
+        e.preventDefault(); e.stopImmediatePropagation(); try { waiting.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (err) {}
+        toast('This is where Seal publishes. Complete what it asks (the signature is yours), then ' + (isMac ? '⌘S' : 'Ctrl S') + ' again or press Publish.', 'info', 8000); return;
+      }
       const cs = changeButton();
       if (cs) { e.preventDefault(); e.stopImmediatePropagation(); pressSeal(cs); toast('Opened the change this record belongs to. Press ' + (isMac ? '⌘S' : 'Ctrl S') + ' again there to publish.', 'info', 7000); return; }
-      if (docRoot()) { e.preventDefault(); toast('No Publish button found on this page. Open the change in “To publish”, or send me the Diagnostic.', 'info', 7000); return; }
+      if (docRoot() || onChangePage()) { e.preventDefault(); toast('No Publish button found on this page. Open the change in “To publish”, or send me the Diagnostic.', 'info', 7000); return; }
     }
     if (e.key.toLowerCase() === 'h' && !e.altKey && (isMac ? e.metaKey && e.shiftKey : e.ctrlKey && !e.shiftKey) && isOn('wbar') && docRoot()) {
       e.preventDefault(); e.stopImmediatePropagation(); openFind(); return;
@@ -511,6 +516,12 @@
   const labelsOf = x => [x.textContent, x.getAttribute('aria-label'), x.getAttribute('title'), x.getAttribute('data-tooltip')].map(t => (t || '').replace(/\s+/g, ' ').trim()).filter(t => t && t.length <= 40);
   const usable = x => !x.closest('.sh') && !x.disabled && x.getAttribute('aria-disabled') !== 'true' && x.getClientRects().length > 0;
   const PUBLISH_ANY = /\bpublish\b/i, PUBLISH_NOT = /unpublish|published|approve|reject|to publish|publish(ing)? (history|settings)/i;
+  // Publier dans Seal est une signature a ton nom (« Signing as », « Signature meaning ») : on appuie sur
+  // Publish quand Seal le propose, on ne remplit ni ne confirme jamais la signature a ta place.
+  const shown = x => !x.closest('.sh') && x.getClientRects().length > 0;
+  const publishWaiting = () => $$('button, [role="button"]').find(x => shown(x) && !usable(x) && labelsOf(x).some(t => PUBLISH_ANY.test(t) && !PUBLISH_NOT.test(t))) || null;
+  const signBlock = () => $$('h1, h2, h3, h4, label, div, span, p, b, strong').find(el => shown(el) && !el.children.length && /^(ready to publish|signing as|signature meaning)/i.test(el.textContent.trim())) || null;
+  const onChangePage = () => /\/cs\/\d+/.test(location.pathname);
   function publishButton() {
     const clickable = 'button, a, [role="button"], [role="menuitem"]';
     // D abord l en-tete de la fiche ou du changement, libelle exact ; sinon tout bouton visible qui dit « publish ».
@@ -911,7 +922,9 @@
     // Libelles des boutons de l en-tete (interface de Seal, pas du contenu) : pour reperer Publish.
     const heads = $$(HEADERS).flatMap(hd => $$('button, a, [role="button"]', hd)).filter(x => !x.closest('.sh')).map(x => (labelsOf(x)[0] || '?').replace(/\d{3,}/g, 'N') + (usable(x) ? '' : ' (off)'));
     const pb = publishButton();
-    out.push('header buttons ' + (heads.slice(0, 30).join(' | ') || 'none seen') + ' || publish found: ' + (pb ? labelsOf(pb)[0] : 'no') + ' || change found: ' + (changeButton() ? 'yes' : 'no'));
+    out.push('header buttons ' + (heads.slice(0, 30).join(' | ') || 'none seen') + ' || publish found: ' + (pb ? labelsOf(pb)[0] : 'no') + ' || change found: ' + (changeButton() ? 'yes' : 'no')
+      + ' || publish waiting: ' + (publishWaiting() ? labelsOf(publishWaiting())[0] : 'no') + ' || sign block: ' + (signBlock() ? 'yes' : 'no')
+      + ' || page buttons saying publish/sign: ' + ($$('button, [role="button"], a').filter(x => shown(x) && labelsOf(x).some(t => /publish|sign/i.test(t))).map(x => labelsOf(x)[0] + (usable(x) ? '' : ' (off)')).slice(0, 12).join(' | ') || 'none'));
     return out.join('\n');
   }
   window.SealHelperWrite = { diag, cleanHtml, readSteps, version: VERSION };

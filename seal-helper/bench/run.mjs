@@ -184,6 +184,19 @@ for (const [name, file, ED, waitFor] of [['plain', 'plain.html', '[data-native-d
   console.log('     ' + (await diag(page)).split('\n').pop());
   await page.close();
 }
+{ // Page d un changement : publier = signer. Ctrl+S y emmene, n ecrit rien dans la signature, et n appuie que quand Seal est pret.
+  console.log('\n== change page');
+  const page = await open('cs/534.html', null);
+  await page.keyboard.press('Control+s'); await page.waitForTimeout(700);
+  let r = await page.evaluate(() => ({ pub: window.__pub || 0, y: window.scrollY, meaning: document.getElementById('meaning').value, toast: document.querySelector('#sh-wtoast')?.textContent || '' }));
+  ok('Ctrl S on a change that still waits: goes to the signature block, presses nothing, fills nothing', r.pub === 0 && r.y > 300 && r.meaning === '' && /signature is yours/.test(r.toast), JSON.stringify(r).slice(0, 160));
+  await page.fill('#meaning', 'Author'); await page.locator('body').click({ position: { x: 5, y: 5 } });
+  await page.keyboard.press('Control+s'); await page.waitForTimeout(300);
+  r = await page.evaluate(() => window.__pub || 0);
+  ok('Ctrl S once Seal is ready: Publish pressed once', r === 1, String(r));
+  console.log('     ' + (await diag(page)).split('\n').pop().slice(0, 300));
+  await page.close();
+}
 await browser.close();
 console.log(fails ? '\n' + fails + ' FAILED' : '\nall green');
 process.exit(fails ? 1 : 0);
