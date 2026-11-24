@@ -4,7 +4,7 @@ A Chrome extension that makes Seal calmer, easier to read and easier to write in
 
 ## Install (2 minutes)
 
-1. Download `seal-helper-2.6.0.zip` and unzip it.
+1. Download `seal-helper-2.6.1.zip` and unzip it.
 2. Open `chrome://extensions` and switch on **Developer mode** (top right).
 3. Click **Load unpacked** and pick the unzipped `seal-helper` folder.
 4. Open Seal. Click the extension icon (puzzle piece, then pin Seal Helper) to switch each setting on or off.
@@ -13,7 +13,13 @@ To update: replace the folder with the new one, then click the reload arrow on t
 
 ## If you see no change
 
-Click the extension icon on a Seal tab: the first card says whether Seal Helper is **active on this tab**, **paused**, or whether the tab **needs a reload** after an update (one button does it). After replacing the folder, always press the reload arrow on the Seal Helper card in `chrome://extensions`, then reload Seal. The sidebar shows its version (v2.6.0) at the bottom.
+Click the extension icon on a Seal tab: the first card says whether Seal Helper is **active on this tab**, **paused**, or whether the tab **needs a reload** after an update (one button does it). After replacing the folder, always press the reload arrow on the Seal Helper card in `chrome://extensions`, then reload Seal. The sidebar shows its version (v2.6.1) at the bottom.
+
+## 2.6.1
+
+- **Fast scrolling no longer changes page**: a quick trackpad scroll with a sideways drift could trigger the browser's own back gesture. It is switched off on Seal; the arrows at the top of the sidebar and Alt ← / Alt → still go back and forward.
+- **Bench mode reads Seal's lists**: in Seal a numbered step is a paragraph that carries a list style, not a list item, so every line used to get a box. Those paragraphs are now the steps; the others stay text.
+- **Formatting test and Diagnostic** say more: which blocks a paste created, and what a Seal paragraph looks like (attribute names, classes and styles only, never its text).
 
 ## 2.6
 

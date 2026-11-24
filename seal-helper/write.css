@@ -38,8 +38,11 @@ html.sh-dark .sh .sh-wb.val { color: #8fb4f0; }
 #sh-wbar.docked {
   position: sticky; top: 0; bottom: auto; left: auto; transform: none; z-index: 20; max-width: none; width: 100%; flex: none;
   align-items: stretch; padding: 5px 12px 3px; border: 0; border-bottom: 1px solid var(--sh-line); border-radius: 0; box-shadow: none;
-  background: var(--sh-bg); overflow-x: auto; scrollbar-width: none;
+  background: var(--sh-bg); overflow: hidden;
 }
+/* Un defilement rapide au pave tactile ne doit jamais devenir le geste « page precedente » du navigateur. */
+html { overscroll-behavior-x: none; }
+body { overscroll-behavior-x: none; }
 #sh-wbar.docked .sh-wgn { display: block; }
 #sh-wbar.docked .sh-wcount { align-self: center; }
 #sh-wbar.docked .sh-wmore { align-self: center; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }

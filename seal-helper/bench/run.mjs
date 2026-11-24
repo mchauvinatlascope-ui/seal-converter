@@ -193,6 +193,18 @@ for (const [name, file, ED, waitFor] of [['plain', 'plain.html', '[data-native-d
   console.log('     ' + (await diag(page)).split('\n').pop());
   await page.close();
 }
+{ // Editeur facon Plate (Seal) : pas de <li>, des blocs p avec un style de liste. Seuls ceux-la sont des etapes.
+  console.log('\n== plate-like lists');
+  const page = await open('plate.html', null);
+  await page.waitForSelector('#sh-wbar'); await page.click('#sh-wbar [data-k="bench"]'); await page.waitForSelector('#sh-bench');
+  const got = await page.evaluate(() => Array.from(document.querySelectorAll('#sh-bench .sh-bsteps > *')).map(e => e.className.split(' ')[0] + ':' + e.textContent.slice(0, 12)));
+  const n = re => got.filter(x => re.test(x)).length;
+  ok('list-styled paragraphs are the steps, other paragraphs stay text', n(/^sh-bstep/) === 3 && n(/^sh-bpara/) === 2 && n(/^sh-bhead/) === 1 && !got.some(x => /sh-wnote|sh-bhint/.test(x)), got.join(' | '));
+  await page.keyboard.press('Escape');
+  console.log((await diag(page)).split('\n').filter(l => /^p |^scroller/.test(l)).map(l => '     ' + l.slice(0, 260)).join('\n'));
+  ok('fast sideways overscroll cannot trigger the browser back gesture', await page.evaluate(() => getComputedStyle(document.documentElement).overscrollBehaviorX === 'none'));
+  await page.close();
+}
 { // Page d un changement : publier = signer. Ctrl+S y emmene, n ecrit rien dans la signature, et n appuie que quand Seal est pret.
   console.log('\n== change page');
   const page = await open('cs/534.html', null);

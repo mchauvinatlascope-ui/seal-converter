@@ -9,7 +9,7 @@
   const LOCAL = 'sealHelperWrite';   // reglages d affichage, snippets, ce qu on a appris de Seal
   const BENCH = 'sealHelperBench';   // coches de paillasse, par fiche
   const DEFAULTS = { on: true, wbar: true, paste: true, proto: true, values: true, slash: true, pubkey: true };
-  const VERSION = '2.6.0';
+  const VERSION = '2.6.1';
   const root = document.documentElement;
   const isMac = /Mac/.test(navigator.platform);
   const Seal = window.Seal, Detect = window.Detect, Parse = window.Parse, Edit = window.Edit, Mix = window.Mix, Copy = window.Copy;
@@ -546,21 +546,31 @@
   ];
   async function formatTest() {
     const html = '<p><strong>Formatting test (Seal Helper): delete me</strong></p>' + FORMATS.map(f => f[1]).join('');
-    if (!await insertHtml(html)) return;
-    await wait(700);
+    const plain = 'Formatting test (Seal Helper): delete me\n' + FORMATS.map(f => f[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n');
+    const count = () => { const o = {}; for (const el of $$('[data-native-block-type]', cur.ed || document)) { const t = el.getAttribute('data-native-block-type'); o[t] = (o[t] || 0) + 1; } return o; };
+    const before = count();
+    if (!await insertHtml(html, plain)) return;
+    await wait(900);
     const ed = cur.ed; const base = getComputedStyle(ed);
-    const found = {}; const w = document.createTreeWalker(ed, NodeFilter.SHOW_TEXT);
-    for (let n = w.nextNode(); n; n = w.nextNode()) { const m = n.nodeValue.match(/SHT ([a-z0-9 ]+)/); if (m && !found[m[1].trim()]) found[m[1].trim()] = n.parentElement; }
+    const after = count();
+    const added = Object.keys(after).map(k => [k, after[k] - (before[k] || 0)]).filter(x => x[1]).map(x => x[0] + (x[1] > 0 ? '+' : '') + x[1]).join(' ') || 'no block';
+    const names = FORMATS.map(f => f[0]).sort((a, b) => b.length - a.length);
+    const found = {}; const nodes = new Set(); const w = document.createTreeWalker(ed, NodeFilter.SHOW_TEXT);
+    for (let n = w.nextNode(); n; n = w.nextNode()) {
+      if (n.nodeValue.indexOf('SHT ') < 0) continue;
+      for (const name of names) if (!found[name] && n.nodeValue.indexOf('SHT ' + name) >= 0) { found[name] = n.parentElement; nodes.add(n); }
+    }
     const kept = [], lost = [], chains = [];
     for (const [name, , test] of FORMATS) {
       const el = found[name];
       if (!el) { lost.push(name + ' (text gone)'); continue; }
       let ok = false; try { ok = test(el, getComputedStyle(el), base); } catch (e) {}
       (ok ? kept : lost).push(name);
-      const chain = []; for (let x = el; x && x !== ed && chain.length < 5; x = x.parentElement) chain.push(x.tagName.toLowerCase() + (x.getAttribute('data-native-block-type') ? '[' + x.getAttribute('data-native-block-type') + ']' : ''));
-      chains.push(name + '=' + chain.join('<'));
+      const blk = el.closest('[data-native-block-type]');
+      const cs = getComputedStyle(el);
+      chains.push(name + '=' + (blk ? blk.getAttribute('data-native-block-type') : '?') + (blk && listStyled(blk) ? '(list)' : '') + '/' + el.tagName.toLowerCase() + (Number(cs.fontWeight) >= 600 ? '.b' : '') + (cs.fontStyle === 'italic' ? '.i' : ''));
     }
-    local.caps = { at: today(), way: lastInsert, kept, lost, chains }; saveLocal();
+    local.caps = { at: today(), way: lastInsert, kept, lost, chains, added, nodes: nodes.size }; saveLocal();
     toast('Seal kept ' + kept.length + ' of ' + FORMATS.length + ' formats. Now open the extension menu, Diagnostic, and paste it to me. Ctrl Z removes the test.', 'ok', 15000, [['Undo', () => undo()]]);
   }
   const SYMBOLS = ['µ', '°C', '°', '±', '×', '÷', '→', '←', '≥', '≤', '≈', '≠', 'α', 'β', 'γ', 'δ', 'ε', 'κ', 'λ', 'Δ', '⁺', '⁻', '²', '³', '⁶', '₂', '½', '‰'];
@@ -759,7 +769,23 @@
   // seules les etapes (elements de liste) se cochent. Sans aucune liste dans la fiche, une ligne est une etape
   // si elle est numerotee, commence par un verbe de paillasse ou porte une valeur ; chaque ligne se corrige a la main.
   const isHead = el => /^H[1-4]$/.test(el.tagName) || /^h[1-6]$/i.test(el.getAttribute('data-native-block-type') || '');
-  const isListEl = el => el.tagName === 'LI' || LIST_BLOCK.test(el.getAttribute('data-native-block-type') || '');
+  // Dans Seal (editeur Plate) une etape numerotee n est pas un <li> : c est un bloc « p » qui porte un style de liste.
+  // On le reconnait a son affichage (list-item, compteur CSS) ou a ses attributs, jamais a son texte.
+  const LISTY = /list-?style|listStyle|ordered|numbered|bullet|todo|checklist|indent-?list/i;
+  function listStyled(el) {
+    if (!el.hasAttribute('data-native-block-type')) return false;
+    for (const a of el.attributes) if (a.name !== 'data-native-block-type' && (/list|todo|check/i.test(a.name) || ((a.name === 'class' || a.name === 'style') && (LISTY.test(a.value) || /counter-(increment|reset|set)/.test(a.value))))) return true;
+    try {
+      const cs = getComputedStyle(el);
+      if (cs.display === 'list-item' || (cs.counterIncrement && cs.counterIncrement !== 'none')) return true;
+      const before = getComputedStyle(el, '::before').content;
+      if (before && /counter\(|"\d+[.)]"|"[•◦▪–-]"/.test(before)) return true;
+      const kid = el.firstElementChild;
+      if (kid && (getComputedStyle(kid).display === 'list-item' || /counter\(/.test(getComputedStyle(kid, '::before').content || ''))) return true;
+    } catch (e) {}
+    return false;
+  }
+  const isListEl = el => el.tagName === 'LI' || LIST_BLOCK.test(el.getAttribute('data-native-block-type') || '') || listStyled(el);
   const BLOCKS = 'li, p, h1, h2, h3, h4, table, ol, ul, [data-native-block-type]';
   const MARKER = /^\s*(?:step\s*)?(?:\d{1,3}[.)]|[a-z][.)]|[-•*–])\s+/i;
   const VERB = /^(?:then |next |finally |carefully |gently )?(?:add|aspirate|acquire|block|bleed|centrifuge|collect|count|cull|decant|discard|dilute|dissolve|filter|fix|flick|harvest|incubate|inject|keep|label|leave|lyse|mash|mix|pellet|permeabili[sz]e|pipette|place|plate|pour|prepare|record|remove|repeat|resuspend|rinse|run|seed|spin|stain|store|thaw|top up|transfer|vortex|wait|wash|weigh)\b/i;
@@ -1010,8 +1036,21 @@
     out.push('header buttons ' + (heads.slice(0, 30).join(' | ') || 'none seen') + ' || publish found: ' + (pb ? labelsOf(pb)[0] : 'no') + ' || change found: ' + (changeButton() ? 'yes' : 'no')
       + ' || publish waiting: ' + (publishWaiting() ? labelsOf(publishWaiting())[0] : 'no') + ' || sign block: ' + (signBlock() ? 'yes' : 'no')
       + ' || page buttons saying publish/sign: ' + ($$('button, [role="button"], a').filter(x => shown(x) && labelsOf(x).some(t => /publish|sign/i.test(t))).map(x => labelsOf(x)[0] + (usable(x) ? '' : ' (off)')).slice(0, 12).join(' | ') || 'none'));
+    try {
+      const ps = $$('[data-native-block-type="p"]', doc || document);
+      const names = {}; for (const el of ps) for (const a of el.attributes) names[a.name] = (names[a.name] || 0) + 1;
+      const shape = el => { if (!el) return 'none'; const cs = getComputedStyle(el); let path = ''; for (let x = el.firstElementChild, d = 0; x && d < 4; x = x.firstElementChild, d++) path += '>' + x.tagName.toLowerCase() + (x.className && typeof x.className === 'string' ? '.' + x.className.split(/\s+/).slice(0, 2).join('.') : '');
+        return 'display ' + cs.display + ' counter ' + cs.counterIncrement + ' before ' + (getComputedStyle(el, '::before').content || '').slice(0, 30) + ' | class ' + (el.getAttribute('class') || '').slice(0, 90) + ' | style ' + (el.getAttribute('style') || '').slice(0, 90) + ' | ' + Array.from(el.attributes).filter(a => /^data-/.test(a.name) && a.value.length <= 24).map(a => a.name + '=' + a.value).join(' ').slice(0, 200) + ' | ' + path; };
+      const lists = ps.filter(listStyled);
+      const numbered = ps.find(el => /^\s*\d{1,2}[.)]\s/.test(el.textContent)); // numero tape a la main ?
+      out.push('p blocks ' + ps.length + ' | list-styled ' + lists.length + ' | typed numbers ' + ps.filter(el => /^\s*\d{1,2}[.)]\s/.test(el.textContent)).length + ' | attrs ' + Object.entries(names).map(([k, v]) => k + '×' + v).join(' ').slice(0, 400));
+      out.push('p plain: ' + shape(ps.find(el => !listStyled(el) && el.textContent.trim())));
+      out.push('p list: ' + shape(lists[0]) + (numbered && !lists.length ? ' || p with a typed number: ' + shape(numbered) : ''));
+      const sc = (function up(el) { for (let x = el; x && x !== document.body; x = x.parentElement) { const o = getComputedStyle(x).overflowY; if (/auto|scroll/.test(o) && x.scrollHeight > x.clientHeight + 4) return x; } return null; })(doc);
+      out.push('scroller ' + (sc ? sc.tagName.toLowerCase() + ' ' + sc.clientWidth + 'x' + sc.clientHeight + ' scrollW ' + sc.scrollWidth + ' overscroll ' + getComputedStyle(sc).overscrollBehaviorX : 'page') + ' | page scrollW ' + document.documentElement.scrollWidth + ' of ' + innerWidth + ' | bar ' + ($('#sh-wbar') ? ($('#sh-wbar').classList.contains('docked') ? 'docked' : 'floating') : 'none'));
+    } catch (e) { out.push('p shape failed: ' + e.message); }
     const c = local.caps;
-    out.push(c ? 'format test ' + c.at + ' via ' + c.way + ' | kept: ' + c.kept.join(', ') + ' | lost: ' + c.lost.join(', ') + ' | ' + c.chains.join(' ; ') : 'format test not run (Blocks, Formatting test, in a test record)');
+    out.push(c ? 'format test ' + c.at + ' via ' + c.way + ' | blocks added: ' + (c.added || '?') + ' | text nodes: ' + (c.nodes || '?') + ' | kept: ' + c.kept.join(', ') + ' | lost: ' + c.lost.join(', ') + ' | ' + c.chains.join(' ; ') : 'format test not run (Blocks, Formatting test, in a test record)');
     return out.join('\n');
   }
   window.SealHelperWrite = { diag, cleanHtml, readSteps, version: VERSION };
