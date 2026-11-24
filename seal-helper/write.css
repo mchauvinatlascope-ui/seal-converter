@@ -173,3 +173,22 @@ html.sh-dark #sh-bench .sh-val { color: #8fb4f0; }
 .sh.sh-wpop .sh-wcheckrow { display: block; width: 100%; padding: 6px 8px; border-radius: 6px; font-size: 12.5px; line-height: 1.4; color: var(--sh-ink); white-space: normal; }
 .sh.sh-wpop .sh-wcheckrow:hover:not([disabled]) { background: var(--sh-hover); }
 .sh.sh-wpop .sh-wcheckrow[disabled] { cursor: default; }
+
+/* ---------------------------------------------------------------- 2.4 : la feuille de paillasse suit la fiche (titres, texte, tableaux) */
+#sh-bench .sh-bhead { margin: 18px 0 4px; padding: 0 10px; font-size: 15px; font-weight: 700; color: var(--sh-ink); }
+#sh-bench .sh-bhead:first-child { margin-top: 0; }
+#sh-bench .sh-bpara { display: flex; gap: 12px; align-items: baseline; padding: 4px 10px 4px 48px; font-size: 14.5px; color: var(--sh-ink2); }
+#sh-bench .sh-bpara > div { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+#sh-bench .sh-blink.quiet { color: var(--sh-ink3); font-weight: 500; font-size: 11.5px; }
+#sh-bench .sh-btable { padding: 6px 10px 8px 48px; overflow-x: auto; }
+#sh-bench .sh-btable table { border-collapse: collapse; font-size: 13.5px; }
+#sh-bench .sh-btable td, #sh-bench .sh-btable th { border: 1px solid var(--sh-line); padding: 3px 10px; text-align: left; vertical-align: top; }
+#sh-bench .sh-btable th { font-weight: 650; background: var(--sh-side); }
+#sh-bench .sh-bhint { padding: 0 10px 8px; }
+@media print {
+  html.sh-bench-open #sh-bench .sh-bhead { margin: 5mm 0 1mm; padding: 0; font-size: 12.5pt; color: #000; break-after: avoid; }
+  html.sh-bench-open #sh-bench .sh-bpara { padding: 1.5mm 0 1.5mm 9mm; font-size: 10.5pt; color: #222; }
+  html.sh-bench-open #sh-bench .sh-btable { padding: 2mm 0 2mm 9mm; overflow: visible; }
+  html.sh-bench-open #sh-bench .sh-btable table { font-size: 10pt; }
+  html.sh-bench-open #sh-bench .sh-btable td, html.sh-bench-open #sh-bench .sh-btable th { border: 1px solid #666; background: none; }
+}

@@ -168,6 +168,22 @@ for (const [name, file, ED, waitFor] of [['plain', 'plain.html', '[data-native-d
   console.log((await diag(page)).split('\n').map(l => '     ' + l.slice(0, 230)).join('\n'));
   await page.close();
 }
+{ // Fiche sans liste : titres, texte et tableau restent du contexte, seules les lignes d action se cochent
+  console.log('\n== loose');
+  const page = await open('loose.html', null);
+  await page.waitForSelector('#sh-wbar'); await page.click('#sh-wbar .sh-wb:has-text("Bench")'); await page.waitForSelector('#sh-bench');
+  const got = await page.evaluate(() => Array.from(document.querySelectorAll('#sh-bench .sh-bsteps > *')).map(e => e.className.replace('sh-wnote ', '').split(' ')[0] + ':' + e.textContent.slice(0, 14)));
+  const n = re => got.filter(x => re.test(x)).length;
+  ok('bench follows the record: headings, text, table, steps', n(/^sh-bhead/) === 2 && n(/^sh-bstep/) === 3 && n(/^sh-bpara/) === 2 && n(/^sh-btable/) === 1, got.join(' | '));
+  await page.click('#sh-bench .sh-bpara >> nth=1 >> .sh-blink'); await page.waitForTimeout(150);
+  ok('“Step” turns a text line into a step', (await page.$$('#sh-bench .sh-bstep')).length === 4);
+  await page.screenshot({ path: path.join(shots, 'loose-bench.png') });
+  await page.keyboard.press('Escape'); await page.waitForTimeout(150);
+  await page.keyboard.press('Control+s'); await page.waitForTimeout(200);
+  ok('Ctrl S without a Publish button opens the change', /Opened the change/.test(await page.evaluate(() => document.querySelector('#sh-wtoast')?.textContent || '')));
+  console.log('     ' + (await diag(page)).split('\n').pop());
+  await page.close();
+}
 await browser.close();
 console.log(fails ? '\n' + fails + ' FAILED' : '\nall green');
 process.exit(fails ? 1 : 0);

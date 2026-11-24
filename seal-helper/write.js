@@ -9,7 +9,7 @@
   const LOCAL = 'sealHelperWrite';   // reglages d affichage, snippets, ce qu on a appris de Seal
   const BENCH = 'sealHelperBench';   // coches de paillasse, par fiche
   const DEFAULTS = { on: true, wbar: true, paste: true, proto: true, values: true, slash: true, pubkey: true };
-  const VERSION = '2.3.0';
+  const VERSION = '2.4.0';
   const root = document.documentElement;
   const isMac = /Mac/.test(navigator.platform);
   const Seal = window.Seal, Detect = window.Detect, Parse = window.Parse, Edit = window.Edit, Mix = window.Mix, Copy = window.Copy;
@@ -403,7 +403,9 @@
     if (e.key.toLowerCase() === 's' && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && isOn('pubkey') && !e.repeat) {
       const b = publishButton();
       if (b) { e.preventDefault(); e.stopImmediatePropagation(); pressSeal(b); toast('Publish pressed for you. Seal takes it from here.', 'ok', 3500); return; }
-      if (docRoot()) { e.preventDefault(); toast('Nothing to publish here: Seal shows no Publish button on this page.', 'info'); return; }
+      const cs = changeButton();
+      if (cs) { e.preventDefault(); e.stopImmediatePropagation(); pressSeal(cs); toast('Opened the change this record belongs to. Press ' + (isMac ? '⌘S' : 'Ctrl S') + ' again there to publish.', 'info', 7000); return; }
+      if (docRoot()) { e.preventDefault(); toast('No Publish button found on this page. Open the change in “To publish”, or send me the Diagnostic.', 'info', 7000); return; }
     }
     if (e.key.toLowerCase() === 'h' && !e.altKey && (isMac ? e.metaKey && e.shiftKey : e.ctrlKey && !e.shiftKey) && isOn('wbar') && docRoot()) {
       e.preventDefault(); e.stopImmediatePropagation(); openFind(); return;
@@ -505,9 +507,23 @@
   // ------------------------------------------------------------ publier au clavier
   // Le bouton de Seal, dans l en-tete de la fiche ou du changement. Jamais Approve : valider le travail d un autre ne se fait pas par reflexe.
   const PUBLISH = /^(publish|review and publish|submit for review)\b/i;
+  const HEADERS = '[data-testid="changeset-top-navbar"], [data-testid="entity-top-navbar"]';
+  const labelsOf = x => [x.textContent, x.getAttribute('aria-label'), x.getAttribute('title'), x.getAttribute('data-tooltip')].map(t => (t || '').replace(/\s+/g, ' ').trim()).filter(t => t && t.length <= 40);
+  const usable = x => !x.closest('.sh') && !x.disabled && x.getAttribute('aria-disabled') !== 'true' && x.getClientRects().length > 0;
+  const PUBLISH_ANY = /\bpublish\b/i, PUBLISH_NOT = /unpublish|published|approve|reject|to publish|publish(ing)? (history|settings)/i;
   function publishButton() {
-    for (const header of $$('[data-testid="changeset-top-navbar"], [data-testid="entity-top-navbar"]')) {
-      const b = $$('button, a, [role="button"]', header).find(x => !x.closest('.sh') && !x.disabled && x.getAttribute('aria-disabled') !== 'true' && (PUBLISH.test(x.textContent.replace(/\s+/g, ' ').trim()) || PUBLISH.test(x.getAttribute('aria-label') || '')));
+    const clickable = 'button, a, [role="button"], [role="menuitem"]';
+    // D abord l en-tete de la fiche ou du changement, libelle exact ; sinon tout bouton visible qui dit « publish ».
+    for (const header of $$(HEADERS)) {
+      const b = $$(clickable, header).find(x => usable(x) && labelsOf(x).some(t => PUBLISH.test(t)));
+      if (b) return b;
+    }
+    return $$(clickable).find(x => usable(x) && labelsOf(x).some(t => PUBLISH_ANY.test(t) && !PUBLISH_NOT.test(t))) || null;
+  }
+  // Le changement auquel la fiche appartient : c est souvent la que Seal met Publish.
+  function changeButton() {
+    for (const header of $$(HEADERS)) {
+      const b = $$('button, a, [role="button"]', header).find(x => usable(x) && labelsOf(x).some(t => /change\s*set\s*#?\s*\d+|^#\d+$/i.test(t)));
       if (b) return b;
     }
     return null;
@@ -668,43 +684,80 @@
     }
     return out;
   }
-  function readSteps() {
-    const doc = docRoot(); if (!doc) return [];
-    let els = $$('li, [data-native-block-type]', doc).filter(el => el.tagName === 'LI' || LIST_BLOCK.test(el.getAttribute('data-native-block-type') || ''));
-    els = els.filter(el => !els.some(o => o !== el && el.contains(o)) || el.tagName === 'LI'); // feuilles
-    let loose = false;
-    if (!els.length) { loose = true; els = $$('[data-native-block-type="p"], p', doc).filter(el => !$('p, [data-native-block-type="p"]', el)); }
-    const seen = {};
-    return els.map(el => {
-      // Une etape qui porte des sous-etapes : son propre texte seulement.
-      const own = $('ol, ul, table', el) ? (() => { const c = el.cloneNode(true); $$('ol, ul, table', c).forEach(x => x.remove()); return c; })() : el;
-      const text = own.textContent.replace(/\s+/g, ' ').trim();
-      if (!text) return null;
-      const key = hash(text); seen[key] = (seen[key] || 0) + 1;
-      let secs = 0;
-      for (const v of Detect.findValues(text)) {
-        const m = v.text.match(DURATION); if (!m) continue;
-        const num = parseFloat(m[1].replace(',', '.')); const u = m[2].toLowerCase();
-        secs = Math.round(num * (u[0] === 'h' ? 3600 : u[0] === 'm' ? 60 : 1)); if (secs > 0 && secs <= 86400) break; secs = 0;
-      }
-      return { id: key + '.' + seen[key], text, html: stepHtml(own), secs, sub: el.tagName === 'LI' && !!el.parentElement.closest('li'), el, loose };
-    }).filter(Boolean);
+  // La fiche telle qu elle est ecrite, dans l ordre : titres, texte et tableaux restent du contexte a lire,
+  // seules les etapes (elements de liste) se cochent. Sans aucune liste dans la fiche, une ligne est une etape
+  // si elle est numerotee, commence par un verbe de paillasse ou porte une valeur ; chaque ligne se corrige a la main.
+  const isHead = el => /^H[1-4]$/.test(el.tagName) || /^h[1-6]$/i.test(el.getAttribute('data-native-block-type') || '');
+  const isListEl = el => el.tagName === 'LI' || LIST_BLOCK.test(el.getAttribute('data-native-block-type') || '');
+  const BLOCKS = 'li, p, h1, h2, h3, h4, table, ol, ul, [data-native-block-type]';
+  const MARKER = /^\s*(?:step\s*)?(?:\d{1,3}[.)]|[a-z][.)]|[-•*–])\s+/i;
+  const VERB = /^(?:then |next |finally |carefully |gently )?(?:add|aspirate|acquire|block|bleed|centrifuge|collect|count|cull|decant|discard|dilute|dissolve|filter|fix|flick|harvest|incubate|inject|keep|label|leave|lyse|mash|mix|pellet|permeabili[sz]e|pipette|place|plate|pour|prepare|record|remove|repeat|resuspend|rinse|run|seed|spin|stain|store|thaw|top up|transfer|vortex|wait|wash|weigh)\b/i;
+  function durationOf(text) {
+    for (const v of Detect.findValues(text)) {
+      const m = v.text.match(DURATION); if (!m) continue;
+      const num = parseFloat(m[1].replace(',', '.')); const u = m[2].toLowerCase();
+      const secs = Math.round(num * (u[0] === 'h' ? 3600 : u[0] === 'm' ? 60 : 1)); if (secs > 0 && secs <= 86400) return secs;
+    }
+    return 0;
   }
+  function readSheet() {
+    const doc = docRoot(); if (!doc) return [];
+    const out = []; const seen = {};
+    const idOf = text => { const k = hash(text); seen[k] = (seen[k] || 0) + 1; return k + '.' + seen[k]; };
+    const clean = el => el.textContent.replace(/\s+/g, ' ').trim();
+    const nested = el => { const list = []; for (const c of el.children) { if (c.matches('ol, ul, table') || isListEl(c)) list.push(c); else list.push(...nested(c)); } return list; };
+    const ownOf = el => { // le texte propre d une etape, sans ses sous-etapes ni ses tableaux
+      const inner = nested(el); if (!inner.length) return el;
+      const c = el.cloneNode(true); const drop = nested(c); for (const x of drop) x.parentNode.removeChild(x); return c;
+    };
+    const tableOf = t => '<table>' + $$('tr', t).map(tr => '<tr>' + Array.from(tr.children).map(c => { const tag = c.tagName === 'TH' ? 'th' : 'td'; return `<${tag}>${stepHtml(c)}</${tag}>`; }).join('') + '</tr>').join('') + '</table>';
+    const walk = (el, depth) => {
+      if (el.closest('.sh')) return;
+      if (el.tagName === 'TABLE') { if (clean(el)) out.push({ kind: 'table', html: tableOf(el), el }); return; }
+      if (isHead(el)) { const t = clean(el); if (t) out.push({ kind: 'head', text: t, el }); return; }
+      if (isListEl(el)) {
+        const own = ownOf(el); const text = clean(own);
+        if (text) out.push({ kind: 'step', id: idOf(text), text, html: stepHtml(own), secs: durationOf(text), sub: depth > 0, el });
+        for (const c of nested(el)) walk(c, depth + (text ? 1 : 0));
+        return;
+      }
+      const kids = Array.from(el.children).filter(c => c.matches(BLOCKS) || c.querySelector(BLOCKS));
+      if (kids.length) { for (const c of kids) walk(c, depth); return; }
+      const text = clean(el);
+      if (text) out.push({ kind: 'text', id: idOf(text), text, html: stepHtml(el), el, para: true,
+        bold: text.length <= 80 && !/[.;,]$/.test(text) && $$('b, strong', el).map(b => b.textContent).join('').replace(/\s+/g, ' ').trim() === text });
+    };
+    walk(doc, 0);
+    const loose = !out.some(e => e.kind === 'step');
+    const kinds = benchState().kinds || {};
+    for (const e of out) {
+      if (!e.para) continue;
+      let kind = 'text';
+      if (loose) kind = e.bold ? 'head' : (MARKER.test(e.text) || VERB.test(e.text) || (e.text.length <= 260 && Detect.findValues(e.text).length)) ? 'step' : 'text';
+      if (kinds[e.id]) kind = kinds[e.id];
+      e.kind = kind; e.loose = loose;
+      if (kind === 'step') { e.secs = durationOf(e.text); e.sub = false; }
+    }
+    return out;
+  }
+  const readSteps = () => readSheet().filter(e => e.kind === 'step');
   const benchKey = () => location.pathname.replace(/\/+$/, '');
   const benchState = () => (benchAll[benchKey()] = benchAll[benchKey()] || { steps: {}, timers: {}, at: Date.now() });
   function saveBench() {
     const lim = Date.now() - 21 * 864e5;
-    benchAll = Object.fromEntries(Object.entries(benchAll).filter(([, v]) => v.at > lim && (Object.keys(v.steps).length || Object.keys(v.timers).length)));
+    benchAll = Object.fromEntries(Object.entries(benchAll).filter(([, v]) => v.at > lim && (Object.keys(v.steps).length || Object.keys(v.timers).length || Object.keys(v.kinds || {}).length)));
     try { chrome.storage.local.set({ [BENCH]: benchAll }); } catch (e) {}
   }
   const benchCount = () => { const b = benchAll[benchKey()]; return b ? Object.values(b.steps).filter(s => s.done || s.note).length : 0; };
-  let benchOpen = false, benchSteps = [], benchTick = 0;
+  let benchOpen = false, benchSteps = [], benchSheet = [], benchTick = 0;
+  function loadSheet() { benchSheet = readSheet(); benchSteps = benchSheet.filter(e => e.kind === 'step'); }
+  function setKind(id, kind) { const st = benchState(); st.kinds = { ...(st.kinds || {}), [id]: kind }; saveBench(); loadSheet(); drawBench(); }
   const left = ms => { const s = Math.max(0, Math.ceil(ms / 1000)); return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); };
   const short = (t, n = 28) => (t.length > n ? t.slice(0, n - 1).trimEnd() + '…' : t);
   function beep() { try { const a = new AudioContext(); const o = a.createOscillator(), g = a.createGain(); o.frequency.value = 880; g.gain.value = 0.08; o.connect(g); g.connect(a.destination); o.start(); o.stop(a.currentTime + 0.5); setTimeout(() => a.close(), 800); } catch (e) {} }
   function openBench() {
-    benchSteps = readSteps();
-    if (!benchSteps.length) return toast('No steps found in this record yet. Write them as a numbered list.', 'info');
+    loadSheet();
+    if (!benchSheet.length) return toast('Nothing to show yet: this record has no text.', 'info');
     closePop(); hideToast(); benchOpen = true; root.classList.add('sh-bench-open'); applyView(); drawBench();
     clearInterval(benchTick); benchTick = setInterval(tickBench, 1000);
   }
@@ -739,8 +792,12 @@
         h('p', {}, 'Bench sheet · printed ' + today() + ' · ' + plural(benchSteps.length, 'step')),
         h('p', { class: 'sh-bfill' }, h('span', {}, 'Date'), h('i', {}), h('span', {}, 'Name'), h('i', {}))),
       h('div', { class: 'sh-bsteps' },
-        benchSteps[0].loose ? h('p', { class: 'sh-wnote' }, 'No numbered list in this record: every paragraph is shown as a step.') : null,
-        benchSteps.map(s => {
+        benchSheet.some(e => e.loose) ? h('p', { class: 'sh-wnote sh-bhint' }, 'No list in this record: lines that read like a step can be ticked. “Step” and “Not a step” on the right correct a line.') : null,
+        benchSheet.map(s => {
+          if (s.kind === 'head') return h('h4', { class: 'sh-bhead' }, s.text);
+          if (s.kind === 'table') return h('div', { class: 'sh-btable', html: s.html });
+          if (s.kind === 'text') return h('div', { class: 'sh-bpara' }, h('div', { html: s.html }),
+            h('button', { type: 'button', class: 'sh-blink quiet', title: 'Tick this line as a step', onclick: () => setKind(s.id, 'step') }, 'Step'));
           const x = st.steps[s.id] || {};
           const toggle = () => { st.steps[s.id] = { ...x, done: x.done ? 0 : Date.now() }; saveBench(); drawBench(); };
           const note = h('input', { type: 'text', class: 'sh-bnote', placeholder: 'What was different?', value: x.note || '', 'aria-label': 'Deviation on this step',
@@ -751,7 +808,8 @@
             h('div', { class: 'sh-bside' },
               x.done ? h('span', { class: 'sh-btime' }, clock(x.done)) : h('span', { class: 'sh-bblank', 'aria-hidden': 'true' }),
               s.secs && !x.done && !st.timers[s.id] ? h('button', { type: 'button', class: 'sh-blink', onclick: () => { st.timers[s.id] = Date.now() + s.secs * 1000; saveBench(); drawBench(); } }, 'Start ' + (s.secs >= 3600 ? Math.round(s.secs / 360) / 10 + ' h' : s.secs >= 60 ? Math.round(s.secs / 6) / 10 + ' min' : s.secs + ' s')) : null,
-              !x.note && x.open !== true ? h('button', { type: 'button', class: 'sh-blink', onclick: () => { st.steps[s.id] = { ...x, open: true }; drawBench(); setTimeout(() => { const i = $$('#sh-bench .sh-bnote').find(n => n.dataset.id === s.id); if (i) i.focus(); }, 0); } }, 'Deviation') : null),
+              !x.note && x.open !== true ? h('button', { type: 'button', class: 'sh-blink', onclick: () => { st.steps[s.id] = { ...x, open: true }; drawBench(); setTimeout(() => { const i = $$('#sh-bench .sh-bnote').find(n => n.dataset.id === s.id); if (i) i.focus(); }, 0); } }, 'Deviation') : null,
+              s.para && !x.done ? h('button', { type: 'button', class: 'sh-blink quiet', title: 'Show this line as plain text', onclick: () => setKind(s.id, 'text') }, 'Not a step') : null),
             x.note || x.open ? h('div', { class: 'sh-bdev' }, h('span', {}, 'Deviation'), (note.dataset.id = s.id, note)) : null);
         })),
       h('footer', {}, h('span', {}, done + ' of ' + benchSteps.length + ' steps done'), notes ? h('span', {}, plural(notes, 'deviation')) : null,
@@ -850,6 +908,10 @@
     out.push('blocks ' + (Object.entries(types).map(([k, v]) => k + '×' + v).join(' ') || 'none') + ' | li ' + (doc ? $$('li', doc).length : 0) + ' | tables ' + (doc ? $$('table', doc).length : 0));
     const tools = $$('[role="toolbar"] button, [role="toolbar"] [role="button"]').filter(el => !el.closest('.sh')).map(el => el.getAttribute('aria-label') || el.getAttribute('title') || '').filter(Boolean);
     out.push('seal toolbar ' + (tools.slice(0, 40).join(', ') || 'none seen'));
+    // Libelles des boutons de l en-tete (interface de Seal, pas du contenu) : pour reperer Publish.
+    const heads = $$(HEADERS).flatMap(hd => $$('button, a, [role="button"]', hd)).filter(x => !x.closest('.sh')).map(x => (labelsOf(x)[0] || '?').replace(/\d{3,}/g, 'N') + (usable(x) ? '' : ' (off)'));
+    const pb = publishButton();
+    out.push('header buttons ' + (heads.slice(0, 30).join(' | ') || 'none seen') + ' || publish found: ' + (pb ? labelsOf(pb)[0] : 'no') + ' || change found: ' + (changeButton() ? 'yes' : 'no'));
     return out.join('\n');
   }
   window.SealHelperWrite = { diag, cleanHtml, readSteps, version: VERSION };
