@@ -8,8 +8,8 @@
   const KEY = 'sealHelper';
   const LOCAL = 'sealHelperWrite';   // reglages d affichage, snippets, ce qu on a appris de Seal
   const BENCH = 'sealHelperBench';   // coches de paillasse, par fiche
-  const DEFAULTS = { on: true, wbar: true, paste: true, proto: true, values: true, slash: true, pubkey: true };
-  const VERSION = '2.7.2';
+  const DEFAULTS = { on: true, wbar: true, paste: true, proto: true, values: true, slash: true, pubkey: true, sci: true };
+  const VERSION = '2.8.0';
   const root = document.documentElement;
   const isMac = /Mac/.test(navigator.platform);
   const Seal = window.Seal, Detect = window.Detect, Parse = window.Parse, Edit = window.Edit, Mix = window.Mix, Copy = window.Copy;
@@ -573,6 +573,62 @@
     local.caps = { at: today(), way: lastInsert, kept, lost, chains, added, nodes: nodes.size }; saveLocal();
     toast('Seal kept ' + kept.length + ' of ' + FORMATS.length + ' formats. Now open the extension menu, Diagnostic, and paste it to me. Ctrl Z removes the test.', 'ok', 15000, [['Undo', () => undo()]]);
   }
+  // ------------------------------------------------------------ nombres scientifiques
+  // 1e6, 2.5e-3, 3x10^5, 10^-2 -> 1 × 10⁶, 2.5 × 10⁻³, 3 × 10⁵, 10⁻². Les exposants sont des caracteres
+  // (comme le fait deja seal-converter) : ils restent tels quels dans Seal, a la copie et a l impression.
+  const SUPER = { 0: '⁰', 1: '¹', 2: '²', 3: '³', 4: '⁴', 5: '⁵', 6: '⁶', 7: '⁷', 8: '⁸', 9: '⁹', '+': '', '-': '⁻', '−': '⁻' };
+  const sup = n => String(n).replace(/^\+/, '').split('').map(c => (c in SUPER ? SUPER[c] : c)).join('');
+  const SCI_E = /^([+\-−]?\d+(?:[.,]\d+)?)[eE]([+\-−]?\d{1,3})$/;
+  const SCI_X = /^([+\-−]?\d+(?:[.,]\d+)?)\s?[x×*]\s?10\s?\^\s?([+\-−]?\d{1,3})$/i;
+  const SCI_P = /^(10)\s?\^\s?([+\-−]?\d{1,3})$/;
+  function sciOf(token) {
+    const t = token.trim(); let m = t.match(SCI_E) || t.match(SCI_X);
+    if (m) return m[1] + ' × 10' + sup(m[2]);
+    m = t.match(SCI_P); if (m) return '10' + sup(m[2]);
+    return '';
+  }
+  // En ecrivant : le nombre se met en forme quand on tape l espace (ou une ponctuation) qui le suit.
+  let sciBusy = false;
+  document.addEventListener('input', e => {
+    if (ours || sciBusy || !isOn('sci') || e.inputType !== 'insertText' || !e.data || !/^[\s,;:.)]$/.test(e.data)) return;
+    const sel = document.getSelection(); const n = sel && sel.anchorNode;
+    if (!n || n.nodeType !== 3 || !sel.isCollapsed || !editorOf(n)) return;
+    const before = n.nodeValue.slice(0, sel.anchorOffset - 1);
+    const m = before.match(/(?:^|[\s(=<>~≈])((?:[+\-−]?\d+(?:[.,]\d+)?[eE][+\-−]?\d{1,3})|(?:[+\-−]?\d+(?:[.,]\d+)?\s?[x×*]\s?10\^[+\-−]?\d{1,3})|(?:10\^[+\-−]?\d{1,3}))$/);
+    if (!m) return;
+    const out = sciOf(m[1]); if (!out) return;
+    const end = before.length, start = end - m[1].length;
+    sciBusy = true;
+    // Apres les propres traitements de l editeur pour cette frappe, et d un seul tenant : rien ne peut se glisser entre
+    // la selection du nombre et son remplacement, meme en tapant vite. Ce qui a ete tape entre-temps reste a sa place.
+    setTimeout(() => {
+      try {
+        const s2 = document.getSelection(); const node = s2.anchorNode;
+        if (!node || node.nodeType !== 3 || !s2.isCollapsed || node.nodeValue.slice(start, end) !== m[1]) return;
+        const tail = s2.anchorOffset - end; if (tail < 0) return;
+        const r = document.createRange(); r.setStart(node, start); r.setEnd(node, end);
+        s2.removeAllRanges(); s2.addRange(r);
+        let ok = false; try { ok = document.execCommand('insertText', false, out); } catch (err) {}
+        if (ok) { try { for (let k = 0; k < tail; k++) document.getSelection().modify('move', 'forward', 'character'); } catch (err) {} }
+      } finally { sciBusy = false; noteSelection(); }
+    }, 0);
+  }, true);
+  function sciButton() {
+    restore(); const picked = selText().trim(); const conv = picked ? sciOf(picked) : '';
+    if (conv) { insertText(conv); return; }
+    const a = h('input', { type: 'text', value: /^[+\-−]?\d+([.,]\d+)?$/.test(picked) ? picked : '1', 'aria-label': 'Number' }), b = h('input', { type: 'text', value: '6', 'aria-label': 'Power of ten' });
+    const prev = h('div', { class: 'sh-wprev sh-wsci' });
+    const make = () => (/^[+\-−]?\d+([.,]\d+)?$/.test(a.value.trim()) && /^[+\-−]?\d{1,3}$/.test(b.value.trim()) ? a.value.trim() + ' × 10' + sup(b.value.trim()) : '');
+    const show = () => { prev.textContent = make() || 'A number, then a whole power of ten.'; };
+    const go = () => { const t = make(); if (!t) return; closePop(); insertText(t); };
+    const el = h('form', { oninput: show, onsubmit: e => { e.preventDefault(); go(); } }, h('h3', {}, 'Scientific number'),
+      h('div', { class: 'sh-wrow' }, field('Number', a), field('× 10 to the power', b)), prev,
+      h('p', { class: 'sh-wnote' }, 'While you write, 1e6 or 2.5x10^-3 followed by a space does the same.'),
+      h('div', { class: 'sh-wact' }, h('button', { type: 'button', onclick: closePop }, 'Cancel'), h('button', { type: 'submit', class: 'pri' }, 'Insert')));
+    openPop('sci', el, caretRect() || $('#sh-wbar'));
+    show(); a.focus(); a.select();
+  }
+
   const SYMBOLS = ['µ', '°C', '°', '±', '×', '÷', '→', '←', '≥', '≤', '≈', '≠', 'α', 'β', 'γ', 'δ', 'ε', 'κ', 'λ', 'Δ', '⁺', '⁻', '²', '³', '⁶', '₂', '½', '‰'];
   function openSymbols(anchor) {
     if (pop && pop.kind === 'symbols') return closePop();
@@ -991,6 +1047,7 @@
           group('Insert',
             key('Table', 'Insert a table', () => { noteSelection(); openTable(); }, 'table'),
             key('µ °C ±', 'Lab symbols', e => openSymbols(e.currentTarget), 'symbols'),
+            key('×10ⁿ', 'Scientific number: converts a selection such as 1e6 or 2.5x10^-3, or asks for the two parts', () => { noteSelection(); sciButton(); }, 'sci'),
             key('Date', 'Today: ' + today(), () => insertText(today()), 'date'),
             key('Blocks', 'Mix, templates, snippets (' + mod + 'J' + (isOn('slash') && !local.sealSlash ? ', or type /' : '') + ')', () => { noteSelection(); openBlocks(false); }, 'blocks'))] : null,
         group('Tools',

@@ -219,3 +219,6 @@ html.sh-dark #sh-bench .sh-val { color: #8fb4f0; }
   html.sh-bench-open #sh-bench .sh-btable table { font-size: 10pt; }
   html.sh-bench-open #sh-bench .sh-btable td, html.sh-bench-open #sh-bench .sh-btable th { border: 1px solid #666; background: none; }
 }
+
+/* 2.8 : nombre scientifique */
+.sh-wpop .sh-wsci { font-size: 16px; color: var(--sh-ink); font-variant-numeric: tabular-nums; }

@@ -111,6 +111,15 @@ for (const [name, file, ED, waitFor] of [['plain', 'plain.html', '[data-native-d
   await page.click('#sh-wbar .sh-wb:has-text("µ °C ±")'); await page.click('.sh-wsym button:has-text("≥")'); await page.waitForTimeout(150);
   ok('symbol typed', /≥/.test(await html(page, ED)));
   await page.keyboard.press('Escape');
+  // 9a. nombres scientifiques en ecrivant, et par le bouton
+  await caretEnd(page, ED + ' h2'); await page.waitForTimeout(150);
+  await page.keyboard.type(' count 1e6 cells, 2.5e-3 M, 3x10^5 and 10^-2. Gene E2e1b stays', { delay: 45 }); await page.waitForTimeout(400);
+  out = (await html(page, ED + ' h2')).replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ');
+  ok('1e6, 2.5e-3, 3x10^5 and 10^-2 are written as powers of ten while typing', /count 1 × 10⁶ cells, 2\.5 × 10⁻³ M, 3 × 10⁵ and 10⁻²\. Gene E2e1b stays/.test(out), out.slice(-90));
+  await page.click('#sh-wbar [data-k="sci"]'); await page.waitForSelector('.sh-wpop[data-kind="sci"]');
+  await page.fill('.sh-wpop[data-kind="sci"] input[aria-label="Number"]', '4.2'); await page.fill('.sh-wpop[data-kind="sci"] input[aria-label="Power of ten"]', '-7');
+  await page.click('.sh-wpop[data-kind="sci"] button.pri'); await page.waitForTimeout(250);
+  ok('the ×10ⁿ button inserts 4.2 × 10⁻⁷', /4\.2 × 10⁻⁷/.test(await html(page, ED)));
   // 9b. rechercher et remplacer : le remplacement contient le mot cherche, il ne doit pas boucler
   const before = ((await html(page, ED)).match(/CXCR5/g) || []).length;
   await page.keyboard.press('Control+h'); await page.waitForSelector('.sh-wpop[data-kind="find"]');
