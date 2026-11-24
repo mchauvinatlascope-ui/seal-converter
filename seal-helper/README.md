@@ -4,7 +4,7 @@ A Chrome extension that makes Seal calmer, easier to read and easier to write in
 
 ## Install (2 minutes)
 
-1. Download `seal-helper-2.6.1.zip` and unzip it.
+1. Download `seal-helper-2.7.0.zip` and unzip it.
 2. Open `chrome://extensions` and switch on **Developer mode** (top right).
 3. Click **Load unpacked** and pick the unzipped `seal-helper` folder.
 4. Open Seal. Click the extension icon (puzzle piece, then pin Seal Helper) to switch each setting on or off.
@@ -13,7 +13,11 @@ To update: replace the folder with the new one, then click the reload arrow on t
 
 ## If you see no change
 
-Click the extension icon on a Seal tab: the first card says whether Seal Helper is **active on this tab**, **paused**, or whether the tab **needs a reload** after an update (one button does it). After replacing the folder, always press the reload arrow on the Seal Helper card in `chrome://extensions`, then reload Seal. The sidebar shows its version (v2.6.1) at the bottom.
+Click the extension icon on a Seal tab: the first card says whether Seal Helper is **active on this tab**, **paused**, or whether the tab **needs a reload** after an update (one button does it). After replacing the folder, always press the reload arrow on the Seal Helper card in `chrome://extensions`, then reload Seal. The sidebar shows its version (v2.7.0) at the bottom.
+
+## 2.7
+
+- **No more doubles with Seal's own bar**: Seal shows its bar above a selection (paragraph style, bold, italic, underline, strikethrough, code, superscript, subscript, colour, alignment, link, comment). The extension no longer shows a bubble there, and the ribbon keeps only what Seal's bar lacks: **Undo / Redo**, **Value** and **Clear**, **Table**, symbols, **Date**, **Blocks**, and the tools (**Find**, **Check**, **Bench**, **Aa**). Bold, italic and Link left the ribbon.
 
 ## 2.6.1
 

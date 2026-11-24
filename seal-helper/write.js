@@ -9,7 +9,7 @@
   const LOCAL = 'sealHelperWrite';   // reglages d affichage, snippets, ce qu on a appris de Seal
   const BENCH = 'sealHelperBench';   // coches de paillasse, par fiche
   const DEFAULTS = { on: true, wbar: true, paste: true, proto: true, values: true, slash: true, pubkey: true };
-  const VERSION = '2.6.1';
+  const VERSION = '2.7.0';
   const root = document.documentElement;
   const isMac = /Mac/.test(navigator.platform);
   const Seal = window.Seal, Detect = window.Detect, Parse = window.Parse, Edit = window.Edit, Mix = window.Mix, Copy = window.Copy;
@@ -966,18 +966,13 @@
           group('Undo',
             key('↶', 'Undo (' + mod + 'Z)', undo, 'undo'),
             key('↷', 'Redo (' + (isMac ? '⌘⇧Z' : 'Ctrl Y') + ')', redo, 'redo')),
+          // Seal montre sa propre barre au-dessus d une selection (style, B, I, U, S, code, exposant, indice, couleur,
+          // alignement, lien, commentaire) : le ruban ne porte que ce qu elle n a pas.
           group('Text',
-            key(h('b', {}, 'B'), 'Bold (' + mod + 'B)', () => format('bold', 'b'), 'bold'),
-            key(h('i', {}, 'I'), 'Italic (' + mod + 'I)', () => format('italic', 'i'), 'italic'),
-            can('underline') ? key(h('u', {}, 'U'), 'Underline (' + mod + 'U)', () => format('underline', 'u'), 'underline') : null,
-            can('strike') ? key(h('s', {}, 'S'), 'Strikethrough', wrap('s'), 'strike') : null,
-            can('subscript') ? key('x₂', 'Subscript', wrap('sub'), 'sub') : null,
-            can('superscript') ? key('x²', 'Superscript', wrap('sup'), 'sup') : null,
             key('Value', 'Blue bold: a value to respect (select it first)', makeValue, 'value', 'val'),
             key('Clear', 'Remove the formatting of the selection', clearFormat, 'clear')),
           group('Insert',
             key('Table', 'Insert a table', () => { noteSelection(); openTable(); }, 'table'),
-            key('Link', 'Insert a link, or turn the selection into one', () => { noteSelection(); openLink(); }, 'link'),
             key('µ °C ±', 'Lab symbols', e => openSymbols(e.currentTarget), 'symbols'),
             key('Date', 'Today: ' + today(), () => insertText(today()), 'date'),
             key('Blocks', 'Mix, templates, snippets (' + mod + 'J' + (isOn('slash') && !local.sealSlash ? ', or type /' : '') + ')', () => { noteSelection(); openBlocks(false); }, 'blocks'))] : null,
@@ -989,7 +984,6 @@
           key('Aa', 'Reading comfort: size, width, typeface, focus', e => openView(e.currentTarget), 'aa'),
           local.view.focus ? key('Exit focus', 'Show the sidebar and panels again', () => setView({ focus: false }), 'exitfocus') : null),
         h('span', { class: 'sh-wfill' }),
-        edit && !caps ? h('button', { type: 'button', class: 'sh-wmore', title: 'Underline, strikethrough, subscript and superscript join the bar once the formatting test shows that Seal keeps them. Run it in a test record.', onmousedown: keep, onclick: () => { noteSelection(); openBlocks(false); menu.q = 'formatting'; drawBlocks(); } }, 'More buttons: run the formatting test') : null,
         h('span', { class: 'sh-wcount', title: 'Words in this record' }, words.toLocaleString('en-NZ') + ' words'));
       if (bar) bar.replaceWith(el); else root.append(el);
     }
@@ -998,22 +992,7 @@
     else { if (now.parentElement !== root) root.append(now); now.style.left = center + 'px'; }
     drawBubble(edit);
   }
-  // Bulle au-dessus d une selection : les trois formats, sans descendre a la barre.
-  function drawBubble(edit) {
-    const sel = document.getSelection();
-    const show = edit && sel && sel.rangeCount && !sel.isCollapsed && sel.toString().trim() && !pop;
-    let b = $('#sh-wbubble');
-    if (!show) { if (b) b.remove(); return; }
-    if (!b) {
-      b = h('div', { id: 'sh-wbubble', class: 'sh', role: 'toolbar', 'aria-label': 'Format the selection' },
-        btn(h('b', {}, 'B'), 'Bold', () => format('bold', 'b')), btn(h('i', {}, 'I'), 'Italic', () => format('italic', 'i')),
-        btn('Value', 'Blue bold: a value to respect', makeValue, 'val'), btn('Clear', 'Remove formatting', clearFormat));
-      root.append(b);
-    }
-    const r = sel.getRangeAt(0).getBoundingClientRect(); const w = b.offsetWidth || 190;
-    const top = r.top - 40 < 6 ? r.bottom + 8 : r.top - 40;
-    b.style.top = Math.round(top) + 'px'; b.style.left = Math.round(Math.max(8, Math.min(r.left + r.width / 2 - w / 2, innerWidth - w - 8))) + 'px';
-  }
+  function drawBubble() { const b = $('#sh-wbubble'); if (b) b.parentNode.removeChild(b); } // 2.7 : plus de bulle, la barre de Seal occupe cette place
   let selTimer = 0;
   document.addEventListener('selectionchange', () => { noteSelection(); clearTimeout(selTimer); selTimer = setTimeout(update, 120); });
   document.addEventListener('focusin', () => setTimeout(update, 0), true);

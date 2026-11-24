@@ -53,15 +53,12 @@ for (const [name, file, ED, waitFor] of [['plain', 'plain.html', '[data-native-d
   ok('bar shown when reading (Bench, Aa, words)', /Bench/.test(await html(page, '#sh-wbar')) && !/Value/.test(await html(page, '#sh-wbar')));
   // 2. valeur sur une selection
   ok('select text', await select(page, ED, '30 min'));
-  await page.waitForSelector('#sh-wbubble');
+  await page.waitForSelector('#sh-wbar [data-k="value"]');
+  ok('no bubble over the selection (Seal shows its own bar there)', !(await page.$('#sh-wbubble')) && !(await page.$('#sh-wbar [data-k="bold"]')));
   ok('bar in edit state', /Value/.test(await html(page, '#sh-wbar')));
-  await page.click('#sh-wbubble .sh-wb.val'); await page.waitForTimeout(350);
+  await page.click('#sh-wbar [data-k="value"]'); await page.waitForTimeout(350);
   // Un contenteditable nu (voie insertHTML) ne garde que le gras : Chrome retire le span. ProseMirror (voie collage) garde le bleu.
   ok('Value marks the selection' + (name === 'plain' ? ' (bold only on this path)' : ' blue'), (name === 'plain' ? /<(strong|b)>30 min/ : /data-native-color="blue"[^>]*>(<strong>|<b>)?30 min/).test(await html(page, ED)), (await diag(page)).split('\n')[0]);
-  // 3. gras par le raccourci rendu a l editeur
-  await select(page, ED, 'CXCR5'); await page.waitForTimeout(200);
-  await page.click('#sh-wbar [data-k="bold"]'); await page.waitForTimeout(200);
-  ok('Bold', /<(strong|b)>CXCR5/.test(await html(page, ED)));
   // 4. collage Word nettoye
   await caretEnd(page, P); await page.keyboard.press('Enter'); await page.waitForTimeout(800); // l editeur regroupe sinon Entree et collage dans la meme annulation
   await page.evaluate(() => { window.__given = []; document.addEventListener('paste', e => window.__given.push(e.clipboardData.getData('text/html')), true); });
