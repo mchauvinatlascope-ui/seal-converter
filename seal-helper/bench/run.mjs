@@ -203,6 +203,9 @@ for (const [name, file, ED, waitFor] of [['plain', 'plain.html', '[data-native-d
   await page.keyboard.press('Escape');
   console.log((await diag(page)).split('\n').filter(l => /^p |^scroller/.test(l)).map(l => '     ' + l.slice(0, 260)).join('\n'));
   ok('fast sideways overscroll cannot trigger the browser back gesture', await page.evaluate(() => getComputedStyle(document.documentElement).overscrollBehaviorX === 'none'));
+  const wheel = await page.evaluate(() => { const fire = (dx, dy) => { const e = new WheelEvent('wheel', { deltaX: dx, deltaY: dy, bubbles: true, cancelable: true }); document.querySelector('[data-native-document-root]').dispatchEvent(e); return e.defaultPrevented; }; return [fire(-90, 4), fire(6, 120), fire(-40, 60)]; });
+  ok('a sideways swipe is stopped, a vertical or mostly vertical scroll is left alone', wheel[0] === true && wheel[1] === false && wheel[2] === false, wheel.join(' / '));
+  console.log('     ' + (await diag(page)).split('\n').filter(l => /^sideways/.test(l)).join('').slice(0, 220));
   await page.close();
 }
 { // Page d un changement : publier = signer. Ctrl+S y emmene, n ecrit rien dans la signature, et n appuie que quand Seal est pret.

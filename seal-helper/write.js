@@ -9,7 +9,7 @@
   const LOCAL = 'sealHelperWrite';   // reglages d affichage, snippets, ce qu on a appris de Seal
   const BENCH = 'sealHelperBench';   // coches de paillasse, par fiche
   const DEFAULTS = { on: true, wbar: true, paste: true, proto: true, values: true, slash: true, pubkey: true };
-  const VERSION = '2.7.1';
+  const VERSION = '2.7.2';
   const root = document.documentElement;
   const isMac = /Mac/.test(navigator.platform);
   const Seal = window.Seal, Detect = window.Detect, Parse = window.Parse, Edit = window.Edit, Mix = window.Mix, Copy = window.Copy;
@@ -1017,6 +1017,37 @@
   window.addEventListener('resize', () => update());
   setInterval(() => { try { update(); } catch (e) { console.warn('[Seal Helper] write', e); } }, 800);
 
+  // ------------------------------------------------------------ defilement : pas de geste « page precedente », et un journal
+  // Un defilement surtout lateral, quand rien sous le pointeur ne peut defiler dans ce sens, devient dans Chrome le geste
+  // « page precedente / suivante ». On l annule ici ; un defilement vertical, meme rapide, n est jamais touche.
+  let lastWheel = { at: 0, dx: 0, dy: 0, blocked: 0 };
+  window.addEventListener('wheel', e => {
+    lastWheel = { at: Date.now(), dx: Math.round(e.deltaX), dy: Math.round(e.deltaY), blocked: lastWheel.blocked };
+    if (!opts.on || e.ctrlKey || Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
+    for (let el = e.target; el && el.nodeType === 1; el = el.parentElement) {
+      const room = el.scrollWidth - el.clientWidth;
+      if (room > 1 && /auto|scroll/.test(getComputedStyle(el).overflowX) && ((e.deltaX < 0 && el.scrollLeft > 0) || (e.deltaX > 0 && el.scrollLeft < room - 1))) return;
+    }
+    e.preventDefault(); lastWheel.blocked++;
+  }, { passive: false, capture: true });
+  // Journal des changements de page (adresses sans identifiants) : dit si un changement suit un defilement, et de quelle sorte il est.
+  const NAVLOG = 'sh-navlog';
+  const shape = p => p.replace(/[0-9a-f]{8}-[0-9a-f-]{20,}/gi, 'ID').replace(/\/o\/[^/]+\/s\/[^/]+/, '').replace(/\d{3,}/g, 'N') || '/';
+  let navPath = location.pathname;
+  function navNote(kind) {
+    try {
+      const log = JSON.parse(sessionStorage.getItem(NAVLOG) || '[]');
+      const ago = lastWheel.at ? Date.now() - lastWheel.at : -1;
+      log.push(clock() + ' ' + kind + ' ' + shape(navPath) + ' -> ' + shape(location.pathname) + (ago >= 0 && ago < 3000 ? ' [wheel ' + ago + ' ms before, dx ' + lastWheel.dx + ' dy ' + lastWheel.dy + ']' : ''));
+      sessionStorage.setItem(NAVLOG, JSON.stringify(log.slice(-12)));
+    } catch (e) {}
+    navPath = location.pathname;
+  }
+  try { const n = performance.getEntriesByType('navigation')[0]; navNote('load(' + (n ? n.type : '?') + ')'); } catch (e) {}
+  window.addEventListener('popstate', () => navNote('history'), true);
+  window.addEventListener('pagehide', () => { try { const log = JSON.parse(sessionStorage.getItem(NAVLOG) || '[]'); const ago = lastWheel.at ? Date.now() - lastWheel.at : -1; log.push(clock() + ' leaving ' + shape(location.pathname) + (ago >= 0 && ago < 3000 ? ' [wheel ' + ago + ' ms before, dx ' + lastWheel.dx + ' dy ' + lastWheel.dy + ']' : '')); sessionStorage.setItem(NAVLOG, JSON.stringify(log.slice(-12))); } catch (e) {} }, true);
+  setInterval(() => { if (location.pathname !== navPath) navNote('route'); }, 300);
+
   // ------------------------------------------------------------ diagnostic (structure seulement, aucun contenu)
   function diag() {
     const doc = docRoot(); const out = ['write v' + VERSION + ' opts ' + Object.keys(DEFAULTS).filter(k => opts[k]).join(' ') + ' | seal slash ' + !!local.sealSlash + ' | last insert ' + lastInsert];
@@ -1045,6 +1076,7 @@
       const sc = (function up(el) { for (let x = el; x && x !== document.body; x = x.parentElement) { const o = getComputedStyle(x).overflowY; if (/auto|scroll/.test(o) && x.scrollHeight > x.clientHeight + 4) return x; } return null; })(doc);
       out.push('scroller ' + (sc ? sc.tagName.toLowerCase() + ' ' + sc.clientWidth + 'x' + sc.clientHeight + ' scrollW ' + sc.scrollWidth + ' overscroll ' + getComputedStyle(sc).overscrollBehaviorX : 'page') + ' | page scrollW ' + document.documentElement.scrollWidth + ' of ' + innerWidth + ' | bar ' + ($('#sh-wbar') ? ($('#sh-wbar').classList.contains('docked') ? 'docked' : 'floating') : 'none'));
     } catch (e) { out.push('p shape failed: ' + e.message); }
+    try { out.push('sideways scrolls stopped ' + lastWheel.blocked + ' | page changes: ' + (JSON.parse(sessionStorage.getItem(NAVLOG) || '[]').join(' ; ') || 'none')); } catch (e) {}
     const c = local.caps;
     out.push(c ? 'format test ' + c.at + ' via ' + c.way + ' | blocks added: ' + (c.added || '?') + ' | text nodes: ' + (c.nodes || '?') + ' | kept: ' + c.kept.join(', ') + ' | lost: ' + c.lost.join(', ') + ' | ' + c.chains.join(' ; ') : 'format test not run (Blocks, Formatting test, in a test record)');
     return out.join('\n');
