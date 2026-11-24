@@ -60,7 +60,7 @@ for (const [name, file, ED, waitFor] of [['plain', 'plain.html', '[data-native-d
   ok('Value marks the selection' + (name === 'plain' ? ' (bold only on this path)' : ' blue'), (name === 'plain' ? /<(strong|b)>30 min/ : /data-native-color="blue"[^>]*>(<strong>|<b>)?30 min/).test(await html(page, ED)), (await diag(page)).split('\n')[0]);
   // 3. gras par le raccourci rendu a l editeur
   await select(page, ED, 'CXCR5'); await page.waitForTimeout(200);
-  await page.click('#sh-wbar .sh-wb >> nth=0'); await page.waitForTimeout(200);
+  await page.click('#sh-wbar [data-k="bold"]'); await page.waitForTimeout(200);
   ok('Bold', /<(strong|b)>CXCR5/.test(await html(page, ED)));
   // 4. collage Word nettoye
   await caretEnd(page, P); await page.keyboard.press('Enter'); await page.waitForTimeout(800); // l editeur regroupe sinon Entree et collage dans la meme annulation

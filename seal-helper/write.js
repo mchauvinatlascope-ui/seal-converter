@@ -9,7 +9,7 @@
   const LOCAL = 'sealHelperWrite';   // reglages d affichage, snippets, ce qu on a appris de Seal
   const BENCH = 'sealHelperBench';   // coches de paillasse, par fiche
   const DEFAULTS = { on: true, wbar: true, paste: true, proto: true, values: true, slash: true, pubkey: true };
-  const VERSION = '2.5.0';
+  const VERSION = '2.6.0';
   const root = document.documentElement;
   const isMac = /Mac/.test(navigator.platform);
   const Seal = window.Seal, Detect = window.Detect, Parse = window.Parse, Edit = window.Edit, Mix = window.Mix, Copy = window.Copy;
@@ -131,6 +131,7 @@
   }
   function format(cmd, k) { if (!restore()) return; if (!sendKey(k)) { try { document.execCommand(cmd); } catch (e) {} } noteSelection(); }
   function undo() { if (!restore()) return; if (!sendKey('z')) { try { document.execCommand('undo'); } catch (e) {} } }
+  function redo() { if (!restore()) return; if (!sendKey('y') && !sendKey('z', true)) { try { document.execCommand('redo'); } catch (e) {} } }
   const oneBlock = s => s && !/[\r\n]/.test(s.trim());
   async function makeValue() {
     restore(); const s = selText();
@@ -445,6 +446,21 @@
       h('div', { class: 'sh-wact' }, h('button', { type: 'button', onclick: closePop }, 'Cancel'), h('button', { type: 'submit', class: 'pri' }, 'Insert table')));
     openPop('table', el, caretRect() || $('#sh-wbar'));
     rows.focus(); rows.select();
+  }
+  function openLink() {
+    restore(); const text0 = oneBlock(selText()) ? selText().trim() : '';
+    const url = h('input', { type: 'text', placeholder: 'https://', 'aria-label': 'Address' }), text = h('input', { type: 'text', value: text0, placeholder: 'Text shown', 'aria-label': 'Text shown' });
+    const go = () => {
+      let u = url.value.trim(); if (u && !/^[a-z][a-z0-9+.-]*:/i.test(u)) u = 'https://' + u;
+      const safe = Parse.safeHref(u);
+      if (!safe) return toast('Give a web or e-mail address (https://… or mailto:…).', 'info');
+      const t = text.value.trim() || safe;
+      closePop(); insertHtml('<a href="' + esc(safe) + '">' + esc(t) + '</a>', t);
+    };
+    const el = h('form', { onsubmit: e => { e.preventDefault(); go(); } }, h('h3', {}, 'Link'), field('Address', url), field('Text shown', text),
+      h('div', { class: 'sh-wact' }, h('button', { type: 'button', onclick: closePop }, 'Cancel'), h('button', { type: 'submit', class: 'pri' }, 'Insert link')));
+    openPop('link', el, caretRect() || $('#sh-wbar'));
+    url.focus();
   }
   function openSaveSnippet() {
     restore(); const sel = document.getSelection(); if (!sel.rangeCount || !sel.toString().trim()) return;
@@ -907,28 +923,53 @@
     const sig = [edit, words, logs, !!local.view.focus, isOn('slash') && !local.sealSlash].join('|');
     const r = doc.getBoundingClientRect();
     const center = Math.round(Math.max(r.left, 0) + (Math.min(r.right, innerWidth) - Math.max(r.left, 0)) / 2);
-    if (!bar || sig !== barSig) {
-      barSig = sig;
-      const sep = () => h('span', { class: 'sh-wsep' });
-      const el = h('div', { id: 'sh-wbar', class: 'sh', role: 'toolbar', 'aria-label': 'Seal Helper writing bar' },
+    // Ruban : pose dans la page juste sous l en-tete de la fiche (comme la barre de fil d Ariane), il pousse le texte
+    // vers le bas au lieu de le recouvrir. Sans en-tete reconnu, il reste la barre flottante du bas.
+    const anchor = $('#sh-props') || $(HEADERS);
+    const docked = !!(anchor && anchor.parentElement && !local.view.focus);
+    const caps = local.caps && Array.isArray(local.caps.kept) ? local.caps.kept : null;
+    const can = name => !!caps && caps.includes(name);
+    if (!bar || sig + docked + (caps ? caps.join() : '') !== barSig) {
+      barSig = sig + docked + (caps ? caps.join() : '');
+      const key = (label, title, onclick, k, cls = '') => { const b = btn(label, title, onclick, cls); b.dataset.k = k; return b; };
+      const group = (name, ...kids) => { const list = kids.flat().filter(Boolean); return list.length ? h('div', { class: 'sh-wg', role: 'group', 'aria-label': name }, h('div', { class: 'sh-wgr' }, list), h('div', { class: 'sh-wgn' }, name)) : null; };
+      const wrap = (tag, k) => async () => { restore(); const t = selText(); if (!t.trim()) return toast('Select the words first.', 'info'); if (!oneBlock(t)) return toast('This works inside one paragraph at a time.', 'info'); await insertHtml('<' + tag + '>' + esc(t) + '</' + tag + '>', t); };
+      const mod = isMac ? '⌘' : 'Ctrl ';
+      const el = h('div', { id: 'sh-wbar', class: 'sh' + (docked ? ' docked' : ''), role: 'toolbar', 'aria-label': 'Seal Helper writing bar' },
         edit ? [
-          btn(h('b', {}, 'B'), 'Bold (' + (isMac ? '⌘B' : 'Ctrl B') + ')', () => format('bold', 'b')),
-          btn(h('i', {}, 'I'), 'Italic (' + (isMac ? '⌘I' : 'Ctrl I') + ')', () => format('italic', 'i')),
-          btn('Value', 'Blue bold: a value to respect (select it first)', makeValue, 'val'),
-          btn('Clear', 'Remove the formatting of the selection', clearFormat), sep(),
-          btn('Table', 'Insert a table', () => { noteSelection(); openTable(); }),
-          btn('µ °C ±', 'Lab symbols', e => openSymbols(e.currentTarget)),
-          btn('Blocks', 'Mix, templates, snippets, date (' + (isMac ? '⌘J' : 'Ctrl J') + (isOn('slash') && !local.sealSlash ? ', or type /' : '') + ')', () => { noteSelection(); openBlocks(false); }),
-          btn('Find', 'Find and replace in this record (' + (isMac ? '⌘⇧H' : 'Ctrl H') + ')', openFind), sep()] : null,
-        logs ? btn('Add run log', 'Write the ticks and deviations of bench mode where your cursor is', addRunLog, 'accent') : null,
-        btn('Bench', 'Bench mode: tick the steps, time them, note a deviation', openBench),
-        btn('Check', 'Before you publish: empty sections, leftover hints, half-empty tables', e => openCheck(e.currentTarget)),
-        btn('Aa', 'Reading comfort: size, width, typeface, focus', e => openView(e.currentTarget)),
-        local.view.focus ? btn('Exit focus', 'Show the sidebar and panels again', () => setView({ focus: false })) : null,
+          group('Undo',
+            key('↶', 'Undo (' + mod + 'Z)', undo, 'undo'),
+            key('↷', 'Redo (' + (isMac ? '⌘⇧Z' : 'Ctrl Y') + ')', redo, 'redo')),
+          group('Text',
+            key(h('b', {}, 'B'), 'Bold (' + mod + 'B)', () => format('bold', 'b'), 'bold'),
+            key(h('i', {}, 'I'), 'Italic (' + mod + 'I)', () => format('italic', 'i'), 'italic'),
+            can('underline') ? key(h('u', {}, 'U'), 'Underline (' + mod + 'U)', () => format('underline', 'u'), 'underline') : null,
+            can('strike') ? key(h('s', {}, 'S'), 'Strikethrough', wrap('s'), 'strike') : null,
+            can('subscript') ? key('x₂', 'Subscript', wrap('sub'), 'sub') : null,
+            can('superscript') ? key('x²', 'Superscript', wrap('sup'), 'sup') : null,
+            key('Value', 'Blue bold: a value to respect (select it first)', makeValue, 'value', 'val'),
+            key('Clear', 'Remove the formatting of the selection', clearFormat, 'clear')),
+          group('Insert',
+            key('Table', 'Insert a table', () => { noteSelection(); openTable(); }, 'table'),
+            key('Link', 'Insert a link, or turn the selection into one', () => { noteSelection(); openLink(); }, 'link'),
+            key('µ °C ±', 'Lab symbols', e => openSymbols(e.currentTarget), 'symbols'),
+            key('Date', 'Today: ' + today(), () => insertText(today()), 'date'),
+            key('Blocks', 'Mix, templates, snippets (' + mod + 'J' + (isOn('slash') && !local.sealSlash ? ', or type /' : '') + ')', () => { noteSelection(); openBlocks(false); }, 'blocks'))] : null,
+        group('Tools',
+          edit ? key('Find', 'Find and replace in this record (' + (isMac ? '⌘⇧H' : 'Ctrl H') + ')', openFind, 'find') : null,
+          key('Check', 'Before you publish: empty sections, leftover hints, half-empty tables', e => openCheck(e.currentTarget), 'check'),
+          key('Bench', 'Bench mode: tick the steps, time them, note a deviation', openBench, 'bench'),
+          logs ? key('Add run log', 'Write the ticks and deviations of bench mode where your cursor is', addRunLog, 'runlog', 'accent') : null,
+          key('Aa', 'Reading comfort: size, width, typeface, focus', e => openView(e.currentTarget), 'aa'),
+          local.view.focus ? key('Exit focus', 'Show the sidebar and panels again', () => setView({ focus: false }), 'exitfocus') : null),
+        h('span', { class: 'sh-wfill' }),
+        edit && !caps ? h('button', { type: 'button', class: 'sh-wmore', title: 'Underline, strikethrough, subscript and superscript join the bar once the formatting test shows that Seal keeps them. Run it in a test record.', onmousedown: keep, onclick: () => { noteSelection(); openBlocks(false); menu.q = 'formatting'; drawBlocks(); } }, 'More buttons: run the formatting test') : null,
         h('span', { class: 'sh-wcount', title: 'Words in this record' }, words.toLocaleString('en-NZ') + ' words'));
       if (bar) bar.replaceWith(el); else root.append(el);
     }
-    $('#sh-wbar').style.left = center + 'px';
+    const now = $('#sh-wbar');
+    if (docked) { if (now.previousElementSibling !== anchor) anchor.after(now); now.style.left = ''; }
+    else { if (now.parentElement !== root) root.append(now); now.style.left = center + 'px'; }
     drawBubble(edit);
   }
   // Bulle au-dessus d une selection : les trois formats, sans descendre a la barre.

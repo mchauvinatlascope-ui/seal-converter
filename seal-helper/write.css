@@ -25,6 +25,26 @@
 .sh .sh-wb.accent { color: var(--sh-violet); font-weight: 600; }
 html.sh-dark .sh .sh-wb.val { color: #8fb4f0; }
 #sh-wbar .sh-wsep { width: 1px; height: 16px; margin: 0 5px; background: var(--sh-line); flex: none; }
+/* 2.6 : le ruban. Des groupes nommes ; pose sous l en-tete de la fiche (.docked) il prend la largeur et pousse le texte. */
+#sh-wbar .sh-wg { display: flex; flex-direction: column; gap: 1px; padding: 0 8px; border-left: 1px solid var(--sh-line); }
+#sh-wbar .sh-wg:first-child { border-left: 0; padding-left: 2px; }
+#sh-wbar .sh-wgr { display: flex; align-items: center; gap: 2px; }
+#sh-wbar .sh-wgn { display: none; font-size: 10px; letter-spacing: .05em; text-transform: uppercase; color: var(--sh-ink3); text-align: center; white-space: nowrap; }
+#sh-wbar .sh-wfill { flex: 1; }
+#sh-wbar .sh-wb u { text-decoration: underline; } #sh-wbar .sh-wb s { text-decoration: line-through; }
+#sh-wbar .sh-wmore { font-size: 11.5px; color: var(--sh-ink3); padding: 2px 8px; border-radius: 5px; white-space: nowrap; }
+#sh-wbar .sh-wmore:hover { color: var(--sh-ink); background: var(--sh-hover); }
+#sh-wbar:not(.docked) .sh-wmore { display: none; }
+#sh-wbar.docked {
+  position: sticky; top: 0; bottom: auto; left: auto; transform: none; z-index: 20; max-width: none; width: 100%; flex: none;
+  align-items: stretch; padding: 5px 12px 3px; border: 0; border-bottom: 1px solid var(--sh-line); border-radius: 0; box-shadow: none;
+  background: var(--sh-bg); overflow-x: auto; scrollbar-width: none;
+}
+#sh-wbar.docked .sh-wgn { display: block; }
+#sh-wbar.docked .sh-wcount { align-self: center; }
+#sh-wbar.docked .sh-wmore { align-self: center; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+#sh-wbar.docked .sh-wg, #sh-wbar.docked .sh-wcount { flex: none; }
+#sh-wbar.docked .sh-wfill { min-width: 8px; }
 #sh-wbar .sh-wcount { margin-left: 8px; padding-right: 6px; font-size: 11.5px; color: var(--sh-ink3); font-variant-numeric: tabular-nums; }
 
 /* ---------------------------------------------------------------- message */
