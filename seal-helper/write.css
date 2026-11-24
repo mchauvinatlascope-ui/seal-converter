@@ -136,7 +136,32 @@ html.sh-dark #sh-bench .sh-val { color: #8fb4f0; }
 #sh-bench .sh-bnote { flex: 1; max-width: 520px; font: 13px var(--sh-ui); color: var(--sh-ink); background: var(--sh-amberbg); border: 1px solid transparent; border-radius: 6px; padding: 4px 9px; }
 #sh-bench .sh-bnote:focus { outline: 2px solid var(--sh-focus); outline-offset: -1px; }
 
-@media print { #sh-wbar, #sh-wbubble, #sh-wtoast, .sh.sh-wpop, #sh-bench { display: none !important; } }
+#sh-bench .sh-bprint, #sh-bench .sh-bblank { display: none; }
+@media print { #sh-wbar, #sh-wbubble, #sh-wtoast, .sh.sh-wpop, html:not(.sh-bench-open) #sh-bench { display: none !important; } }
+/* Mode paillasse ouvert : l impression (ou « Save as PDF ») sort la feuille a cocher, rien d autre. */
+@page { margin: 14mm 14mm 16mm; }
+@media print {
+  html.sh-bench-open body, html.sh-bench-open #sh-side, html.sh-bench-open #sh-page, html.sh-bench-open #sh-props, html.sh-bench-open #sh-outline { display: none !important; }
+  html.sh-bench-open, html.sh-bench-open #sh-bench { background: #fff !important; color: #000 !important; }
+  html.sh-bench-open #sh-bench { position: static !important; display: block !important; left: 0 !important; font-size: 11.5pt; line-height: 1.4; }
+  html.sh-bench-open #sh-bench header, html.sh-bench-open #sh-bench footer, html.sh-bench-open #sh-bench .sh-blink, html.sh-bench-open #sh-bench .sh-wnote { display: none !important; }
+  html.sh-bench-open #sh-bench .sh-bprint { display: block; padding: 0 0 6mm; border-bottom: 1px solid #000; margin-bottom: 3mm; }
+  html.sh-bench-open #sh-bench .sh-bprint h1 { margin: 0 0 1mm; font-size: 16pt; line-height: 1.2; }
+  html.sh-bench-open #sh-bench .sh-bprint p { margin: 0; font-size: 9.5pt; color: #333; }
+  html.sh-bench-open #sh-bench .sh-bfill { display: flex; gap: 3mm; align-items: flex-end; margin-top: 5mm !important; }
+  html.sh-bench-open #sh-bench .sh-bfill i { flex: 1; border-bottom: 1px solid #000; height: 5mm; }
+  html.sh-bench-open #sh-bench .sh-bsteps { overflow: visible !important; padding: 0; max-width: none; display: block; }
+  html.sh-bench-open #sh-bench .sh-bstep { break-inside: avoid; background: none !important; border-top: 1px solid #bbb !important; border-radius: 0; margin: 0; padding: 3mm 0; grid-template-columns: 7mm 1fr 30mm; }
+  html.sh-bench-open #sh-bench .sh-bstep.sub { margin-left: 9mm; }
+  html.sh-bench-open #sh-bench .sh-bstep .sh-btx { color: #000 !important; font-weight: 400 !important; }
+  html.sh-bench-open #sh-bench .sh-val { color: #000 !important; font-weight: 700 !important; }
+  html.sh-bench-open #sh-bench .sh-bbox { width: 5mm; height: 5mm; border: 1.2px solid #000 !important; background: #fff !important; color: #000 !important; border-radius: 1mm; font-size: 10pt; line-height: 4.4mm; }
+  html.sh-bench-open #sh-bench .sh-bside { justify-content: flex-end; }
+  html.sh-bench-open #sh-bench .sh-bblank { display: block; width: 26mm; height: 5mm; border-bottom: 1px solid #000; }
+  html.sh-bench-open #sh-bench .sh-btime { color: #000; font-size: 10pt; }
+  html.sh-bench-open #sh-bench .sh-bdev { color: #000; }
+  html.sh-bench-open #sh-bench .sh-bnote { background: none; border: 0; border-bottom: 1px solid #000; border-radius: 0; color: #000; padding: 0; max-width: none; }
+}
 
 /* ---------------------------------------------------------------- 2.2 : rechercher, controler */
 ::highlight(sh-find) { background-color: #fde68a; color: #1b1d21; }

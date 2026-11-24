@@ -150,10 +150,21 @@ for (const [name, file, ED, waitFor] of [['plain', 'plain.html', '[data-native-d
   await page.waitForTimeout(1200);
   ok('timer runs', /left/.test(await html(page, '#sh-bench .sh-btimers')));
   await page.screenshot({ path: path.join(shots, name + '-5-bench.png') });
+  await page.emulateMedia({ media: 'print' }); await page.waitForTimeout(100);
+  const sheet = await page.evaluate(() => ({ body: getComputedStyle(document.body).display, head: getComputedStyle(document.querySelector('.sh-bprint')).display, foot: getComputedStyle(document.querySelector('#sh-bench footer')).display, blank: document.querySelectorAll('.sh-bblank').length }));
+  ok('bench prints as a sheet: only the checklist, with its header and blank time lines', sheet.body === 'none' && sheet.head === 'block' && sheet.foot === 'none' && sheet.blank > 2, JSON.stringify(sheet));
+  await page.screenshot({ path: path.join(shots, name + '-9-sheet.png'), fullPage: true });
+  await page.pdf({ path: path.join(shots, name + '-bench.pdf'), format: 'A4' });
+  await page.emulateMedia({ media: 'screen' });
   await page.click('#sh-bench .sh-bbtn.pri'); await page.waitForTimeout(700);
   out = await html(page, ED);
   ok('run log written at the cursor', /Run log, [\s\S]*Done at[\s\S]*lysed 3 min/.test(out) && !(await page.$('#sh-bench')));
   await page.screenshot({ path: path.join(shots, name + '-6-end.png'), fullPage: true });
+  if (name === 'plain') { // Ctrl+S presse Publish, jamais Approve
+    await page.keyboard.press('Control+s'); await page.waitForTimeout(200);
+    const r = await page.evaluate(() => [window.__pub || 0, window.__approve || 0]);
+    ok('Ctrl S presses Seal\'s Publish button once, never Approve', r[0] === 1 && r[1] === 0, r.join(' / '));
+  }
   console.log((await diag(page)).split('\n').map(l => '     ' + l.slice(0, 230)).join('\n'));
   await page.close();
 }

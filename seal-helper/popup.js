@@ -1,5 +1,5 @@
 const KEY = 'sealHelper';
-const DEFAULTS = { on: true, side: true, home: true, appmenu: false, props: true, doc: true, dates: true, info: true, quiet: true, slot: true, readnb: true, wbar: true, paste: true, proto: true, values: true, slash: true };
+const DEFAULTS = { on: true, side: true, home: true, appmenu: false, props: true, doc: true, dates: true, info: true, quiet: true, slot: true, readnb: true, wbar: true, paste: true, proto: true, values: true, slash: true, pubkey: true };
 document.getElementById('ver').textContent = 'v' + chrome.runtime.getManifest().version;
 const IDS = Object.keys(DEFAULTS);
 

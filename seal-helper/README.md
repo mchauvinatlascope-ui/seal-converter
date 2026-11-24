@@ -4,7 +4,7 @@ A Chrome extension that makes Seal calmer, easier to read and easier to write in
 
 ## Install (2 minutes)
 
-1. Download `seal-helper-2.2.0.zip` and unzip it.
+1. Download `seal-helper-2.3.0.zip` and unzip it.
 2. Open `chrome://extensions` and switch on **Developer mode** (top right).
 3. Click **Load unpacked** and pick the unzipped `seal-helper` folder.
 4. Open Seal. Click the extension icon (puzzle piece, then pin Seal Helper) to switch each setting on or off.
@@ -13,7 +13,12 @@ To update: replace the folder with the new one, then click the reload arrow on t
 
 ## If you see no change
 
-Click the extension icon on a Seal tab: the first card says whether Seal Helper is **active on this tab**, **paused**, or whether the tab **needs a reload** after an update (one button does it). After replacing the folder, always press the reload arrow on the Seal Helper card in `chrome://extensions`, then reload Seal. The sidebar shows its version (v2.2.0) at the bottom.
+Click the extension icon on a Seal tab: the first card says whether Seal Helper is **active on this tab**, **paused**, or whether the tab **needs a reload** after an update (one button does it). After replacing the folder, always press the reload arrow on the Seal Helper card in `chrome://extensions`, then reload Seal. The sidebar shows its version (v2.3.0) at the bottom.
+
+## 2.3
+
+- **Bench sheet on paper or as a PDF**: in Bench mode, **Print / PDF** (or Ctrl P) prints the checklist alone: the record title, a line for the date and the name, each step with its box, a blank line for the time, the values in bold, and the ticks and deviations already noted. Choose *Save as PDF* in the print window to get a file.
+- **Ctrl S publishes**: on a record or a change where Seal shows a Publish button (Publish, Review and publish, Submit for review), Ctrl S (⌘S on a Mac) presses it for you. It never presses Approve, and whatever Seal asks next, a comment or a confirmation, is still yours to answer. Switch it off under Writing, *Ctrl S publishes*.
 
 ## 2.2
 
@@ -186,7 +191,7 @@ If something is refused, a message says "Seal did not accept this here" and noth
 - **My work** and **To publish**: full pages, filter by name or by type (Experiments, Documents, Projects), changes grouped by day, empty changes hidden.
 - **Record header and outline**: the key fields of a record (ID, owner, dates, status) under its title bar, and its headings on the right when the screen is wide enough.
 
-Every line clicks the matching Seal line for you, so opening, rights and publishing stay Seal's own. The extension never publishes, signs or changes a status by itself.
+Every line clicks the matching Seal line for you, so opening, rights and publishing stay Seal's own. The extension never publishes, signs or changes a status by itself: Ctrl S only presses Seal's Publish button when you press the keys.
 
 **Clean up**
 - **Clean documents**: change bars show on hover only, lines of dashes become a thin rule, the first table row reads as a header.

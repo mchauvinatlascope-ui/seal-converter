@@ -8,8 +8,8 @@
   const KEY = 'sealHelper';
   const LOCAL = 'sealHelperWrite';   // reglages d affichage, snippets, ce qu on a appris de Seal
   const BENCH = 'sealHelperBench';   // coches de paillasse, par fiche
-  const DEFAULTS = { on: true, wbar: true, paste: true, proto: true, values: true, slash: true };
-  const VERSION = '2.2.0';
+  const DEFAULTS = { on: true, wbar: true, paste: true, proto: true, values: true, slash: true, pubkey: true };
+  const VERSION = '2.3.0';
   const root = document.documentElement;
   const isMac = /Mac/.test(navigator.platform);
   const Seal = window.Seal, Detect = window.Detect, Parse = window.Parse, Edit = window.Edit, Mix = window.Mix, Copy = window.Copy;
@@ -399,6 +399,12 @@
     if (e.key === 'Escape' && pop) { closePop(); return; }
     if (e.key === 'Escape' && benchOpen) { closeBench(); return; }
     const inEd = !!editorOf(e.target);
+    // Ctrl+S : le bouton Publish de Seal, presse pour toi. Rien d autre : si Seal demande une confirmation, elle reste a toi.
+    if (e.key.toLowerCase() === 's' && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && isOn('pubkey') && !e.repeat) {
+      const b = publishButton();
+      if (b) { e.preventDefault(); e.stopImmediatePropagation(); pressSeal(b); toast('Publish pressed for you. Seal takes it from here.', 'ok', 3500); return; }
+      if (docRoot()) { e.preventDefault(); toast('Nothing to publish here: Seal shows no Publish button on this page.', 'info'); return; }
+    }
     if (e.key.toLowerCase() === 'h' && !e.altKey && (isMac ? e.metaKey && e.shiftKey : e.ctrlKey && !e.shiftKey) && isOn('wbar') && docRoot()) {
       e.preventDefault(); e.stopImmediatePropagation(); openFind(); return;
     }
@@ -494,6 +500,22 @@
   function openSymbols(anchor) {
     if (pop && pop.kind === 'symbols') return closePop();
     openPop('symbols', h('div', { class: 'sh-wsym' }, SYMBOLS.map(s => h('button', { type: 'button', onmousedown: keep, onclick: () => insertText(s) }, s))), anchor, { above: true });
+  }
+
+  // ------------------------------------------------------------ publier au clavier
+  // Le bouton de Seal, dans l en-tete de la fiche ou du changement. Jamais Approve : valider le travail d un autre ne se fait pas par reflexe.
+  const PUBLISH = /^(publish|review and publish|submit for review)\b/i;
+  function publishButton() {
+    for (const header of $$('[data-testid="changeset-top-navbar"], [data-testid="entity-top-navbar"]')) {
+      const b = $$('button, a, [role="button"]', header).find(x => !x.closest('.sh') && !x.disabled && x.getAttribute('aria-disabled') !== 'true' && (PUBLISH.test(x.textContent.replace(/\s+/g, ' ').trim()) || PUBLISH.test(x.getAttribute('aria-label') || '')));
+      if (b) return b;
+    }
+    return null;
+  }
+  function pressSeal(el) {
+    const o = { bubbles: true, cancelable: true, view: window, button: 0, pointerType: 'mouse', isPrimary: true };
+    el.dispatchEvent(new PointerEvent('pointerdown', o)); el.dispatchEvent(new MouseEvent('mousedown', o));
+    el.dispatchEvent(new PointerEvent('pointerup', o)); el.dispatchEvent(new MouseEvent('mouseup', o)); el.click();
   }
 
   // ------------------------------------------------------------ rechercher et remplacer dans la fiche
@@ -683,10 +705,10 @@
   function openBench() {
     benchSteps = readSteps();
     if (!benchSteps.length) return toast('No steps found in this record yet. Write them as a numbered list.', 'info');
-    closePop(); hideToast(); benchOpen = true; applyView(); drawBench();
+    closePop(); hideToast(); benchOpen = true; root.classList.add('sh-bench-open'); applyView(); drawBench();
     clearInterval(benchTick); benchTick = setInterval(tickBench, 1000);
   }
-  function closeBench() { benchOpen = false; clearInterval(benchTick); $('#sh-bench')?.remove(); applyView(); update(); }
+  function closeBench() { benchOpen = false; root.classList.toggle('sh-bench-open', false); clearInterval(benchTick); $('#sh-bench')?.remove(); applyView(); update(); }
   function tickBench() {
     const st = benchState(); let ended = false;
     for (const [id, end] of Object.entries(st.timers)) if (end > 0 && end <= Date.now()) { st.timers[id] = -1; ended = true; }
@@ -710,7 +732,12 @@
     const old = $('#sh-bench'); const scroll = old ? $('.sh-bsteps', old).scrollTop : 0;
     const el = h('div', { id: 'sh-bench', class: 'sh' + ($('#sh-side') ? ' with-side' : ''), role: 'dialog', 'aria-label': 'Bench mode' },
       h('header', {}, h('b', {}, short(title, 70)), h('span', { class: 'sh-bpill' }, 'Bench mode'), h('span', { class: 'sh-btimers' }, timerChips()),
+        h('button', { type: 'button', class: 'sh-bbtn', title: 'Print this checklist, or choose “Save as PDF” in the print window', onclick: () => window.print() }, 'Print / PDF'),
         h('button', { type: 'button', class: 'sh-bbtn', onclick: closeBench }, 'Exit')),
+      // En-tete de la feuille imprimee (cache a l ecran)
+      h('div', { class: 'sh-bprint' }, h('h1', {}, title || 'Bench sheet'),
+        h('p', {}, 'Bench sheet · printed ' + today() + ' · ' + plural(benchSteps.length, 'step')),
+        h('p', { class: 'sh-bfill' }, h('span', {}, 'Date'), h('i', {}), h('span', {}, 'Name'), h('i', {}))),
       h('div', { class: 'sh-bsteps' },
         benchSteps[0].loose ? h('p', { class: 'sh-wnote' }, 'No numbered list in this record: every paragraph is shown as a step.') : null,
         benchSteps.map(s => {
@@ -722,7 +749,7 @@
             h('button', { type: 'button', class: 'sh-bbox', role: 'checkbox', 'aria-checked': x.done ? 'true' : 'false', 'aria-label': 'Done: ' + short(s.text, 60), onclick: toggle }, x.done ? '✓' : ''),
             h('div', { class: 'sh-btx', html: s.html, onclick: toggle }),
             h('div', { class: 'sh-bside' },
-              x.done ? h('span', { class: 'sh-btime' }, clock(x.done)) : null,
+              x.done ? h('span', { class: 'sh-btime' }, clock(x.done)) : h('span', { class: 'sh-bblank', 'aria-hidden': 'true' }),
               s.secs && !x.done && !st.timers[s.id] ? h('button', { type: 'button', class: 'sh-blink', onclick: () => { st.timers[s.id] = Date.now() + s.secs * 1000; saveBench(); drawBench(); } }, 'Start ' + (s.secs >= 3600 ? Math.round(s.secs / 360) / 10 + ' h' : s.secs >= 60 ? Math.round(s.secs / 6) / 10 + ' min' : s.secs + ' s')) : null,
               !x.note && x.open !== true ? h('button', { type: 'button', class: 'sh-blink', onclick: () => { st.steps[s.id] = { ...x, open: true }; drawBench(); setTimeout(() => { const i = $$('#sh-bench .sh-bnote').find(n => n.dataset.id === s.id); if (i) i.focus(); }, 0); } }, 'Deviation') : null),
             x.note || x.open ? h('div', { class: 'sh-bdev' }, h('span', {}, 'Deviation'), (note.dataset.id = s.id, note)) : null);
