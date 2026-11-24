@@ -8,8 +8,8 @@
   const KEY = 'sealHelper';
   const LOCAL = 'sealHelperWrite';   // reglages d affichage, snippets, ce qu on a appris de Seal
   const BENCH = 'sealHelperBench';   // coches de paillasse, par fiche
-  const DEFAULTS = { on: true, wbar: true, paste: true, proto: true, values: true, slash: true, pubkey: true, sci: true };
-  const VERSION = '2.8.0';
+  const DEFAULTS = { on: true, wbar: true, paste: true, proto: true, values: true, slash: true, pubkey: true, sci: true, updates: true };
+  const VERSION = '2.9.0';
   const root = document.documentElement;
   const isMac = /Mac/.test(navigator.platform);
   const Seal = window.Seal, Detect = window.Detect, Parse = window.Parse, Edit = window.Edit, Mix = window.Mix, Copy = window.Copy;
@@ -1140,6 +1140,44 @@
   }
   window.SealHelperWrite = { diag, cleanHtml, readSteps, version: VERSION };
 
+  // ------------------------------------------------------------ nouvelle version
+  // Le travail est fait par bg.js ; ici on affiche. Si les fichiers du dossier sont deja plus recents que la version
+  // qui tourne, l extension se relance et la page se recharge (jamais pendant qu on ecrit : un bouton le propose).
+  let updateAsked = false;
+  function applyUpdate(v) {
+    toast('Seal Helper ' + v + ' is in place: restarting the extension and reloading this page…', 'ok', 6000);
+    try { chrome.runtime.sendMessage({ sh: 'update', apply: true }, () => { void chrome.runtime.lastError; }); } catch (e) {}
+    setTimeout(() => location.reload(), 1600);
+  }
+  function updateCard(u) {
+    const old = $('#sh-update'); if (old) old.parentNode.removeChild(old);
+    if (!u) return;
+    const hide = () => { local.updateLater = { v: u.onDisk || u.latest, at: Date.now() }; saveLocal(); updateCard(null); };
+    const later = local.updateLater && local.updateLater.v === (u.onDisk || u.latest) && Date.now() - local.updateLater.at < 20 * 3600 * 1000;
+    let body = null;
+    if (u.ready || u.settling) body = [h('b', {}, 'Seal Helper ' + u.onDisk + ' is in place'), h('p', {}, u.settling ? 'Its files were just copied. Restart the extension once the copy is complete; this page reloads.' : 'Restart the extension to use it. This page reloads.'),
+      h('div', { class: 'sh-uact' }, h('button', { type: 'button', class: 'pri', onclick: () => applyUpdate(u.onDisk) }, 'Restart now'))];
+    else if (u.available && !later) {
+      const steps = h('ol', { hidden: true }, h('li', {}, 'Unzip the download.'), h('li', {}, 'Put its files over your seal-helper folder (replace all).'), h('li', {}, 'Reload this page and press “Restart now” on the card that appears.'));
+      body = [h('b', {}, 'Seal Helper ' + u.latest + ' is available'), u.notes ? h('p', {}, u.notes) : null, steps,
+        h('div', { class: 'sh-uact' }, h('a', { class: 'pri', href: u.url, target: '_blank', rel: 'noopener', onclick: () => { steps.hidden = false; } }, 'Download'),
+          h('button', { type: 'button', onclick: () => { steps.hidden = !steps.hidden; } }, 'How'), h('button', { type: 'button', onclick: hide }, 'Later'))];
+    }
+    if (body) root.append(h('div', { id: 'sh-update', class: 'sh', role: 'status' }, h('small', {}, 'You have ' + u.running), body));
+  }
+  function checkUpdate() {
+    if (updateAsked || !isOn('updates')) return;
+    updateAsked = true;
+    try {
+      chrome.runtime.sendMessage({ sh: 'update' }, u => {
+        void chrome.runtime.lastError;
+        if (!u) return;
+        if (u.ready && !editing()) return applyUpdate(u.onDisk);
+        updateCard(u);
+      });
+    } catch (e) {}
+  }
+
   // ------------------------------------------------------------ reglages
   function refresh() { applyView(); barSig = ''; if (!opts.on) { closePop(); if (benchOpen) closeBench(); } update(); }
   try {
@@ -1148,7 +1186,7 @@
       if (r[BENCH] && typeof r[BENCH] === 'object') benchAll = r[BENCH];
       refresh();
     });
-    chrome.storage.sync.get(KEY, r => { opts = { ...DEFAULTS, ...(r[KEY] || {}) }; refresh(); });
+    chrome.storage.sync.get(KEY, r => { opts = { ...DEFAULTS, ...(r[KEY] || {}) }; refresh(); setTimeout(checkUpdate, 1200); });
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area === 'sync' && changes[KEY]) { opts = { ...DEFAULTS, ...(changes[KEY].newValue || {}) }; refresh(); }
     });

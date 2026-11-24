@@ -1,10 +1,10 @@
 # Seal Helper
 
-A Chrome extension that makes Seal calmer, easier to read and easier to write in. Navigation and reading only change how Seal looks in your own browser. Since 2.0 it also helps you write: it writes to a record only where your cursor is, when you ask (a button, a shortcut, Ctrl V), through Seal's own editor, so Seal records it as your edit and Ctrl Z undoes it. It sends nothing anywhere.
+A Chrome extension that makes Seal calmer, easier to read and easier to write in. Navigation and reading only change how Seal looks in your own browser. Since 2.0 it also helps you write: it writes to a record only where your cursor is, when you ask (a button, a shortcut, Ctrl V), through Seal's own editor, so Seal records it as your edit and Ctrl Z undoes it. It sends nothing from Seal anywhere; its only request to the outside is a version check (see 2.9).
 
 ## Install (2 minutes)
 
-1. Download `seal-helper-2.8.0.zip` and unzip it.
+1. Download `seal-helper-2.9.0.zip` and unzip it.
 2. Open `chrome://extensions` and switch on **Developer mode** (top right).
 3. Click **Load unpacked** and pick the unzipped `seal-helper` folder.
 4. Open Seal. Click the extension icon (puzzle piece, then pin Seal Helper) to switch each setting on or off.
@@ -13,7 +13,13 @@ To update: replace the folder with the new one, then click the reload arrow on t
 
 ## If you see no change
 
-Click the extension icon on a Seal tab: the first card says whether Seal Helper is **active on this tab**, **paused**, or whether the tab **needs a reload** after an update (one button does it). After replacing the folder, always press the reload arrow on the Seal Helper card in `chrome://extensions`, then reload Seal. The sidebar shows its version (v2.8.0) at the bottom.
+Click the extension icon on a Seal tab: the first card says whether Seal Helper is **active on this tab**, **paused**, or whether the tab **needs a reload** after an update (one button does it). After replacing the folder, always press the reload arrow on the Seal Helper card in `chrome://extensions`, then reload Seal. The sidebar shows its version (v2.9.0) at the bottom.
+
+## 2.9
+
+- **New version available**: when a newer version is published, a small card at the bottom left of Seal says so, with what is new and a **Download** button. Updating is now three gestures: unzip, put the files over your seal-helper folder, reload the Seal page and press **Restart now**. No more visit to chrome://extensions: the extension restarts itself.
+- **One folder for the lab** (optional): if everyone loads the extension from the same synced folder, replacing the files there once updates everybody at their next page reload.
+- To know about new versions, the extension reads a version number from its page on GitHub, at most every six hours. It is its only request to the outside, it sends nothing about you or Seal, and it can be switched off under Updates.
 
 ## 2.8
 

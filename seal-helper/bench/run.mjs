@@ -9,7 +9,7 @@ const here = path.dirname(fileURLToPath(import.meta.url)); const ext = path.join
 const shots = process.env.SHOTS || here;
 const STUB = `window.__store = { sync: {}, local: {} };
   const area = n => ({ get: (k, cb) => { const o = {}; for (const x of [].concat(k)) if (x in __store[n]) o[x] = __store[n][x]; setTimeout(() => cb(o), 0); }, set: (o, cb) => { Object.assign(__store[n], JSON.parse(JSON.stringify(o))); cb && cb(); }, remove: k => { delete __store[n][k]; } });
-  window.chrome = { storage: { sync: area('sync'), local: area('local'), onChanged: { addListener() {} } }, runtime: { onMessage: { addListener() {} }, getManifest: () => ({ version: 'bench' }) } };`;
+  window.chrome = { storage: { sync: area('sync'), local: area('local'), onChanged: { addListener() {} } }, runtime: { onMessage: { addListener() {} }, getManifest: () => ({ version: 'bench' }), sendMessage: (m, cb) => { window.__sent = (window.__sent || []).concat([m]); setTimeout(() => cb && cb(m.apply ? { ok: true } : (window.__update || null)), 0); } } };`;
 const WORD = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><body><!--StartFragment-->
 <h1>Intracellular staining</h1>
 <p class=MsoListParagraphCxSpFirst style='margin-left:36.0pt;text-indent:-18.0pt;mso-list:l0 level1 lfo1'><![if !supportLists]><span style='mso-list:Ignore'>1.<span style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;</span></span><![endif]>Fix cells 30 min at RT in 100 µL <b>Fix/Perm</b></p>
@@ -215,6 +215,21 @@ for (const [name, file, ED, waitFor] of [['plain', 'plain.html', '[data-native-d
   const wheel = await page.evaluate(() => { const fire = (dx, dy) => { const e = new WheelEvent('wheel', { deltaX: dx, deltaY: dy, bubbles: true, cancelable: true }); document.querySelector('[data-native-document-root]').dispatchEvent(e); return e.defaultPrevented; }; return [fire(-90, 4), fire(6, 120), fire(-40, 60)]; });
   ok('a sideways swipe is stopped, a vertical or mostly vertical scroll is left alone', wheel[0] === true && wheel[1] === false && wheel[2] === false, wheel.join(' / '));
   console.log('     ' + (await diag(page)).split('\n').filter(l => /^sideways/.test(l)).join('').slice(0, 220));
+  await page.close();
+}
+{ // Avis de nouvelle version : une carte en bas a gauche, avec le lien du zip et les trois gestes
+  console.log('\n== update notice');
+  const page = await browser.newPage({ viewport: { width: 1320, height: 860 } });
+  await page.addInitScript(STUB + "; window.__update = { running: '2.9.0', onDisk: '', ready: false, available: true, latest: '2.10.0', notes: 'Plate layouts in Blocks.', url: 'https://github.com/mchauvinatlascope-ui/seal-converter/raw/main/seal-helper/seal-helper-2.10.0.zip' };");
+  await page.goto('file://' + path.join(here, 'plate.html'));
+  await page.addStyleTag({ content: readFileSync(path.join(ext, 'content.css'), 'utf8') + readFileSync(path.join(ext, 'write.css'), 'utf8') });
+  for (const f of ['engine/seal.js', 'engine/detect.js', 'engine/parse.js', 'engine/edit.js', 'engine/mix.js', 'engine/copy.js', 'write.js']) await page.addScriptTag({ content: readFileSync(path.join(ext, f), 'utf8') });
+  await page.waitForSelector('#sh-update', { timeout: 6000 });
+  const card = await page.evaluate(() => ({ text: document.querySelector('#sh-update').textContent, href: document.querySelector('#sh-update a').href }));
+  ok('a newer published version shows a card with the download link', /2\.10\.0 is available/.test(card.text) && /Plate layouts/.test(card.text) && /seal-helper-2\.10\.0\.zip$/.test(card.href), card.text.slice(0, 90));
+  await page.screenshot({ path: path.join(shots, 'update-card.png'), clip: { x: 0, y: 560, width: 420, height: 300 } });
+  await page.click('#sh-update button:has-text("Later")'); await page.waitForTimeout(150);
+  ok('Later hides it', !(await page.$('#sh-update')));
   await page.close();
 }
 { // Page d un changement : publier = signer. Ctrl+S y emmene, n ecrit rien dans la signature, et n appuie que quand Seal est pret.
