@@ -4,7 +4,7 @@ A Chrome extension that makes Seal calmer, easier to read and easier to write in
 
 ## Install (2 minutes)
 
-1. Download `seal-helper-2.7.0.zip` and unzip it.
+1. Download `seal-helper-2.7.1.zip` and unzip it.
 2. Open `chrome://extensions` and switch on **Developer mode** (top right).
 3. Click **Load unpacked** and pick the unzipped `seal-helper` folder.
 4. Open Seal. Click the extension icon (puzzle piece, then pin Seal Helper) to switch each setting on or off.
@@ -13,7 +13,14 @@ To update: replace the folder with the new one, then click the reload arrow on t
 
 ## If you see no change
 
-Click the extension icon on a Seal tab: the first card says whether Seal Helper is **active on this tab**, **paused**, or whether the tab **needs a reload** after an update (one button does it). After replacing the folder, always press the reload arrow on the Seal Helper card in `chrome://extensions`, then reload Seal. The sidebar shows its version (v2.7.0) at the bottom.
+Click the extension icon on a Seal tab: the first card says whether Seal Helper is **active on this tab**, **paused**, or whether the tab **needs a reload** after an update (one button does it). After replacing the folder, always press the reload arrow on the Seal Helper card in `chrome://extensions`, then reload Seal. The sidebar shows its version (v2.7.1) at the bottom.
+
+## 2.7.1
+
+- **Lab tree in the sidebar**: the notebook's Lab tree was filed under the « ? » help menu; it now sits with the other sections (Projects, Experiments, Protocols…).
+- **Bench mode reads step tables**: a table with a Step column (often with # and Done) gives one box per row, with its number; the other columns follow in small print. Tables without a Step column stay tables.
+- **Tables no longer show empty** in Bench mode on a long record (they kept their place but lost their height on screen; print was right).
+- **Fewer wrong steps**: without any list or step table, a line is offered as a step only when it is numbered or starts with a bench verb; a sentence that merely contains a value stays text.
 
 ## 2.7
 

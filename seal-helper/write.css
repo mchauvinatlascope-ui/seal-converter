@@ -208,6 +208,10 @@ html.sh-dark #sh-bench .sh-val { color: #8fb4f0; }
 #sh-bench .sh-btable td, #sh-bench .sh-btable th { border: 1px solid var(--sh-line); padding: 3px 10px; text-align: left; vertical-align: top; }
 #sh-bench .sh-btable th { font-weight: 650; background: var(--sh-side); }
 #sh-bench .sh-bhint { padding: 0 10px 8px; }
+/* Les lignes de la feuille ne se tassent jamais : un tableau gardait sa place mais perdait sa hauteur des que la fiche etait longue. */
+#sh-bench .sh-bsteps > * { flex: none; }
+#sh-bench .sh-bnum { color: var(--sh-ink3); font-variant-numeric: tabular-nums; }
+#sh-bench .sh-bextra { display: block; font-size: 12.5px; font-weight: 400; color: var(--sh-ink2); }
 @media print {
   html.sh-bench-open #sh-bench .sh-bhead { margin: 5mm 0 1mm; padding: 0; font-size: 12.5pt; color: #000; break-after: avoid; }
   html.sh-bench-open #sh-bench .sh-bpara { padding: 1.5mm 0 1.5mm 9mm; font-size: 10.5pt; color: #222; }

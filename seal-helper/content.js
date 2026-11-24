@@ -14,7 +14,7 @@
   const isMac = /Mac/.test(navigator.platform);
   let opts = { ...DEFAULTS };
   const isOn = k => opts.on && opts[k];
-  const VERSION = '2.7.0';
+  const VERSION = '2.7.1';
 
   // Ecran de passage : quand on doit recharger la page (fiche -> cahier, cahier -> fiche), un ecran
   // calme au nom de la destination couvre le depart, le rechargement et les sauts de l appli,
@@ -1105,7 +1105,7 @@
     return m && m.n ? h('span', { class: 'sh-n', title: m.label }, String(m.n)) : null;
   }
 
-  const HELP_RE = /how to|faq|feedback|help|lab tree|guide/i;
+  const HELP_RE = /how to|faq|feedback|help|guide/i; // 2.7.1 : « Lab tree » est une vraie section, plus une aide
   let helpOpen = false;
   document.addEventListener('click', e => { if (helpOpen && !(e.target.closest && e.target.closest('.sh-help'))) { helpOpen = false; render(true); } }, true);
 

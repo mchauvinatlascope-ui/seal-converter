@@ -9,7 +9,7 @@
   const LOCAL = 'sealHelperWrite';   // reglages d affichage, snippets, ce qu on a appris de Seal
   const BENCH = 'sealHelperBench';   // coches de paillasse, par fiche
   const DEFAULTS = { on: true, wbar: true, paste: true, proto: true, values: true, slash: true, pubkey: true };
-  const VERSION = '2.7.0';
+  const VERSION = '2.7.1';
   const root = document.documentElement;
   const isMac = /Mac/.test(navigator.platform);
   const Seal = window.Seal, Detect = window.Detect, Parse = window.Parse, Edit = window.Edit, Mix = window.Mix, Copy = window.Copy;
@@ -810,7 +810,24 @@
     const tableOf = t => '<table>' + $$('tr', t).map(tr => '<tr>' + Array.from(tr.children).map(c => { const tag = c.tagName === 'TH' ? 'th' : 'td'; return `<${tag}>${stepHtml(c)}</${tag}>`; }).join('') + '</tr>').join('') + '</table>';
     const walk = (el, depth) => {
       if (el.closest('.sh')) return;
-      if (el.tagName === 'TABLE') { if (clean(el)) out.push({ kind: 'table', html: tableOf(el), el }); return; }
+      if (el.tagName === 'TABLE') {
+        if (!clean(el)) return;
+        const rows = $$('tr', el).map(tr => Array.from(tr.children)).filter(r => r.length);
+        const head = rows.length > 1 ? rows[0].map(c => clean(c)) : [];
+        const stepCol = head.findIndex(t => /^(steps?|action|procedure|task|what to do)$/i.test(t));
+        if (stepCol < 0) { out.push({ kind: 'table', html: tableOf(el), el }); return; }
+        // Le tableau d etapes de la fiche : chaque ligne se coche ; les autres colonnes suivent en petit, sauf le numero et la case « Done ».
+        const numCol = head.findIndex(t => /^(#|no\.?|n°|nr\.?|step ?#)$/i.test(t));
+        const skip = new Set([stepCol, numCol, ...head.map((t, k) => (/^(done|✓|✔|check|tick|ok|initials?)$/i.test(t) ? k : -1))]);
+        rows.slice(1).forEach(r => {
+          const cell = r[stepCol]; const text = cell ? clean(cell) : '';
+          if (!text) return;
+          const num = numCol >= 0 && r[numCol] ? clean(r[numCol]) : '';
+          const extra = r.map((c, k) => (skip.has(k) || !clean(c) ? '' : '<span class="sh-bextra">' + (head[k] ? esc(head[k]) + ': ' : '') + stepHtml(c) + '</span>')).join('');
+          out.push({ kind: 'step', id: idOf(text), text, html: (num ? '<span class="sh-bnum">' + esc(num.replace(/[.)]$/, '')) + '.</span> ' : '') + stepHtml(cell) + extra, secs: durationOf(text), sub: false, el: r[0].parentElement });
+        });
+        return;
+      }
       if (isHead(el)) { const t = clean(el); if (t) out.push({ kind: 'head', text: t, el }); return; }
       if (isListEl(el)) {
         const own = ownOf(el); const text = clean(own);
@@ -830,7 +847,7 @@
     for (const e of out) {
       if (!e.para) continue;
       let kind = 'text';
-      if (loose) kind = e.bold ? 'head' : (MARKER.test(e.text) || VERB.test(e.text) || (e.text.length <= 260 && Detect.findValues(e.text).length)) ? 'step' : 'text';
+      if (loose) kind = e.bold ? 'head' : (MARKER.test(e.text) || (VERB.test(e.text) && e.text.length <= 260)) ? 'step' : 'text';
       if (kinds[e.id]) kind = kinds[e.id];
       e.kind = kind; e.loose = loose;
       if (kind === 'step') { e.secs = durationOf(e.text); e.sub = false; }
@@ -889,7 +906,7 @@
         h('p', {}, 'Bench sheet · printed ' + today() + ' · ' + plural(benchSteps.length, 'step')),
         h('p', { class: 'sh-bfill' }, h('span', {}, 'Date'), h('i', {}), h('span', {}, 'Name'), h('i', {}))),
       h('div', { class: 'sh-bsteps' },
-        benchSheet.some(e => e.loose) ? h('p', { class: 'sh-wnote sh-bhint' }, 'No list in this record: lines that read like a step can be ticked. “Step” and “Not a step” on the right correct a line.') : null,
+        benchSheet.some(e => e.loose) ? h('p', { class: 'sh-wnote sh-bhint' }, 'No list or step table in this record: numbered lines and lines that start with a bench verb can be ticked. “Step” and “Not a step” on the right correct a line.') : null,
         benchSheet.map(s => {
           if (s.kind === 'head') return h('h4', { class: 'sh-bhead' }, s.text);
           if (s.kind === 'table') return h('div', { class: 'sh-btable', html: s.html });

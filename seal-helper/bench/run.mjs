@@ -196,7 +196,10 @@ for (const [name, file, ED, waitFor] of [['plain', 'plain.html', '[data-native-d
   await page.waitForSelector('#sh-wbar'); await page.click('#sh-wbar [data-k="bench"]'); await page.waitForSelector('#sh-bench');
   const got = await page.evaluate(() => Array.from(document.querySelectorAll('#sh-bench .sh-bsteps > *')).map(e => e.className.split(' ')[0] + ':' + e.textContent.slice(0, 12)));
   const n = re => got.filter(x => re.test(x)).length;
-  ok('list-styled paragraphs are the steps, other paragraphs stay text', n(/^sh-bstep/) === 3 && n(/^sh-bpara/) === 2 && n(/^sh-bhead/) === 1 && !got.some(x => /sh-wnote|sh-bhint/.test(x)), got.join(' | '));
+  ok('steps = rows of the step table + list-styled paragraphs; other text and tables stay context', n(/^sh-bstep/) === 5 && n(/^sh-bpara/) === 43 && n(/^sh-bhead/) === 2 && n(/^sh-btable/) === 1 && !got.some(x => /sh-wnote|sh-bhint/.test(x)), got.filter(x => !/Filler/.test(x)).join(' | '));
+  const th = await page.evaluate(() => document.querySelector('#sh-bench .sh-btable').getBoundingClientRect().height);
+  ok('a table keeps its height in a long record', th > 40, th + ' px');
+  await page.screenshot({ path: path.join(shots, 'plate-bench.png') });
   await page.keyboard.press('Escape');
   console.log((await diag(page)).split('\n').filter(l => /^p |^scroller/.test(l)).map(l => '     ' + l.slice(0, 260)).join('\n'));
   ok('fast sideways overscroll cannot trigger the browser back gesture', await page.evaluate(() => getComputedStyle(document.documentElement).overscrollBehaviorX === 'none'));
