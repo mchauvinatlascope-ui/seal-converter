@@ -1,4 +1,4 @@
-// enos Helper 1.0.1
+// enos Helper 1.0.2
 // Ne fait que changer l affichage dans ce navigateur : n ecrit jamais dans enos,
 // n envoie rien, ne touche a aucun formulaire.
 // Dans enos l adresse ne change pas quand on ouvre un projet, une procedure ou une fiche :
@@ -11,7 +11,7 @@
 // section#content, aside#sidebar_right (Details, 350 px), icones fa-* / bsi-* / glyphicon-*.
 (() => {
   if (window.top !== window) return; // jamais dans un cadre interne
-  const VERSION = '1.0.1';
+  const VERSION = '1.0.2';
   const KEY = 'enosHelper';
   const DEFAULTS = { on: true, layout: 'drawer', recentMax: 30, palette: true, autoOpen: false, chips: true, calm: true, forms: false, resume: true, home: true };
   const root = document.documentElement;
@@ -643,7 +643,16 @@
     const hello = (hr < 5 ? 'Good evening' : hr < 12 ? 'Good morning' : hr < 18 ? 'Good afternoon' : 'Good evening') + (who ? ', ' + who : '');
     const go = it => { closeHome(); replay(it); };
     const pinned = new Set(store.pins.map(p => p.name));
-    const card = (p, i) => h('button', { type: 'button', class: 'eh-card', draggable: 'true', title: stepsHint(p) + ' · right click to rename, move or remove',
+    // Retirer une epingle : l etoile pleine de sa carte ; le message propose de la remettre.
+    const unpin = p => {
+      const at = store.pins.indexOf(p); if (at < 0) return;
+      store.pins.splice(at, 1); save(); render();
+      if (!toastEl.isConnected) document.body.append(toastEl);
+      toastEl.replaceChildren(h('span', {}, 'Unpinned « ' + p.name + ' »'), h('button', { type: 'button', class: 'eh-tbtn', onclick: () => { toastEl.hidden = true; if (!store.pins.some(x => x.name === p.name)) { store.pins.splice(Math.min(at, store.pins.length), 0, p); save(); render(); } } }, 'Undo'), h('button', { type: 'button', title: 'Close', onclick: () => { toastEl.hidden = true; } }, icon('x')));
+      toastEl.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { toastEl.hidden = true; }, 8000);
+    };
+    const card = (p, i) => h('div', { class: 'eh-cardw' }, cardBtn(p, i), h('button', { type: 'button', class: 'eh-star eh-on eh-unpin', title: 'Unpin', 'aria-label': 'Unpin ' + p.name, onclick: () => unpin(p) }, icon('starFull')));
+    const cardBtn = (p, i) => h('button', { type: 'button', class: 'eh-card', draggable: 'true', title: stepsHint(p) + ' · right click to rename or move',
       onclick: () => go(p), oncontextmenu: e => { e.preventDefault(); naming = null; popChip = p; renderPop(); },
       ondragstart: e => { dragPin = p; try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', p.name); } catch (_) {} },
       ondragover: e => { if (dragPin && dragPin !== p) e.preventDefault(); },
@@ -690,7 +699,7 @@
         h('button', { type: 'button', class: 'eh-close', title: 'Close Home and show enos (Esc)', 'aria-label': 'Close Home', onclick: () => closeHome(true) }, icon('x'))),
       homeLoad ? h('div', { class: 'eh-banner' }, h('b', {}, 'Load pinned views from a file saved by enos Helper'), filePick('Choose the file'), h('button', { type: 'button', class: 'eh-link', onclick: () => { homeLoad = false; renderHome(); } }, 'Cancel')) : null,
       h('section', { class: 'eh-sec' },
-        h('div', { class: 'eh-sec-h' }, h('h2', {}, 'Pinned views'), h('span', {}, store.pins.length ? 'One click instead of the whole path. Drag to reorder.' : 'A pinned view opens in one click instead of the whole path.')),
+        h('div', { class: 'eh-sec-h' }, h('h2', {}, 'Pinned views'), h('span', {}, store.pins.length ? 'One click instead of the whole path. Drag to reorder, the star unpins.' : 'A pinned view opens in one click instead of the whole path.')),
         h('div', { class: 'eh-cards' }, store.pins.map(card), add)),
       h('div', { class: 'eh-two' },
         h('section', { class: 'eh-panel eh-wide' },

@@ -68,6 +68,11 @@ html.eh-busy .eh-chip { opacity: .6; pointer-events: none; }
 .eh-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
 .eh-card { height: 112px; padding: 14px 16px; display: flex; flex-direction: column; align-items: stretch; gap: 4px; background: var(--eh-bg); border: 1px solid var(--eh-line); border-radius: 10px; color: var(--eh-fg); font: inherit; text-align: left; cursor: pointer; min-width: 0; }
 .eh-card:hover { border-color: #B9B7AA; }
+.eh-cardw { position: relative; min-width: 0; display: flex; }
+.eh-cardw .eh-card { flex: 1; }
+.eh-cardw .eh-card-top { padding-right: 26px; }
+.eh-unpin { position: absolute; top: 5px; right: 6px; width: 32px; height: 32px; }
+.eh-unpin:hover { background: var(--eh-hover); }
 .eh-card-top { display: flex; align-items: center; gap: 8px; }
 .eh-card-top .eh-eyebrow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .eh-card-name { font: 700 17px/1.25 var(--eh-head); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

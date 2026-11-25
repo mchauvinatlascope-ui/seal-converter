@@ -4,7 +4,7 @@ A Chrome extension that gets you where you work in enos in one click. It gives e
 
 ## Install (2 minutes)
 
-1. Download `enos-helper-1.0.1.zip` and unzip it.
+1. Download `enos-helper-1.0.2.zip` and unzip it.
 2. Open `chrome://extensions` and switch on **Developer mode** (top right).
 3. Click **Load unpacked** and pick the unzipped `enos-helper` folder.
 4. Open enos and sign in. The first time, three steps explain the star. Then **Home** opens in place of the empty enos home page.
@@ -15,7 +15,7 @@ To update: replace the folder with the new one, click the reload arrow on the en
 
 Home opens when you arrive in enos, and any time from the **Home** button in the orange bar (Esc or the × closes it and shows enos as usual).
 
-- **Pinned views**: one card each, with the path it follows and its keyboard shortcut (Alt 1 to 9). Click to open, drag to reorder, right-click to rename, move or remove.
+- **Pinned views**: one card each, with the path it follows and its keyboard shortcut (Alt 1 to 9). Click to open, drag to reorder, the star at the top right unpins, right-click renames or moves.
 - **Pick up where you left off**: your last views; the star pins one.
 - **My queries**: the queries and saved filters you pinned, by name, and a link to each query list of enos.
 - **All of enos**: the whole left menu with its names, sub-entries included, one click each.
@@ -44,6 +44,10 @@ Type a few letters: your pinned views, your recent views, the entries of the eno
 ## What it never does
 
 It never clicks Save, Delete or any button for you unless that click is part of a path you pinned yourself; it never fills a record. The one thing it types is the list filters you had typed yourself when you pinned a view through a list row (then presses Search). To greet you on Home it reads your first name where enos shows it at the top right; it is kept nowhere. Nothing leaves your browser.
+
+## 1.0.2
+
+- **Unpin**: each card on Home has its star at the top right; click it to unpin (the message offers Undo). Right-click still renames or moves.
 
 ## 1.0.1
 

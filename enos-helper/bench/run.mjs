@@ -66,6 +66,12 @@ ok((await page.$eval('#crumbtext', e => e.textContent)) === 'Projects queries', 
 await page.click('#eh-chips .eh-chip-home'); await sleep(200);
 await page.$$eval('#eh-home .eh-map-r .eh-star.eh-on', bs => bs[0].click()); await sleep(200);
 ok((await page.$$eval('#eh-home .eh-card', els => els.length)) === 1, 'the same star unpins');
+await page.$$eval('#eh-home .eh-map-r', rs => rs.find(r => r.querySelector('.eh-link').title === 'Settings').querySelector('.eh-star').click()); await sleep(200);
+await page.click('#eh-home .eh-unpin'); await sleep(200);
+ok((await page.$$eval('#eh-home .eh-card', els => els.length)) === 1 && await page.$eval('#eh-toast', e => !e.hidden && /Unpinned « Settings »/.test(e.textContent)), 'the star on a card unpins it and says so');
+await page.click('#eh-toast .eh-tbtn'); await sleep(200);
+ok((await page.$$eval('#eh-home .eh-card-name', els => els.map(e => e.textContent))).join(',') === 'Settings,Pin a view', 'Undo puts it back');
+await page.click('#eh-home .eh-unpin'); await sleep(200);
 await page.keyboard.press('Escape'); await sleep(100);
 ok(await page.$eval('#eh-home', e => e.hidden), 'Escape closes Home');
 await page.click('#eh-chips .eh-chip-home'); await sleep(150);
