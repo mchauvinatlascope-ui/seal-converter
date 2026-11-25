@@ -274,17 +274,23 @@ await setOpts({ on: true, layout: 'drawer', palette: true, autoOpen: false, rece
 await ctrl('.'); await sleep(200);
 ok(await page.$eval('html', e => e.classList.contains('eh-open')), 'drawer opens again after off/on');
 await ctrl('.');
-// 1.1.1 : boutons d une ligne sans texte, meme action pour tous, infobulle seulement au survol (liste des requetes d enos).
+// 1.1.1 : boutons d une ligne sans texte, meme action pour tous (liste des requetes d enos).
+// 1.1.3 : Execute ouvre la fenetre « Query Parameters » ; une case Ignore cochee a la main est rejouee, comptee dans la fenetre.
 await page.$$eval('#sidebar-menu a', as => as.find(a => a.getAttribute('ng-click') === "go('Animals queries')").click()); await sleep(900);
-await page.hover('#queries-panel .acts a[data-k=execute]'); await page.click('#queries-panel .acts a[data-k=execute]'); await sleep(1500);
-ok((await crumbs()) === 'Query execute', 'query executed by hand');
-await page.click('#eh-chips .eh-chip-pin'); await sleep(200);
+await page.hover('#queries-panel .acts a[data-k=execute]'); await page.click('#queries-panel .acts a[data-k=execute]'); await sleep(1200);
+ok(await page.$eval('#qp', e => !e.classList.contains('hidden')), 'Execute by hand opens the parameters window');
+ok(await page.$eval('html', e => e.classList.contains('eh-modal')), 'the window is seen: the bar buttons step aside');
+await page.click('#qp .prow:nth-of-type(2) input[type=checkbox]'); await sleep(150);
+await page.click('#qp button'); await sleep(1200);
+ok((await crumbs()) === 'Query run 1', 'query run by hand with the second Ignore ticked: ' + await crumbs());
+await page.click('#eh-chips .eh-chip-pin'); await sleep(250);
+steps = await page.$$eval('#eh-pop .eh-steps li .eh-t', els => els.map(e => e.textContent));
+ok(steps.join(' > ') === 'Animals › Reports › Queries > MC QUERY > tick « Line - Name » > OK', 'the path says which box is ticked: ' + steps.join(' > '));
 await page.keyboard.press('Enter'); await sleep(300);
-await page.$$eval('#sidebar-menu a', as => as.find(a => a.textContent === 'Settings').click()); await sleep(800);
 await page.evaluate(() => { window.pressed = []; });
 await page.click('#eh-chips .eh-chip-home'); await sleep(300);
-await page.$$eval('#eh-home .eh-card', cs => cs.find(c => c.querySelector('.eh-card-name').textContent === 'Query execute').click()); await sleep(4000);
-ok((await crumbs()) === 'Query execute' && await page.evaluate(() => window.pressed.join(',') === "go('Animals queries'),rowact(),rowact:execute"), 'the pinned query presses Execute, not Print, though no button has a name yet: ' + await page.evaluate(() => window.pressed.join(',')) + ' / ' + await page.$eval('#eh-toast', e => e.textContent));
+await page.$$eval('#eh-home .eh-card', cs => cs.find(c => c.querySelector('.eh-card-name').textContent === 'Query run 1').click()); await sleep(6000);
+ok((await crumbs()) === 'Query run 1' && await page.evaluate(() => window.pressed.join(',') === "go('Animals queries'),rowact(),rowact:execute,qpok()"), 'the pinned query presses Execute (not Print), ticks the same Ignore box in the window although result boxes sit behind, then OK: ' + await crumbs() + ' / ' + await page.evaluate(() => window.pressed.join(',')) + ' / ' + await page.$eval('#eh-toast', e => e.textContent));
 // La fenetre de l icone, ouverte en onglet pour la capture.
 const pop = await browser.newPage(); await pop.setViewport({ width: 360, height: 560 });
 await pop.goto('chrome-extension://' + new URL(sw.url()).host + '/popup.html'); await sleep(400);

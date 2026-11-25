@@ -69,6 +69,7 @@
       <div class="panel" id="home-panel"><div class="dashboard-container"><div class="widget" bsi-widget bsi-entity="Activity">To do list</div><div class="widget" bsi-widget>My query</div></div></div>
       <div class="panel hidden" id="generic-panel"><h4 class="panel-heading" id="generic-title"></h4></div>
       <div class="panel hidden" id="queries-panel">
+        <div class="hidden" id="qres"><input type="checkbox" checked> MM1 <input type="checkbox" checked> MM2</div>
         <table>
           <tr><th>Name</th><th>Code</th><th>Access</th><th>Staff</th><th>Actions</th></tr>
           <tr><td>My group query</td><td>MC QUERY</td><td></td><td>MALAGHAN Workspace</td><td class="acts"><a ng-click="rowact()" data-k="open"><i></i></a><a ng-click="rowact()" data-k="edit"><i></i></a><a ng-click="rowact()" data-k="execute"><i class="imoon imoon-play3"></i></a><a ng-click="rowact()" data-k="print"><i></i></a><a ng-click="rowact()" data-k="trash"><i></i></a></td></tr>
@@ -113,6 +114,13 @@
       </ul>
     </aside>
   </div>
+  <div id="qp" class="hidden" style="position:fixed;z-index:2000;left:320px;top:90px;width:760px;background:#fff;border:1px solid #999;padding:12px">
+    <b>Query Parameters</b>
+    <div class="prow"><select><option></option></select><select><option>Location - Path</option></select><input type="text" value="1.22"><input type="checkbox"></div>
+    <div class="prow"><select><option></option></select><select><option>Line - Name</option></select><input type="text" value="x"><input type="checkbox"></div>
+    <div class="prow"><select><option></option></select><select><option>Presence Status</option></select><select><option>On Site</option></select><input type="checkbox"></div>
+    <button type="button" ng-click="qpok()">OK</button>
+  </div>
   <script>
     // Simule enos : connexion d abord ; puis l adresse ne change (presque) jamais ; les volets s affichent selon les clics ; un delai imite le serveur.
     window.pressed = [];
@@ -131,7 +139,8 @@
       e.preventDefault();
       const act = el.getAttribute('ng-click');
       window.pressed.push(act);
-      if (act === 'rowact()') { window.pressed.push('rowact:' + el.dataset.k); document.getElementById('crumbtext').textContent = 'Query ' + el.dataset.k; return; }
+      if (act === 'rowact()') { window.pressed.push('rowact:' + el.dataset.k); document.getElementById('crumbtext').textContent = 'Query ' + el.dataset.k; if (el.dataset.k === 'execute') later(() => { document.querySelectorAll('#qp input[type=checkbox]').forEach(c => { c.checked = false; }); document.getElementById('qp').classList.remove('hidden'); }); return; }
+      if (act === 'qpok()') { const on = [...document.querySelectorAll('#qp input[type=checkbox]')].map((c, i) => (c.checked ? i : '')).filter(x => x !== '').join(''); document.getElementById('qp').classList.add('hidden'); later(() => { document.getElementById('crumbtext').textContent = 'Query run ' + on; document.getElementById('qres').classList.remove('hidden'); }); return; }
       const m = act.match(/^(\w+)\((?:'(.*)')?\)$/);
       const [fn, arg] = [m[1], m[2]];
       if (fn === 'login') { document.getElementById('login').classList.add('hidden'); document.getElementById('main').classList.remove('hidden'); location.hash = '#/home'; show(['home-panel'], ''); return; }

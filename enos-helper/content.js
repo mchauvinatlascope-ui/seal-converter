@@ -1,4 +1,4 @@
-// enos Helper 1.1.2
+// enos Helper 1.1.3
 // Ne fait que changer l affichage dans ce navigateur : n ecrit jamais dans enos,
 // n envoie rien, ne touche a aucun formulaire.
 // Dans enos l adresse ne change pas quand on ouvre un projet, une procedure ou une fiche :
@@ -11,7 +11,7 @@
 // section#content, aside#sidebar_right (Details, 350 px), icones fa-* / bsi-* / glyphicon-*.
 (() => {
   if (window.top !== window) return; // jamais dans un cadre interne
-  const VERSION = '1.1.2';
+  const VERSION = '1.1.3';
   const KEY = 'enosHelper';
   const DEFAULTS = { on: true, layout: 'drawer', recentMax: 30, palette: true, autoOpen: false, chips: true, calm: true, forms: false, resume: true, home: true };
   const root = document.documentElement;
@@ -157,6 +157,38 @@
   // ------------------------------------------------------------ le chemin de clics
   // Signature d un element clique : de quoi le retrouver (texte, titre, icone, ligne de tableau).
   const ACTIONABLE = 'input[type="checkbox"], input[type="radio"], a, button, [role="button"], [role="menuitem"], [role="tab"], [ng-click], [data-ng-click], [ui-sref], li, i, svg, img, th, td, tr, label, [tabindex]';
+  // Une fenetre d enos (« Query Parameters »...) : le bloc le plus haut, en position fixe ou absolue, qui n est ni la zone de travail,
+  // ni la barre, ni un volet. Ce qu on y clique se compte DANS la fenetre (la 5e case de la fenetre, pas de la page).
+  function layerOf(el) {
+    let best = null;
+    for (let p = el; p && p !== document.body && p !== root; p = p.parentElement) {
+      if (ours(p) || p.matches('#content, section.content-main, #content-navbar, header, #sidebar_left, #sidebar_right, #sidebar-menu')) return null;
+      if (p.querySelector('#content, #content-navbar')) break;
+      const pos = getComputedStyle(p).position;
+      if (pos === 'fixed' || pos === 'absolute') best = p;
+    }
+    return best;
+  }
+  function topLayer() {
+    for (const y of [0.35, 0.5, 0.2]) {
+      const e = document.elementFromPoint(Math.round(innerWidth / 2), Math.round(innerHeight * y));
+      const L = e && !ours(e) ? layerOf(e) : null;
+      if (L) { const r = L.getBoundingClientRect(); if (r.width > 280 && r.height > 120) return L; }
+    }
+    return null;
+  }
+  // Le champ d une ligne de parametres (« Line - Name ») pour dire quelle case est cochee : la premiere liste remplie de la ligne.
+  function fieldOfBox(el) {
+    let p = el.parentElement;
+    for (let k = 0; p && k < 6; k++, p = p.parentElement) {
+      const sel = $$('select', p);
+      if (!sel.length) continue;
+      if ($$('input[type="checkbox"]', p).length !== 1) return '';
+      const t = sel.map(x => (x.selectedIndex >= 0 && x.options[x.selectedIndex] ? x.options[x.selectedIndex].text.trim() : '')).filter(Boolean)[0];
+      return (t || '').slice(0, 40);
+    }
+    return '';
+  }
   const CONTAINER = /^(FORM|FIELDSET|TABLE|TBODY|THEAD|SECTION|MAIN|ASIDE|HEADER|BODY|HTML)$/;
   function iconOf(el) {
     const cls = e => (e && typeof e.className === 'string' ? e.className.trim().split(/\s+/).filter(c => /^(fa|fas|far|fab|glyphicon|icon|imoon|icomoon|bsi|ion|mdi)-/.test(c)) : []);
@@ -174,7 +206,7 @@
     // Une icone dans un bouton : on vise le bouton.
     if (/^(i|svg|img)$/i.test(el.tagName) && el.parentElement && el.parentElement.closest('a, button, [role="button"], [ng-click], [data-ng-click]')) el = el.parentElement.closest('a, button, [role="button"], [ng-click], [data-ng-click]');
     const s = sigOf(el);
-    if (el.tagName === 'INPUT') { s.want = el.type === 'radio' ? true : !el.checked; if (!s.text && !s.title) s.title = (el.type === 'radio' ? 'option' : (s.want ? 'tick' : 'untick')); } // l etat voulu apres ton clic (note avant qu il change)
+    if (el.tagName === 'INPUT') { s.want = el.type === 'radio' ? true : el.checked; s.say = (el.type === 'radio' ? 'option' : (s.want ? 'tick' : 'untick')) + (fieldOfBox(el) ? ' « ' + fieldOfBox(el) + ' »' : (s.title ? ' ' + s.title : '')); } // l etat voulu : au moment du clic, la case a deja pris son nouvel etat
     const row = el.closest('tr, [role="row"]');
     if (row && !/^(th|tr)$/.test(s.tag)) {
       s.row = rowKey(row);
@@ -184,13 +216,15 @@
       const inRow = $$(ACTIONABLE, row).filter(e => same(sigOf(e), s, true));
       s.n = Math.max(0, inRow.indexOf(el));
     } else {
-      const all = $$(ACTIONABLE).filter(e => !ours(e) && same(sigOf(e), s, true));
+      const L = layerOf(el);
+      if (L) s.layer = 1;
+      const all = $$(ACTIONABLE, L || document).filter(e => !ours(e) && same(sigOf(e), s, true));
       s.n = Math.max(0, all.indexOf(el));
     }
     if (noise(el, s)) return null;
     s.root = railOf(el) || (topBarOf(el) && /home|logo|brand/i.test((el.className || '') + ' ' + s.icon + ' ' + (el.getAttribute('href') || '')));
     s.menu = el.closest('#sidebar-menu, .sidebar-menu') ? menuPath(el).concat(s.text || s.title).filter(Boolean).join(' › ') : '';
-    s.label = (s.menu || s.text || s.title || (s.icon ? s.icon.replace(/^(fa|fas|far|glyphicon|icon|imoon|bsi)-/, '') : s.tag)) + (s.row ? ' on ' + (s.rowLabel || s.row) : '');
+    s.label = (s.menu || s.say || s.text || s.title || (s.icon ? s.icon.replace(/^(fa|fas|far|glyphicon|icon|imoon|bsi)-/, '') : s.tag)) + (s.row ? ' on ' + (s.rowLabel || s.row) : '');
     return s;
   }
   // Les filtres remplis au-dessus d une liste (Reference « *ml* », Status...) : leur libelle et leur valeur, pour les remettre au rejeu.
@@ -262,7 +296,7 @@
   // Meme element : meme balise et, soit la meme action AngularJS (hors $index / $event), soit le meme texte et le meme titre.
   const actKey = a => (a || '').replace(/\$(index|event|parent)\b/g, '').replace(/\s+/g, '');
   const same = (a, b, loose) => a.tag === b.tag
-    && ((a.act && b.act && actKey(a.act) === actKey(b.act)) || (a.text === b.text && a.title === b.title))
+    && ((a.tag === 'input' && !a.act && !b.act) || (a.act && b.act && actKey(a.act) === actKey(b.act)) || (a.text === b.text && a.title === b.title))
     && (loose ? true : a.icon === b.icon) && (a.icon === b.icon || !b.icon || !a.icon);
   function find(s) {
     let scope = [document];
@@ -292,6 +326,8 @@
     let cands = scope.flatMap(sc => $$(ACTIONABLE, sc)).filter(e => !ours(e) && same(sigOf(e), s, true) && (s.row || visible(e) || s.tag === 'li' || s.tag === 'a' || s.menu));
     if (s.href) { const byHref = cands.filter(e => (e.getAttribute('href') || '').slice(0, 80) === s.href); if (byHref.length) cands = byHref; }
     if (s.act) { const byAct = cands.filter(e => actKey(actOf(e)) === actKey(s.act)); if (byAct.length) cands = byAct; }
+    // Un pas fait dans une fenetre d enos se cherche dans la fenetre ouverte, pas dans la page derriere.
+    if (s.layer) { const inL = cands.filter(e => layerOf(e)); if (!inL.length) return null; cands = inL; }
     // Plusieurs boutons pour la meme action d enos (executeAction(a,item)) : leur infobulle les departage.
     if (s.title) { const byTip = cands.filter(e => tipOf(e).slice(0, 60) === s.title); if (byTip.length) cands = byTip; }
     if (!cands.length) return null;
@@ -985,7 +1021,7 @@
     if (out !== wasOut) { wasOut = out; if (out) trail = []; renderChips(); }
     else if (!out && opts.chips && !chipsEl.isConnected) renderChips();
     if (!out && sideMenu()) { offerResume(); maybeWelcome(); }
-    root.classList.toggle('eh-modal', $$('.modal, [uib-modal-window], .modal-dialog').some(m => !ours(m) && visible(m)));
+    root.classList.toggle('eh-modal', $$('.modal, [uib-modal-window], .modal-dialog').some(m => !ours(m) && visible(m)) || !!topLayer());
     const dash = out ? null : dashBox();
     if (!dash) homeDismissed = false; // quitter l accueil d enos : Home y reviendra a la prochaine visite
     if (homeOpen) { if (out || (docked() && !dash)) closeHome(); else if (!!dash !== docked()) renderHome(); else placeHome(); }
@@ -1017,8 +1053,10 @@
       const cells = $$('td', row);
       lines.push('table ' + k + ' first row: ' + cells.length + ' cells, key cells ' + rowCells(row).length + '; buttons: ' + $$('a, button, i, span[ng-click], [bsi-icon], input', row).slice(0, 24).map(e => attrsOf(e) + (e.children.length ? '>' + [...e.children].slice(0, 2).map(attrsOf).join('+') : '')).join(' | '));
     });
-    const modal = $$('.modal, [uib-modal-window], .modal-dialog').find(m => !ours(m) && visible(m));
-    if (modal) lines.push('modal open: labels ' + $$('label, th, h3, h4, .modal-title', modal).map(e => txt(e).slice(0, 30)).filter(Boolean).slice(0, 30).join(' | ') + ' ; fields ' + $$('input, select, textarea, button', modal).slice(0, 60).map(e => e.tagName.toLowerCase() + (e.type ? ':' + e.type : '') + [...e.attributes].filter(a => /^(ng-model|data-ng-model|name|ng-click|bsi-attribute|bsi-name|bsi-label)$/.test(a.name)).map(a => '[' + a.name + '=' + a.value.slice(0, 40) + ']').join('')).join(' | '));
+    const mid = document.elementFromPoint(Math.round(innerWidth / 2), Math.round(innerHeight * 0.35));
+    if (mid && !ours(mid)) { const chain = []; for (let p = mid; p && p !== document.body && chain.length < 14; p = p.parentElement) { const cs = getComputedStyle(p); chain.push(selOf(p) + '{' + cs.position + (cs.zIndex !== 'auto' ? ' z' + cs.zIndex : '') + '}'); } lines.push('at screen centre: ' + chain.join(' < ')); }
+    const modal = topLayer() || $$('.modal, [uib-modal-window], .modal-dialog').find(m => !ours(m) && visible(m));
+    if (modal) lines.push('window open ' + selOf(modal) + ' ' + rect(modal) + ': labels ' + $$('label, th, h3, h4, .modal-title', modal).map(e => txt(e).slice(0, 30)).filter(Boolean).slice(0, 30).join(' | ') + ' ; fields ' + $$('input, select, textarea, button, a[ng-click]', modal).slice(0, 70).map(e => e.tagName.toLowerCase() + (e.type ? ':' + e.type : '') + (e.parentElement ? '<' + e.parentElement.tagName.toLowerCase() + (typeof e.parentElement.className === 'string' && e.parentElement.className ? '.' + e.parentElement.className.trim().split(/\s+/).slice(0, 2).join('.') : '') : '') + [...e.attributes].filter(a => /^(ng-model|data-ng-model|name|ng-click|ng-change|typeahead|uib-typeahead|bsi-attribute|bsi-name|bsi-label|bsi-source|bsi-entity|class)$/.test(a.name)).map(a => '[' + a.name + '=' + a.value.slice(0, 40) + ']').join('')).join(' | '));
     const right = $('#sidebar_right');
     if (right) lines.push('details entries ' + detailEntries().map(d => d.label).join(' | '));
     if (right) { lines.push('right panel ' + rect(right) + ' texts ' + $$('*', right).filter(e => e.children.length === 0 && txt(e)).map(e => txt(e).slice(0, 30)).slice(0, 20).join(' | ')); }

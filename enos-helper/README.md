@@ -4,7 +4,7 @@ A Chrome extension that gets you where you work in enos in one click. It gives e
 
 ## Install (2 minutes)
 
-1. Download `enos-helper-1.1.2.zip` and unzip it.
+1. Download `enos-helper-1.1.3.zip` and unzip it.
 2. Open `chrome://extensions` and switch on **Developer mode** (top right).
 3. Click **Load unpacked** and pick the unzipped `enos-helper` folder.
 4. Open enos and sign in. The first time, three steps explain the star. Then **Home** opens in place of the empty enos home page.
@@ -44,6 +44,12 @@ Type a few letters: your pinned views, your recent views, the entries of the eno
 ## What it never does
 
 It never clicks Save, Delete or any button for you unless that click is part of a path you pinned yourself; it never fills a record. The one thing it types is the list filters you had typed yourself when you pinned a view through a list row (then presses Search). To open your pinned views quickly it counts the calls enos makes to its server while a page loads (a number, never their content). To greet you on Home it reads your first name where enos shows it at the top right; it is kept nowhere. Nothing leaves your browser.
+
+## 1.1.3
+
+- **Windows of enos (Query Parameters…)** are now recognised. What you click in one is counted inside that window, so a pinned query that ticks an **Ignore** box ticks the same box again, whatever sits behind the window. The path names it: « tick « Line - Name » ». Pin the query again once, ticking the boxes as you want them.
+- A box already in the wanted state is left alone; boxes without a name could not be found again before, they can now.
+- The diagnostic describes the window that is open (the kind of its fields, never their values).
 
 ## 1.1.2
 

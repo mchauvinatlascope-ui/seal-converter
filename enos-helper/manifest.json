@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "enos Helper",
-  "version": "1.1.2",
+  "version": "1.1.3",
   "description": "A home dashboard, one-click shortcuts and a Ctrl K finder for enos. Stays in your browser: it sends nothing anywhere.",
   "permissions": [
     "storage",
