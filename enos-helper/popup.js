@@ -1,23 +1,24 @@
 const KEY = 'enosHelper';
-const DEFAULTS = { on: true, layout: 'drawer', recentMax: 30, palette: true, autoOpen: false, chips: true, calm: true, forms: false, resume: true };
-const BOOLS = ['on', 'autoOpen', 'palette', 'chips', 'calm', 'forms', 'resume'];
-document.getElementById('ver').textContent = 'v' + chrome.runtime.getManifest().version;
+const DEFAULTS = { on: true, layout: 'drawer', recentMax: 30, palette: true, autoOpen: false, chips: true, calm: true, forms: false, resume: true, home: true };
+const BOOLS = { on: 'on', calm: 'calm', forms: 'forms', homeOn: 'home' }; // case a cocher -> reglage
+const $ = id => document.getElementById(id);
+$('ver').textContent = chrome.runtime.getManifest().version;
+if (/Mac/.test(navigator.platform)) $('find').querySelector('kbd').textContent = '⌘ K';
 
 function paint(opts) {
-  for (const id of BOOLS) document.getElementById(id).checked = !!opts[id];
-  document.getElementById('layout').value = opts.layout || 'drawer';
-  document.getElementById('all').classList.toggle('off', !opts.on);
+  for (const [id, k] of Object.entries(BOOLS)) $(id).checked = !!opts[k];
+  $('all').classList.toggle('off', !opts.on);
 }
 chrome.storage.sync.get(KEY, r => {
   let opts = { ...DEFAULTS, ...(r[KEY] || {}) };
   paint(opts);
-  for (const id of BOOLS) document.getElementById(id).addEventListener('change', e => { opts = { ...opts, [id]: e.target.checked }; paint(opts); chrome.storage.sync.set({ [KEY]: opts }); });
-  document.getElementById('layout').addEventListener('change', e => { opts = { ...opts, layout: e.target.value }; chrome.storage.sync.set({ [KEY]: opts }); });
+  for (const [id, k] of Object.entries(BOOLS)) $(id).addEventListener('change', e => { opts = { ...opts, [k]: e.target.checked }; paint(opts); chrome.storage.sync.set({ [KEY]: opts }); });
 });
 
 // Etat sur l onglet actif : l extension y tourne-t-elle ? (URL lue grace a activeTab, seulement au clic sur l icone)
 const ENOS = /^https:\/\/malaghan\.poweredbyenos\.com\//;
-const state = document.getElementById('state');
+const state = $('state');
+const say = t => { $('msg').textContent = t; };
 function showState(cls, title, text, action) {
   state.hidden = false; state.className = cls;
   state.querySelector('b').textContent = title; state.querySelector('span').textContent = text;
@@ -28,21 +29,34 @@ chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
   const tab = tabs && tabs[0];
   if (!tab) return;
   if (!tab.url || !ENOS.test(tab.url)) {
-    showState('off', 'Not an enos tab', 'Open malaghan.poweredbyenos.com to see enos Helper at work.',
+    showState('off', 'Not an enos tab', 'Open enos to see your Home and your pinned views.',
       { label: 'Open enos', run: () => chrome.tabs.create({ url: 'https://malaghan.poweredbyenos.com/' }) });
     return;
   }
-  chrome.tabs.sendMessage(tab.id, { eh: 'status' }, r => {
-    if (chrome.runtime.lastError || !r) {
-      showState('warn', 'This enos tab needs a reload', 'The extension was installed or updated after this tab was opened. Reload it once.',
+  const send = (eh, cb) => chrome.tabs.sendMessage(tab.id, { eh }, r => { void chrome.runtime.lastError; if (cb) cb(r); });
+  send('status', r => {
+    if (!r) {
+      showState('warn', 'This enos tab needs a reload', 'The extension was installed or updated after this tab was opened.',
         { label: 'Reload the tab', run: () => { chrome.tabs.reload(tab.id); window.close(); } });
-    } else if (!r.on) showState('off', 'enos Helper is paused', 'Turn it on above to get the sidebar and Ctrl K.');
-    else showState('ok', 'Active on this tab · v' + r.v, r.pins + ' shortcut' + (r.pins === 1 ? '' : 's') + ', ' + r.recent + ' recent view' + (r.recent === 1 ? '' : 's') + (r.error ? ' · ' + r.error : '') + '.',
-      { label: 'Diagnostic', run: () => chrome.tabs.sendMessage(tab.id, { eh: 'diag' }, d => {
-        const ta = document.getElementById('diag'); ta.value = (d && d.text) || 'No answer from the page.'; ta.classList.add('show'); ta.select();
-        try { navigator.clipboard.writeText(ta.value); } catch (e) {}
-        state.querySelector('span').textContent = 'Diagnostic copied: paste it to me. Page structure and menu labels only, no table content and none of your shortcuts.';
-      }) });
-    document.getElementById('forget').onclick = () => chrome.tabs.sendMessage(tab.id, { eh: 'forget' }, () => { state.querySelector('span').textContent = 'Shortcuts and recent views forgotten.'; });
+      return;
+    }
+    if (!r.on) { showState('off', 'enos Helper is paused', 'Switch it on at the top right.'); return; }
+    if (r.out) { showState('off', 'Sign in to enos first', 'Your Home and your pinned views show once you are signed in.'); return; }
+    showState('ok', 'Working on this enos tab', r.pins + ' pinned view' + (r.pins === 1 ? '' : 's') + (r.error ? ' · ' + r.error : ''));
+    for (const id of ['home', 'find', 'export', 'import', 'diagb', 'forget']) $(id).disabled = false;
+    $('home').onclick = () => send('home', () => window.close());
+    $('find').onclick = () => send('find', () => window.close());
+    $('export').onclick = () => send('export', x => say(x && x.pins ? 'Saved to enos-helper-shortcuts.json in your Downloads.' : 'No pinned view to save yet.'));
+    $('import').onclick = () => send('import', () => window.close()); // le choix du fichier se fait dans la page, sur Home
+    $('diagb').onclick = () => send('diag', d => {
+      const ta = $('diag'); ta.value = (d && d.text) || 'No answer from the page.'; ta.classList.add('show'); ta.select();
+      try { navigator.clipboard.writeText(ta.value); } catch (e) {}
+      say('Copied. Page structure and menu names only: no table content, none of your shortcuts.');
+    });
+    let sure = false;
+    $('forget').onclick = () => {
+      if (!sure) { sure = true; $('forget').textContent = 'Click again to forget all pinned and recent views'; return; }
+      send('forget', () => { say('Pinned and recent views forgotten.'); $('forget').textContent = 'Forget everything'; sure = false; });
+    };
   });
 });

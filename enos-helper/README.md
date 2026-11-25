@@ -1,41 +1,60 @@
 # enos Helper
 
-A Chrome extension that gets you where you work in enos in one click: shortcuts that replay your own clicks, shown in the orange bar, a Ctrl K finder over the whole enos menu, and your recent views. It only runs on malaghan.poweredbyenos.com, in your own browser: it never writes to enos and sends nothing anywhere.
+A Chrome extension that gets you where you work in enos in one click. It gives enos a **Home** (your pinned views, your last views, your queries and the whole enos menu on one page), shortcuts in the orange bar that replay your own clicks, and a Ctrl K finder. It only runs on malaghan.poweredbyenos.com, in your own browser: it sends nothing anywhere.
 
 ## Install (2 minutes)
 
-1. Download `enos-helper-0.4.1.zip` and unzip it.
+1. Download `enos-helper-1.0.0.zip` and unzip it.
 2. Open `chrome://extensions` and switch on **Developer mode** (top right).
 3. Click **Load unpacked** and pick the unzipped `enos-helper` folder.
-4. Open enos and sign in. Your shortcuts appear in the orange bar next to the search box (empty at first: **Pin a view**). **Ctrl .** (⌘ . on a Mac) or the small tab at the bottom left opens the sidebar; **Ctrl K** opens the finder.
+4. Open enos and sign in. The first time, three steps explain the star. Then **Home** opens in place of the empty enos home page.
 
-To update: replace the folder with the new one, click the reload arrow on the enos Helper card in `chrome://extensions`, then reload the enos tab.
+To update: replace the folder with the new one, click the reload arrow on the enos Helper card in `chrome://extensions`, then reload the enos tab. Your pinned views are kept.
 
-## Your first shortcut: Procedures
+## Home
 
-enos keeps the same address whatever you open, so a shortcut is a path of clicks, not a link. The extension notes your clicks in enos as you go; a click in the left menu starts a new path, and clicks that lead nowhere (the ≡ toggle, Sign In, notifications, your account menu) are ignored.
+Home opens when you arrive in enos, and any time from the **Home** button in the orange bar (Esc or the × closes it and shows enos as usual).
+
+- **Pinned views**: one card each, with the path it follows and its keyboard shortcut (Alt 1 to 9). Click to open, drag to reorder, right-click to rename, move or remove.
+- **Pick up where you left off**: your last views; the star pins one.
+- **My queries**: the queries and saved filters you pinned, by name, and a link to each query list of enos.
+- **All of enos**: the whole left menu with its names, sub-entries included, one click each.
+- At the bottom: **Save my pinned views to a file** and **Load from a file**, to keep a copy or move them to another computer.
+
+## Your first pinned view: Procedures
+
+enos keeps the same address whatever you open, so a pinned view is a path of clicks, not a link. The extension notes your clicks in enos as you go; a click in the left menu starts a new path, and clicks that lead nowhere (the ≡ toggle, Sign In, notifications, your account menu) are ignored.
 
 1. Go where you want the usual way: left menu **Projects › Management**, the magnifier of your project, **Procedures** in Details.
-2. Click the **★** in the orange bar. A small window proposes a name (`Procedures`), lists the clicks it noted (remove one with its × if it is not part of the way), Enter pins.
-3. From now on: click **Procedures** in the orange bar, or press **Alt 1**, or Ctrl K, `proc`, Enter. The extension clicks the same steps for you, one after the other, and tells you when it is there.
+2. Click **★ Pin this view** in the orange bar. A small window proposes a name and shows the path it will follow (**Edit steps** lets you drop a click that is not part of the way). Enter pins.
+3. From now on: its card on Home, its button in the orange bar, **Alt 1**, or Ctrl K, `proc`, Enter. A banner at the bottom shows the steps as they go (**Stop** halts it), and a message says when it is there.
 
-Right-click a shortcut in the bar to rename, move or remove it. The ≡ at the end of the bar opens the sidebar: recent views, My queries, the whole enos menu.
+Rows are recognised by their reference (ML-040014), so counters that change from one day to the next do not break a pinned view. If a step cannot be found (enos changed, or the row is not in the list that day), it stops and says which step.
 
-Rows are recognised by their reference (ML-040014), so counters that change from one day to the next do not break a shortcut. If a step cannot be found (enos changed, or the row is not in the list that day), the replay stops and says which step.
+## Finder (Ctrl K)
 
-## The enos menu, flat
-
-The sidebar lists the whole left menu of enos with its sub-entries, even the ones enos hides until you hover (Projects › Management, Animals › Reports › Queries…). One click opens the entry. The finder (Ctrl K) searches them too, along with the saved filters of an open list (Filter Selection) and your recent views.
+Type a few letters: your pinned views, your recent views, the entries of the enos menu (even folded ones) and what the open page offers (the saved filters of a list, the entries of Details), each under its heading. Enter opens; Ctrl Enter pins a recent view.
 
 ## Settings (click the extension icon)
 
-- **Shortcuts in the enos bar** (on by default), **Sidebar**: drawer, always open (pushes enos to the right; may not fit), or hidden; **Open the drawer on arrival**; **Ctrl K finder**.
-- **Forget all shortcuts and recent views**: they are kept in this browser only.
-- **Diagnostic**: copies the page structure and menu labels (no table content, none of your shortcuts) so the extension can be adjusted to enos.
+- **Open Home**, **Find**.
+- **Calm tables** (on): one line per row, the bin kept away from the magnifier. **Readable forms** (off): narrower columns, empty fields toned down. **Start on Home** (on).
+- **Save to a file**, **Load from a file**, **Copy a diagnostic** (page structure and menu names only: no table content, none of your shortcuts), **Forget everything**.
 
 ## What it never does
 
-It never clicks Save, Delete or any button for you unless that click is part of a path you pinned yourself; it never fills a record. The one thing it types is the list filters you had typed yourself when you pinned a shortcut through a list row (then presses Search). Nothing leaves your browser.
+It never clicks Save, Delete or any button for you unless that click is part of a path you pinned yourself; it never fills a record. The one thing it types is the list filters you had typed yourself when you pinned a view through a list row (then presses Search). To greet you on Home it reads your first name where enos shows it at the top right; it is kept nowhere. Nothing leaves your browser.
+
+## 1.0
+
+- **Home**: a dashboard in place of the empty enos home page (pinned views as cards, last views, My queries, the whole enos menu), with a **Home** button in the orange bar.
+- A new look, in the Atlascope family; buttons in the orange bar are now white and readable.
+- **Pin this view** shows the path as a trail and says which list filter it remembers.
+- A banner follows a pinned view while it opens, with a **Stop** button; a view pinned through a filtered list opens about 3 seconds faster.
+- The finder groups its results (Pinned, Recent, enos menu, On this page) and Ctrl Enter pins a recent view.
+- **Save / Load** your pinned views as a file.
+- A three-step introduction on first install.
+- The side drawer is no longer shown (Ctrl . still opens it).
 
 ## 0.4.1
 

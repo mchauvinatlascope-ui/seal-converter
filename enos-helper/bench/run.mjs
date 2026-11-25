@@ -13,8 +13,8 @@ const src = path.resolve(here, '..');
 // Copie de l extension dont le manifeste vise le serveur du banc au lieu d enos.
 const ext = fs.mkdtempSync(path.join(process.env.EH_BENCH_DIR || '/tmp', 'enos-helper-bench-'));
 for (const f of ['manifest.json', 'background.js', 'content.js', 'content.css', 'popup.html', 'popup.js']) fs.copyFileSync(path.join(src, f), path.join(ext, f));
-fs.mkdirSync(path.join(ext, 'icons')); for (const f of fs.readdirSync(path.join(src, 'icons'))) fs.copyFileSync(path.join(src, 'icons', f), path.join(ext, 'icons', f));
-const man = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8')); man.content_scripts[0].matches = ['http://127.0.0.1/*']; fs.writeFileSync(path.join(ext, 'manifest.json'), JSON.stringify(man));
+for (const d of ['icons', 'fonts']) { fs.mkdirSync(path.join(ext, d)); for (const f of fs.readdirSync(path.join(src, d))) fs.copyFileSync(path.join(src, d, f), path.join(ext, d, f)); }
+const man = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8')); man.content_scripts[0].matches = ['http://127.0.0.1/*']; man.web_accessible_resources[0].matches = ['http://127.0.0.1/*']; fs.writeFileSync(path.join(ext, 'manifest.json'), JSON.stringify(man));
 
 let fails = 0;
 const ok = (cond, msg) => { console.log((cond ? 'ok   ' : 'FAIL ') + msg); if (!cond) fails++; };
@@ -41,9 +41,29 @@ const ctrl = async key => { await page.keyboard.down('Control'); await page.keyb
 const trailLen = () => page.$eval('#eh-side .eh-pin', e => (e.textContent.match(/(\d+) step/) || [0, 0])[1] | 0).catch(() => 0);
 
 // Connexion : le clic Sign In ne compte pas.
-await page.click('#loginForm button'); await sleep(1200);
+await page.click('#loginForm button'); await sleep(1400);
 await ctrl('.');
 ok((await trailLen()) === 0, 'Sign In not recorded as a step');
+await ctrl('.');
+// 1.0 : premiere installation, puis Home a la place de l accueil vide.
+ok(await page.$eval('#eh-welcome', e => !e.hidden && /Get to any enos view in one click/.test(e.textContent)).catch(() => false), 'first run: the three steps are shown once');
+await page.screenshot({ path: path.join(here, 'shot-welcome.png') });
+await page.$$eval('#eh-welcome .eh-btn', bs => bs.find(b => b.textContent === 'Skip').click()); await sleep(150);
+ok(!(await page.$('#eh-welcome')), 'Skip closes the first run');
+ok(await page.$eval('#eh-home', e => !e.hidden && /Good (morning|afternoon|evening), Manon/.test(e.querySelector('h1').textContent)), 'Home opens on arrival and greets by first name: ' + await page.$eval('#eh-home h1', e => e.textContent).catch(() => '-'));
+ok(await page.$eval('#eh-home', e => { const r = e.getBoundingClientRect(); return r.left === 60 && r.top === 40; }), 'Home sits right of the rail, under the orange bar');
+ok(await page.$eval('#eh-home .eh-cards', e => e.children.length === 1 && /Pin a view/.test(e.textContent)), 'no pinned view yet: the Pin a view tile alone');
+const map = await page.$$eval('#eh-home .eh-map > div', ds => ds.map(d => d.querySelector('.eh-map-h').textContent + ':' + [...d.querySelectorAll('.eh-link')].map(a => a.textContent).join('|')));
+ok(map.join(' ; ') === 'Locations:Records|Reports › Queries ; Animals:Locations|Entries|Reports › Queries ; Projects:Management|Reports › Queries ; Also:Dashboard|Settings', 'All of enos lists the destinations, not the folders: ' + map.join(' ; '));
+ok(await page.$eval('#eh-chips .eh-chip-home', e => e.classList.contains('eh-on')), 'Home chip is on');
+await page.keyboard.press('Escape'); await sleep(100);
+ok(await page.$eval('#eh-home', e => e.hidden), 'Escape closes Home');
+await page.click('#eh-chips .eh-chip-home'); await sleep(150);
+ok(await page.$eval('#eh-home', e => !e.hidden), 'Home chip opens it again');
+await page.$$eval('#eh-home .eh-map .eh-link', as => as.find(a => a.textContent === 'Entries').click()); await sleep(600);
+ok((await page.$eval('#crumbtext', e => e.textContent)) === 'Animals entries' && await page.$eval('#eh-home', e => e.hidden), 'a menu name on Home opens the view and closes Home');
+await page.$$eval('#sidebar-menu a', as => as.find(a => a.textContent === 'Dashboard').click()); await sleep(500);
+await ctrl('.');
 const groups = await page.$$eval('#eh-side .eh-grp .eh-t', els => els.map(e => e.textContent));
 ok(groups.join(',') === 'Dashboard,Locations,Animals,Projects,Settings', 'enos menu listed in the drawer: ' + groups.join(','));
 await page.$$eval('#eh-side .eh-grp', els => els.find(e => e.textContent.includes('Projects')).click()); await sleep(100);
@@ -66,7 +86,7 @@ await ctrl('.');
 rows = await page.$$eval('#eh-side .eh-row', els => els.map(e => e.title));
 ok(rows.some(t => t === 'Projects › Management'), 'old pin cleaned of Sign In and menu toggle: ' + JSON.stringify(rows));
 await ctrl('.');
-await page.click('#eh-chips .eh-chip:not(.eh-chip-pin):not(.eh-chip-more)'); await sleep(2500);
+await page.click('#eh-chips .eh-chip-v'); await sleep(2500);
 ok((await crumbs()) === 'Projects', 'old pin now opens Projects: ' + await crumbs() + ' / ' + await page.evaluate(() => window.pressed.join(',')));
 await sw.evaluate(async origin => { await chrome.storage.local.set({ ['eh:' + origin]: { pins: [], recent: [] } }); }, base.replace(/\/#.*$/, ''));
 await sleep(400);
@@ -90,7 +110,11 @@ ok(await page.$eval('#eh-pop', e => !e.hidden), 'pin window opens under the bar'
 const suggested = await page.$eval('#eh-pop #eh-name', e => e.value);
 ok(suggested === 'Procedure ML-2025-0026', 'short name proposed: ' + suggested);
 let steps = await page.$$eval('#eh-pop .eh-steps li .eh-t', els => els.map(e => e.textContent));
-ok(steps[0] === 'Projects › Management' && steps[1] === 'Search' && /search on ML-040014/.test(steps[2]) && steps[3] === 'Procedures' && /search on ML-2025-0026/.test(steps[4]), 'steps readable: ' + JSON.stringify(steps));
+ok(steps[0] === 'Projects › Management' && steps[1] === 'Search' && steps[2] === 'ML-040014' && steps[3] === 'Procedures' && steps[4] === 'ML-2025-0026', 'path readable: ' + JSON.stringify(steps));
+ok(await page.$eval('#eh-pop', e => /Also remembers the list filter: Reference \*040\*/.test(e.textContent)), 'the remembered list filter is said');
+await page.screenshot({ path: path.join(here, 'shot-pin.png') });
+ok(!(await page.$('#eh-pop .eh-steps li button')), 'steps are plain until Edit steps');
+await page.click('#eh-pop .eh-link'); await sleep(100);
 ok(await page.evaluate(() => { const b = document.querySelector('#eh-chips .eh-chip-pin'); return /5 clicks/.test(b.title); }), 'the typed filter is not a click');
 await page.$$eval('#eh-pop .eh-steps li button', bs => bs[4].click()); await sleep(100);
 steps = await page.$$eval('#eh-pop .eh-steps li .eh-t', els => els.map(e => e.textContent));
@@ -103,6 +127,15 @@ await page.$eval('#eh-pop #eh-name', e => { e.value = ''; });
 await page.type('#eh-pop #eh-name', 'Procedure two');
 await page.keyboard.press('Enter'); await sleep(200);
 ok(await page.$eval('#eh-pop', e => e.hidden), 'Enter pins and closes');
+// Home : la carte de la vue epinglee, ses dernieres vues.
+await page.click('#eh-chips .eh-chip-home'); await sleep(200);
+const cardT = await page.$eval('#eh-home .eh-card', e => [...e.querySelectorAll('.eh-eyebrow, kbd, .eh-card-name, .eh-card-path')].map(x => x.textContent).join(' | '));
+ok(cardT === 'Projects | Alt 1 | Procedure two | Management › ML-040014 › Procedures › ML-2025-0026 · filter Reference *040*', 'pinned card: domain, shortcut, name, path: ' + cardT);
+const rec = await page.$$eval('#eh-home .eh-hrow-main b', els => els.map(e => e.textContent));
+ok(rec.length >= 1 && rec[0] === 'Procedure ML-2025-0026', 'recent views listed on Home: ' + rec.join(', '));
+ok(!(await page.$eval('#eh-home', e => /SECRET/.test(e.textContent))), 'no record content on Home');
+await page.screenshot({ path: path.join(here, 'shot-home.png') });
+await page.keyboard.press('Escape'); await sleep(100);
 await ctrl('.');
 rows = await page.$$eval('#eh-side .eh-row', els => els.map(e => e.textContent));
 ok(rows.some(t => t.startsWith('Procedure two')), 'pinned under its name');
@@ -110,13 +143,13 @@ ok(!rows.some(t => /SECRET/.test(t)), 'no title text in the names');
 ok(await page.$eval('#eh-chips', e => e.textContent.includes('Procedure two')), 'chip in the orange bar');
 await ctrl('.');
 // Clic droit sur la puce : renommer.
-await page.click('#eh-chips .eh-chip:not(.eh-chip-pin):not(.eh-chip-more)', { button: 'right' }); await sleep(200);
+await page.click('#eh-chips .eh-chip-v', { button: 'right' }); await sleep(200);
 ok(await page.$eval('#eh-pop', e => !e.hidden && /Rename/.test(e.textContent) && /Remove/.test(e.textContent)), 'right click opens rename / move / remove');
 await page.$eval('#eh-pop input', e => { e.value = ''; });
 await page.type('#eh-pop input', 'Proc 2');
 await page.keyboard.press('Enter'); await sleep(200);
 ok(await page.$eval('#eh-chips', e => e.textContent.includes('Proc 2')), 'chip renamed from the bar');
-await page.click('#eh-chips .eh-chip:not(.eh-chip-pin):not(.eh-chip-more)', { button: 'right' }); await sleep(200);
+await page.click('#eh-chips .eh-chip-v', { button: 'right' }); await sleep(200);
 await page.$eval('#eh-pop input', e => { e.value = ''; });
 await page.type('#eh-pop input', 'Procedure two');
 await page.keyboard.press('Enter'); await sleep(200);
@@ -125,30 +158,37 @@ await page.keyboard.press('Enter'); await sleep(200);
 await page.$$eval('#sidebar-menu a', as => as.find(a => a.textContent === 'Dashboard').click()); await sleep(500);
 await page.evaluate(() => { window.pressed = []; });
 await page.keyboard.down('Alt'); await page.keyboard.press('1'); await page.keyboard.up('Alt');
-let opened = false;
-for (let i = 0; i < 60 && !opened; i++) { await sleep(200); opened = await page.$eval('#eh-toast', e => !e.hidden && /Opened Procedure two/.test(e.textContent)).catch(() => false); }
+let opened = false, prog = '';
+for (let i = 0; i < 60 && !opened; i++) { await sleep(200); prog = prog || await page.$eval('#eh-prog', e => (e.hidden ? '' : e.textContent)).catch(() => ''); opened = await page.$eval('#eh-toast', e => !e.hidden && /Opened Procedure two/.test(e.textContent)).catch(() => false); }
 await sleep(800);
 ok((await crumbs()) === 'Projects / Procedures / Procedure' && (await page.$eval('#proc-ref', e => e.value)) === 'ML-2025-0026' && (await page.evaluate(() => window.pressed.includes("open('ML-040014')"))), 'Alt 1 replayed to the right procedure: ' + await page.evaluate(() => window.pressed.join(',')));
 ok(await page.evaluate(() => window.pressed.includes('search()')) && (await page.$eval('#f-ref', e => e.value)) === '*040*', 'typed filter put back and Search pressed before the row click');
 ok(opened, 'toast says opened');
+ok(/Opening Procedure two.*Step \d of 5/.test(prog) && await page.$eval('#eh-prog', e => e.hidden), 'progress banner during the replay, gone after: ' + prog);
 
 // Un clic de puce depuis une autre vue.
 await page.$$eval('#sidebar-menu a', as => as.find(a => a.textContent === 'Settings').click()); await sleep(500);
-await page.click('#eh-chips .eh-chip:not(.eh-chip-pin):not(.eh-chip-more)'); await sleep(9000);
-ok((await crumbs()) === 'Projects / Procedures / Procedure', 'chip replays from another view');
+await page.click('#eh-chips .eh-chip-home'); await sleep(200);
+await page.click('#eh-home .eh-card'); await sleep(11000);
+ok((await crumbs()) === 'Projects / Procedures / Procedure' && await page.$eval('#eh-home', e => e.hidden), 'a card on Home replays from another view and Home closes');
+await page.$$eval('#sidebar-menu a', as => as.find(a => a.textContent === 'Settings').click()); await sleep(500);
+await page.click('#eh-chips .eh-chip-v'); await sleep(1200);
+await page.$$eval('#eh-prog button', bs => bs[0].click()); await sleep(6000);
+ok((await crumbs()) !== 'Projects / Procedures / Procedure' && await page.$eval('#eh-toast', e => /Stopped/.test(e.textContent)), 'Stop halts a replay: ' + await crumbs());
 
 // Ctrl K : une entree repliee du menu (Queries de Projects) et un filtre enregistre.
 await ctrl('k');
 await page.keyboard.type('quer'); await sleep(150);
 let items = await page.$$eval('#eh-pal .eh-it', els => els.map(e => e.textContent));
-ok(items.some(t => /Menu.*Queries.*Projects › Reports/.test(t)), 'Queries found in the folded menu: ' + JSON.stringify(items));
+ok(items.some(t => /Queries.*Projects › Reports/.test(t)) && (await page.$$eval('#eh-pal .eh-gh', els => els.map(e => e.textContent))).includes('enos menu'), 'Queries found in the folded menu, under its heading: ' + JSON.stringify(items));
+await page.screenshot({ path: path.join(here, 'shot-finder.png') });
 await page.$$eval('#eh-pal .eh-it', els => els.find(e => /Projects › Reports/.test(e.textContent)).click()); await sleep(600);
 ok((await crumbs()) === 'Projects queries', 'folded menu entry opened from the finder');
 await page.$$eval('#sidebar-menu a', as => as.find(a => a.textContent === 'Management').click()); await sleep(500);
 await ctrl('k');
 await page.keyboard.type('2026'); await sleep(150);
 items = await page.$$eval('#eh-pal .eh-it', els => els.map(e => e.textContent));
-ok(items.some(t => /Menu.*My projects 2026.*Filter Selection/.test(t)), 'saved filter found under Filter Selection');
+ok(items.some(t => /My projects 2026.*Filter Selection/.test(t)), 'saved filter found under Filter Selection');
 await page.keyboard.press('Enter'); await sleep(400);
 ok((await crumbs()) === 'Projects · mine', 'saved filter applied from the finder');
 
@@ -180,25 +220,42 @@ const qs = await page.$$eval('#eh-side .eh-row', els => els.filter(e => !e.class
 ok(qs.length === 3 && qs[0].startsWith('Locations'), 'My queries gathered from every domain: ' + JSON.stringify(qs));
 await page.$$eval('#eh-side .eh-tag', els => els.find(e => e.textContent.startsWith('Billing')).click()); await sleep(500);
 ok((await crumbs()) === 'Projects / Billing', 'Details entry opened from the sidebar');
+// 1.0 : sauvegarde dans un fichier puis rechargement des vues epinglees.
+await page.click('#eh-chips .eh-chip-home'); await sleep(200);
+const jf = path.join(ext, 'pins.json');
+fs.writeFileSync(jf, JSON.stringify({ app: 'enos Helper', pins: [{ name: 'Animal queries', trail: [{ tag: 'a', text: 'Queries', title: '', icon: '', n: 0, label: 'Animals › Reports › Queries', menu: 'Animals › Reports › Queries', act: "go('Animals queries')", root: true }, { tag: 'button', text: 'Sign In', label: 'Sign In' }] }] }));
+await (await page.$('#eh-home .eh-home-foot input[type=file]')).uploadFile(jf); await sleep(500);
+const cards = await page.$$eval('#eh-home .eh-card .eh-card-name', els => els.map(e => e.textContent));
+ok(cards.join(',') === 'Procedure two,Animal queries,Pin a view', 'pinned views loaded from a file, added to mine: ' + cards.join(','));
+ok(await page.$eval('#eh-home', e => /My queries/.test(e.textContent) && [...e.querySelectorAll('.eh-panel')][1].querySelector('.eh-hrow-main b').textContent === 'Animal queries'), 'a pinned query is listed under My queries');
+await page.$$eval('#eh-home .eh-card', els => els[1].click()); await sleep(2500);
+ok((await crumbs()) === 'Animals queries', 'the loaded view opens (its Sign In step dropped): ' + await crumbs());
+await setOpts({ on: true, layout: 'drawer', palette: true, autoOpen: false, recentMax: 30, chips: true, calm: true, forms: false, resume: true, home: false }); await sleep(300);
 await page.reload(); await sleep(800);
 await page.click('#loginForm button'); await sleep(2500);
+ok(!(await page.$('#eh-welcome')) && await page.$eval('#eh-home', e => e.hidden).catch(() => true), 'no first run twice, no Home when Start on Home is off');
 ok(await page.$eval('#eh-toast', e => !e.hidden && /Back to «/.test(e.textContent)).catch(() => false), 'resume offered on arrival: ' + await page.$eval('#eh-toast', e => e.textContent).catch(() => '-'));
 await page.click('#eh-toast .eh-tbtn'); await sleep(9000);
-ok(/^Projects/.test(await crumbs()), 'resume replays the last view: ' + await crumbs());
-await setOpts({ on: true, layout: 'drawer', palette: true, autoOpen: false, recentMax: 30, chips: true, calm: false, forms: false, resume: true }); await sleep(300);
+ok(/^Animals queries/.test(await crumbs()), 'resume replays the last view: ' + await crumbs());
+await setOpts({ on: true, layout: 'drawer', palette: true, autoOpen: false, recentMax: 30, chips: true, calm: false, forms: false, resume: true, home: false }); await sleep(300);
 ok(await page.$eval('html', e => !e.classList.contains('eh-calm')), 'calm sheet can be turned off');
 
 // Reglages : puces coupees, mode « push », extinction.
 await setOpts({ on: true, layout: 'drawer', palette: true, autoOpen: false, recentMax: 30, chips: false, calm: true, resume: true }); await sleep(300);
 ok(!(await page.$('#eh-chips')), 'chips can be turned off');
 await setOpts({ on: true, layout: 'push', palette: true, autoOpen: false, recentMax: 30, chips: true }); await sleep(300);
-ok(await page.$eval('body', e => getComputedStyle(e).marginLeft === '248px'), 'push layout pushes the page');
+ok(await page.$eval('body', e => getComputedStyle(e).marginLeft === '264px'), 'push layout pushes the page');
 await setOpts({ on: false, layout: 'push', palette: true, autoOpen: false, recentMax: 30, chips: true }); await sleep(300);
 ok(await page.$eval('body', e => getComputedStyle(e).marginLeft === '0px') && !(await page.$('#eh-chips')), 'off: page back to normal');
 await setOpts({ on: true, layout: 'drawer', palette: true, autoOpen: false, recentMax: 30, chips: true }); await sleep(300);
 await ctrl('.'); await sleep(200);
 ok(await page.$eval('html', e => e.classList.contains('eh-open')), 'drawer opens again after off/on');
-await page.screenshot({ path: path.join(here, 'shot.png') });
+await ctrl('.');
+// La fenetre de l icone, ouverte en onglet pour la capture.
+const pop = await browser.newPage(); await pop.setViewport({ width: 360, height: 560 });
+await pop.goto('chrome-extension://' + new URL(sw.url()).host + '/popup.html'); await sleep(400);
+ok(await pop.$eval('body', e => /Open Home/.test(e.textContent) && /Start on Home/.test(e.textContent) && /Save to a file/.test(e.textContent)), 'toolbar popup: Open Home, Comfort, My shortcuts');
+await pop.screenshot({ path: path.join(here, 'shot-popup.png') }); await pop.close();
 await browser.close();
 srv.close();
 fs.rmSync(ext, { recursive: true, force: true });

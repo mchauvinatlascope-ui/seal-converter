@@ -4,63 +4,65 @@
 <meta charset="utf-8">
 <title>enos Helper</title>
 <style>
-  :root { --bg:#fff; --fg:#1b1d21; --fg2:#5d626b; --fg3:#8f959f; --line:#e4e4e0; --on:#1b1d21; color-scheme: light; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#1c1e22; --fg:#eceef1; --fg2:#a9afb9; --fg3:#7d8592; --line:#30333a; --on:#eceef1; color-scheme: dark; } }
+  @font-face { font-family: "EH Schibsted"; font-weight: 500 800; src: url("fonts/schibsted-grotesk.woff2") format("woff2"); }
+  @font-face { font-family: "EH Atkinson"; font-weight: 400; src: url("fonts/atkinson-hyperlegible-400.woff2") format("woff2"); }
+  @font-face { font-family: "EH Atkinson"; font-weight: 700; src: url("fonts/atkinson-hyperlegible-700.woff2") format("woff2"); }
+  @font-face { font-family: "EH Mono"; font-weight: 500; src: url("fonts/jetbrains-mono-500.woff2") format("woff2"); }
+  :root { --bg: #FDFDFB; --ground: #F7F6F2; --fg: #1F2823; --fg2: #5C6860; --line: #E2E0D6; --line2: #CFCDC1; --accent: #1F5673; color-scheme: light;
+    --text: "EH Atkinson", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; --head: "EH Schibsted", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; --mono: "EH Mono", ui-monospace, Menlo, Consolas, monospace; }
   * { box-sizing: border-box; }
-  body { margin: 0; width: 320px; background: var(--bg); color: var(--fg); font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
-  header { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
-  header b { font-size: 14px; flex: 1; }
-  header span { color: var(--fg2); font-size: 11.5px; }
-  h2 { margin: 0; padding: 12px 14px 2px; font-size: 10.5px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--fg3); }
-  .row { display: flex; align-items: flex-start; gap: 12px; padding: 8px 14px; cursor: pointer; }
-  .row div { flex: 1; }
-  .row small { display: block; color: var(--fg2); font-size: 12px; }
-  .off .row { opacity: .45; pointer-events: none; }
-  input[type="checkbox"] { appearance: none; flex: none; width: 30px; height: 18px; margin: 1px 0 0; border-radius: 9px; background: var(--line); position: relative; cursor: pointer; transition: background .12s; }
-  input[type="checkbox"]::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--bg); transition: transform .12s; }
-  input[type="checkbox"]:checked { background: var(--on); }
-  input[type="checkbox"]:checked::after { transform: translateX(12px); }
-  input[type="checkbox"]:focus-visible { outline: 2px solid #1f6f78; outline-offset: 2px; }
-  select { font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; margin-top: 4px; }
-  footer { margin-top: 6px; padding: 10px 14px 12px; color: var(--fg2); font-size: 11.5px; border-top: 1px solid var(--line); }
-  #state { display: flex; align-items: flex-start; gap: 10px; margin: 10px 14px 0; padding: 9px 11px; border-radius: 8px; background: #f3f3f0; font-size: 12.5px; line-height: 1.4; }
-  @media (prefers-color-scheme: dark) { #state { background: #25282e; } }
-  #state i { flex: none; width: 9px; height: 9px; margin-top: 5px; border-radius: 50%; background: #9aa0a8; }
-  #state.ok i { background: #1f9d5a; } #state.warn i { background: #e0a21b; } #state.off i { background: #c4c7cc; }
-  #state div { flex: 1; } #state b { display: block; font-weight: 600; } #state span { color: var(--fg2); font-size: 12px; }
-  #state button { margin: 6px 6px 0 0; font: inherit; font-size: 12px; font-weight: 600; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 3px 9px; cursor: pointer; }
-  #state button:hover { border-color: #b9bcc1; }
-  #state[hidden] { display: none; }
-  #diag { display: none; margin: 8px 14px 0; width: calc(100% - 28px); height: 150px; font: 10.5px ui-monospace, Menlo, Consolas, monospace; border: 1px solid var(--line); border-radius: 6px; padding: 6px; color: var(--fg); background: var(--bg); resize: vertical; }
+  body { margin: 0; width: 360px; background: var(--bg); color: var(--fg); font: 14px/1.4 var(--text); }
+  header { display: flex; align-items: center; gap: 10px; padding: 16px 18px 12px; }
+  header .mark { width: 30px; height: 30px; border-radius: 8px; background: var(--fg); display: flex; align-items: center; justify-content: center; }
+  header b { flex: 1; font: 800 17px/1.2 var(--head); }
+  header span { font: 500 11.5px/1 var(--mono); color: var(--fg2); }
+  h2 { margin: 0; padding: 14px 18px 4px; font: 700 11px/1.3 var(--head); letter-spacing: .07em; text-transform: uppercase; color: var(--fg2); }
+  #state { margin: 0 18px; padding: 10px 12px; border-radius: 8px; background: var(--ground); display: flex; align-items: flex-start; gap: 10px; font-size: 13.5px; }
+  #state i { flex: none; width: 9px; height: 9px; margin-top: 5px; border-radius: 50%; background: #8D958F; }
+  #state.ok { background: #E8F1EA; } #state.ok i { background: #1F7A47; }
+  #state.warn { background: #F8EEDB; } #state.warn i { background: #A86A00; }
+  #state div { flex: 1; min-width: 0; } #state b { display: block; } #state span { display: block; color: #3F4C45; font-size: 12.5px; }
+  #state button { margin-top: 8px; }
+  button { font: 700 14px/1 var(--text); color: var(--fg); background: var(--bg); border: 1px solid var(--line2); border-radius: 8px; height: 36px; padding: 0 14px; cursor: pointer; }
+  button:hover { border-color: #B9B7AA; }
+  button.main { color: #fff; background: var(--fg); border-color: var(--fg); }
+  button.main:hover { background: #2C3832; }
+  button:disabled { opacity: .4; cursor: default; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  #go { display: flex; gap: 8px; padding: 12px 18px 4px; }
+  #go button { flex: 1; height: 44px; }
+  #go kbd { font: 500 11.5px/1 var(--mono); color: var(--fg2); margin-left: 6px; }
+  .row { display: flex; align-items: center; gap: 12px; padding: 9px 18px; cursor: pointer; }
+  .row div { flex: 1; } .row b { display: block; } .row small { display: block; color: var(--fg2); font-size: 12.5px; }
+  .off .row, .off #go, .off #links { opacity: .45; pointer-events: none; }
+  input[type="checkbox"] { appearance: none; flex: none; width: 38px; height: 22px; margin: 0; border-radius: 11px; background: #8D958F; position: relative; cursor: pointer; transition: background .12s; }
+  input[type="checkbox"]::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .12s; }
+  input[type="checkbox"]:checked { background: var(--fg); }
+  input[type="checkbox"]:checked::after { transform: translateX(16px); }
+  #links { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 4px 18px; font-size: 13.5px; }
+  #links button { height: auto; padding: 0; border: 0; background: none; font: inherit; font-weight: 400; color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+  #links button.danger { color: #A3261E; }
+  #msg { min-height: 18px; margin: 6px 18px 0; color: var(--fg2); font-size: 12.5px; }
+  #diag { display: none; margin: 8px 18px 0; width: calc(100% - 36px); height: 130px; font: 10.5px var(--mono); border: 1px solid var(--line); border-radius: 6px; padding: 6px; color: var(--fg); background: #fff; resize: vertical; }
   #diag.show { display: block; }
-  #tools { display: flex; align-items: center; gap: 10px; margin: 4px 14px 0; font-size: 11.5px; color: var(--fg2); }
-  #tools button { flex: none; font: inherit; font-size: 12px; font-weight: 600; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 3px 9px; cursor: pointer; }
+  footer { margin-top: 10px; padding: 12px 18px 14px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--fg2); }
 </style>
 </head>
 <body>
-  <header><b>enos Helper</b><span id="ver"></span><input type="checkbox" id="on" aria-label="enos Helper on"></header>
+  <header><span class="mark"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="#fff" stroke="#fff" stroke-width="1.2" stroke-linejoin="round"><path d="M8 1.8l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6z"/></svg></span><b>enos Helper</b><span id="ver"></span><input type="checkbox" id="on" aria-label="enos Helper on"></header>
   <div id="state" hidden><i></i><div><b></b><span></span></div></div>
-  <textarea id="diag" readonly aria-label="Diagnostic"></textarea>
   <div id="all">
-    <h2>Layout</h2>
-    <label class="row" for="layout"><div>Sidebar<small>Shortcuts, finder and recent pages.</small>
-      <select id="layout">
-        <option value="drawer">Drawer: a small tab at the bottom left, Ctrl . opens it</option>
-        <option value="push">Always open (pushes enos to the right; may not fit)</option>
-        <option value="none">Hidden: only the Ctrl K finder</option>
-      </select></div></label>
-    <label class="row" for="autoOpen"><div>Open the drawer on arrival<small>The drawer shows when a page loads; close it with its × or Ctrl .</small></div><input type="checkbox" id="autoOpen"></label>
-    <label class="row" for="chips"><div>Shortcuts in the enos bar<small>Your pinned views as small buttons in the orange bar, next to the search box. Alt 1 to 9 opens them too.</small></div><input type="checkbox" id="chips"></label>
-    <h2>Calmer enos</h2>
-    <label class="row" for="calm"><div>Calm lists<small>Titles on one line (hover to unfold), the bin icon set apart and dimmed, rows highlighted under the mouse.</small></div><input type="checkbox" id="calm"></label>
-    <label class="row" for="forms"><div>Records in reading width (try it)<small>Fields capped at a reading width, empty fields dimmed, the file drop zone reduced. Off by default: turn off if a record looks wrong.</small></div><input type="checkbox" id="forms"></label>
-    <label class="row" for="resume"><div>Offer to reopen the last view<small>On arrival, a small message proposes to go back where you were.</small></div><input type="checkbox" id="resume"></label>
-    <h2>Finder</h2>
-    <label class="row" for="palette"><div>Ctrl K finder<small>Finds your shortcuts, recent views and entries of the enos menus. Enter opens.</small></div><input type="checkbox" id="palette"></label>
-    <h2>Your lists</h2>
-    <div id="tools"><button type="button" id="forget">Forget all shortcuts and recent views</button><span>Kept in this browser only.</span></div>
+    <div id="go"><button type="button" class="main" id="home" disabled>Open Home</button><button type="button" id="find" disabled>Find<kbd>Ctrl K</kbd></button></div>
+    <h2>Comfort</h2>
+    <label class="row" for="calm"><div><b>Calm tables</b><small>One line per row, the bin kept away from the magnifier</small></div><input type="checkbox" id="calm"></label>
+    <label class="row" for="forms"><div><b>Readable forms</b><small>Narrower columns, empty fields toned down</small></div><input type="checkbox" id="forms"></label>
+    <label class="row" for="homeOn"><div><b>Start on Home</b><small>Show your dashboard when enos opens</small></div><input type="checkbox" id="homeOn"></label>
+    <h2>My shortcuts</h2>
+    <div id="links"><button type="button" id="export" disabled>Save to a file</button><button type="button" id="import" disabled>Load from a file</button><button type="button" id="diagb" disabled>Copy a diagnostic</button><button type="button" id="forget" class="danger" disabled>Forget everything</button></div>
+    <p id="msg" role="status"></p>
+    <textarea id="diag" readonly aria-label="Diagnostic"></textarea>
   </div>
-  <footer>Shortcuts replay your own clicks in enos. Nothing is written to enos or sent anywhere.</footer>
+  <footer>Stays on this computer. Sends nothing, changes nothing in enos.</footer>
   <script src="popup.js"></script>
 </body>
 </html>
