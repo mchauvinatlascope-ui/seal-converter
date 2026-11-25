@@ -281,16 +281,17 @@ await page.hover('#queries-panel .acts a[data-k=execute]'); await page.click('#q
 ok(await page.$eval('#qp', e => !e.classList.contains('hidden')), 'Execute by hand opens the parameters window');
 ok(await page.$eval('html', e => e.classList.contains('eh-modal')), 'the window is seen: the bar buttons step aside');
 await page.click('#qp tr.prow:nth-child(2) input[type=checkbox]'); await sleep(150);
+await page.click('#qp tr.prow:nth-child(3) input[type=checkbox]'); await sleep(150);
 await page.click('#qp button'); await sleep(1200);
-ok((await crumbs()) === 'Query run 1', 'query run by hand with the second Ignore ticked: ' + await crumbs());
+ok((await crumbs()) === 'Query run 12', 'query run by hand with the second and third Ignore ticked: ' + await crumbs());
 await page.click('#eh-chips .eh-chip-pin'); await sleep(250);
 steps = await page.$$eval('#eh-pop .eh-steps li .eh-t', els => els.map(e => e.textContent));
-ok(steps.join(' > ') === 'Animals › Reports › Queries > MC QUERY > tick « Line - Name » > OK', 'the path says which box is ticked (second of two rows with the same field, in a table): ' + steps.join(' > '));
+ok(steps.join(' > ') === 'Animals › Reports › Queries > MC QUERY > tick « Line - Name » > tick « Presence Status » > OK', 'the path says which box is ticked (second of two rows with the same field, in a table): ' + steps.join(' > '));
 await page.keyboard.press('Enter'); await sleep(300);
 await page.evaluate(() => { window.pressed = []; });
 await page.click('#eh-chips .eh-chip-home'); await sleep(300);
-await page.$$eval('#eh-home .eh-card', cs => cs.find(c => c.querySelector('.eh-card-name').textContent === 'Query run 1').click()); await sleep(6000);
-ok((await crumbs()) === 'Query run 1' && await page.evaluate(() => window.pressed.join(',') === "go('Animals queries'),rowact(),rowact:execute,qpok()"), 'the pinned query presses Execute (not Print), ticks the same Ignore box in the window although result boxes sit behind, then OK: ' + await crumbs() + ' / ' + await page.evaluate(() => window.pressed.join(',')) + ' / ' + await page.$eval('#eh-toast', e => e.textContent));
+await page.$$eval('#eh-home .eh-card', cs => cs.find(c => c.querySelector('.eh-card-name').textContent === 'Query run 12').click()); await sleep(7000);
+ok((await crumbs()) === 'Query run 12' && await page.evaluate(() => window.pressed.join(',') === "go('Animals queries'),rowact(),rowact:execute,qpok()"), 'the pinned query presses Execute (not Print), ticks the same two Ignore boxes (second « Line - Name » row, « Presence Status ») although result boxes sit behind, then OK: ' + await crumbs() + ' / ' + await page.evaluate(() => window.pressed.join(',')) + ' / ' + await page.$eval('#eh-toast', e => e.textContent));
 // La fenetre de l icone, ouverte en onglet pour la capture.
 const pop = await browser.newPage(); await pop.setViewport({ width: 360, height: 560 });
 await pop.goto('chrome-extension://' + new URL(sw.url()).host + '/popup.html'); await sleep(400);

@@ -117,9 +117,9 @@
   <div id="qp" class="hidden" style="position:fixed;z-index:2000;left:320px;top:90px;width:760px;background:#fff;border:1px solid #999;padding:12px">
     <b>Query Parameters</b>
     <table class="clauses"><tbody>
-    <tr class="prow"><td><select><option></option></select></td><td><select><option>Line - Name</option></select></td><td><input type="text" value="x"></td><td><input type="checkbox"></td></tr>
-    <tr class="prow"><td><select><option></option></select></td><td><select><option>Line - Name</option></select></td><td><input type="text" value=""></td><td><input type="checkbox"></td></tr>
-    <tr class="prow"><td><select><option></option></select></td><td><select><option>Presence Status</option></select></td><td><select><option>On Site</option></select></td><td><input type="checkbox"></td></tr>
+    <tr class="prow"><td><select><option></option></select></td><td><select><option>Line - Name</option></select></td><td><input type="text" value="x"></td><td class="grouping"><input type="checkbox" ng-model="row.Ignore"></td></tr>
+    <tr class="prow"><td><select><option></option></select></td><td><select><option>Line - Name</option></select></td><td><input type="text" value=""></td><td class="grouping"><input type="checkbox" ng-model="row.Ignore"></td></tr>
+    <tr class="prow"><td><select><option></option></select></td><td><select><option>Presence Status</option></select></td><td><select><option>On Site</option></select></td><td class="grouping"><input type="checkbox" ng-model="row.Ignore"></td></tr>
     </tbody></table>
     <button type="button" ng-click="qpok()">OK</button>
   </div>

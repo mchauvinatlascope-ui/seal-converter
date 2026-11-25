@@ -1,4 +1,4 @@
-// enos Helper 1.1.4
+// enos Helper 1.1.5
 // Ne fait que changer l affichage dans ce navigateur : n ecrit jamais dans enos,
 // n envoie rien, ne touche a aucun formulaire.
 // Dans enos l adresse ne change pas quand on ouvre un projet, une procedure ou une fiche :
@@ -11,7 +11,7 @@
 // section#content, aside#sidebar_right (Details, 350 px), icones fa-* / bsi-* / glyphicon-*.
 (() => {
   if (window.top !== window) return; // jamais dans un cadre interne
-  const VERSION = '1.1.4';
+  const VERSION = '1.1.5';
   const KEY = 'enosHelper';
   const DEFAULTS = { on: true, layout: 'drawer', recentMax: 30, palette: true, autoOpen: false, chips: true, calm: true, forms: false, resume: true, home: true };
   const root = document.documentElement;
@@ -184,11 +184,18 @@
       const sel = $$('select', p);
       if (!sel.length) continue;
       if ($$('input[type="checkbox"]', p).length !== 1) return '';
-      const t = sel.map(x => (x.selectedIndex >= 0 && x.options[x.selectedIndex] ? x.options[x.selectedIndex].text.trim() : '')).filter(Boolean)[0];
+      const chosen = x => (x.selectedIndex >= 0 && x.options[x.selectedIndex] ? x.options[x.selectedIndex].text.trim() : '');
+      const named = sel.find(x => /DisplayProperty|Field(?!Operator)/i.test(x.getAttribute('name') || ''));
+      const t = (named && chosen(named)) || sel.map(chosen).filter(Boolean)[0];
       return (t || '').slice(0, 40);
     }
     return '';
   }
+  // Une case a cocher d un formulaire (« Ignore » d une ligne de parametres) : ce qu elle regle (ng-model), le champ de sa ligne,
+  // et son rang parmi les cases du meme champ (deux lignes « Line - Name » : la premiere, la seconde).
+  const modelOf = e => e.getAttribute('ng-model') || e.getAttribute('data-ng-model') || '';
+  const boxPeers = (scope, model, field) => $$('input[type="checkbox"]', scope).filter(e => !ours(e) && modelOf(e) === model && fieldOfBox(e) === field);
+  const openLayer = () => topLayer() || $$('.modal, [uib-modal-window], .modal-dialog').find(m => !ours(m) && visible(m)) || null;
   const CONTAINER = /^(FORM|FIELDSET|TABLE|TBODY|THEAD|SECTION|MAIN|ASIDE|HEADER|BODY|HTML)$/;
   function iconOf(el) {
     const cls = e => (e && typeof e.className === 'string' ? e.className.trim().split(/\s+/).filter(c => /^(fa|fas|far|fab|glyphicon|icon|imoon|icomoon|bsi|ion|mdi)-/.test(c)) : []);
@@ -220,6 +227,7 @@
     } else {
       const L = layerOf(el);
       if (L) s.layer = 1;
+      if (el.tagName === 'INPUT' && el.type === 'checkbox' && (modelOf(el) || fieldOfBox(el))) { const peers = boxPeers(L || document, modelOf(el), fieldOfBox(el)); s.box = { model: modelOf(el), field: fieldOfBox(el), k: Math.max(0, peers.indexOf(el)), of: peers.length }; }
       const all = $$(ACTIONABLE, L || document).filter(e => !ours(e) && same(sigOf(e), s, true));
       s.n = Math.max(0, all.indexOf(el));
     }
@@ -301,6 +309,12 @@
     && ((a.tag === 'input' && !a.act && !b.act) || (a.act && b.act && actKey(a.act) === actKey(b.act)) || (a.text === b.text && a.title === b.title))
     && (loose ? true : a.icon === b.icon) && (a.icon === b.icon || !b.icon || !a.icon);
   function find(s) {
+    if (s.box && s.tag === 'input') {
+      const where = s.layer ? openLayer() : document;
+      if (!where) return null;
+      const peers = boxPeers(where, s.box.model, s.box.field);
+      return peers[s.box.k] || null;
+    }
     let scope = [document];
     if (s.row) {
       let rows = $$('tr, [role="row"]').filter(r => !ours(r) && visible(r) && rowKey(r) === s.row);
@@ -406,6 +420,7 @@
     const steps = item.trail || [];
     if (!steps.length) { toast('This shortcut has no steps.'); return; }
     if (loggedOut()) { toast('Sign in to enos first, then open the shortcut.'); return; }
+    if (steps.some(st => st.tag === 'input' && st.row && !st.box)) { toast('« ' + item.name + ' » was pinned with an older version, which could not tell its ticked boxes apart. Open it by hand once more (tick your boxes) and pin it again.', false, 14000); return; }
     const began = Date.now();
     replaying = item; recording = false; stopAsked = false;
     closeHome();
