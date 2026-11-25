@@ -4,7 +4,7 @@ A Chrome extension that gets you where you work in enos in one click. It gives e
 
 ## Install (2 minutes)
 
-1. Download `enos-helper-1.1.1.zip` and unzip it.
+1. Download `enos-helper-1.1.2.zip` and unzip it.
 2. Open `chrome://extensions` and switch on **Developer mode** (top right).
 3. Click **Load unpacked** and pick the unzipped `enos-helper` folder.
 4. Open enos and sign in. The first time, three steps explain the star. Then **Home** opens in place of the empty enos home page.
@@ -44,6 +44,11 @@ Type a few letters: your pinned views, your recent views, the entries of the eno
 ## What it never does
 
 It never clicks Save, Delete or any button for you unless that click is part of a path you pinned yourself; it never fills a record. The one thing it types is the list filters you had typed yourself when you pinned a view through a list row (then presses Search). To open your pinned views quickly it counts the calls enos makes to its server while a page loads (a number, never their content). To greet you on Home it reads your first name where enos shows it at the top right; it is kept nowhere. Nothing leaves your browser.
+
+## 1.1.2
+
+- A list row is looked for more loosely (spacing, capitals, the cell that names it), the Search button of a list is found by its icon, and when a pinned view stops the diagnostic says what the extension saw at that moment (counts and yes / no, no content).
+- The icons of the query lists (Execute, Edit, Export…) are now read, and buttons that share one enos action are told apart by their tooltip everywhere, not only in list rows.
 
 ## 1.1.1
 

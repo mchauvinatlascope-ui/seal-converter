@@ -1,4 +1,4 @@
-// enos Helper 1.1.1
+// enos Helper 1.1.2
 // Ne fait que changer l affichage dans ce navigateur : n ecrit jamais dans enos,
 // n envoie rien, ne touche a aucun formulaire.
 // Dans enos l adresse ne change pas quand on ouvre un projet, une procedure ou une fiche :
@@ -11,7 +11,7 @@
 // section#content, aside#sidebar_right (Details, 350 px), icones fa-* / bsi-* / glyphicon-*.
 (() => {
   if (window.top !== window) return; // jamais dans un cadre interne
-  const VERSION = '1.1.1';
+  const VERSION = '1.1.2';
   const KEY = 'enosHelper';
   const DEFAULTS = { on: true, layout: 'drawer', recentMax: 30, palette: true, autoOpen: false, chips: true, calm: true, forms: false, resume: true, home: true };
   const root = document.documentElement;
@@ -20,6 +20,7 @@
   let opts = { ...DEFAULTS };
   let store = { pins: [], recent: [] };
   let lastError = '';
+  let lastStop = ''; // dernier arret d un trajet, en comptes et oui / non (pour le diagnostic)
   const WEL = 'eh:welcome';
   let welcomed = null; // null = pas encore lu ; false = premiere installation a montrer
 
@@ -158,10 +159,10 @@
   const ACTIONABLE = 'input[type="checkbox"], input[type="radio"], a, button, [role="button"], [role="menuitem"], [role="tab"], [ng-click], [data-ng-click], [ui-sref], li, i, svg, img, th, td, tr, label, [tabindex]';
   const CONTAINER = /^(FORM|FIELDSET|TABLE|TBODY|THEAD|SECTION|MAIN|ASIDE|HEADER|BODY|HTML)$/;
   function iconOf(el) {
-    const cls = e => (e && typeof e.className === 'string' ? e.className.trim().split(/\s+/).filter(c => /^(fa|fas|far|fab|glyphicon|icon|bsi|ion|mdi)-/.test(c)) : []);
+    const cls = e => (e && typeof e.className === 'string' ? e.className.trim().split(/\s+/).filter(c => /^(fa|fas|far|fab|glyphicon|icon|imoon|icomoon|bsi|ion|mdi)-/.test(c)) : []);
     let c = cls(el);
     if (!c.length) for (const k of el.children) { c = cls(k); if (c.length) break; }
-    if (!c.length) { const d = el.querySelector('[class*="fa-"], [class*="glyphicon-"], [class*="bsi-"]'); if (d) c = cls(d); }
+    if (!c.length) { const d = el.querySelector('[class*="fa-"], [class*="glyphicon-"], [class*="imoon-"], [class*="bsi-"]'); if (d) c = cls(d); }
     if (!c.length) { const b = el.getAttribute('bsi-icon') || (el.querySelector('[bsi-icon]') ? el.querySelector('[bsi-icon]').getAttribute('bsi-icon') : ''); if (b) c = ['bsi-icon:' + b.slice(0, 40)]; }
     return c.slice(0, 3).join(' ');
   }
@@ -189,7 +190,7 @@
     if (noise(el, s)) return null;
     s.root = railOf(el) || (topBarOf(el) && /home|logo|brand/i.test((el.className || '') + ' ' + s.icon + ' ' + (el.getAttribute('href') || '')));
     s.menu = el.closest('#sidebar-menu, .sidebar-menu') ? menuPath(el).concat(s.text || s.title).filter(Boolean).join(' › ') : '';
-    s.label = (s.menu || s.text || s.title || (s.icon ? s.icon.replace(/^(fa|fas|far|glyphicon|icon|bsi)-/, '') : s.tag)) + (s.row ? ' on ' + (s.rowLabel || s.row) : '');
+    s.label = (s.menu || s.text || s.title || (s.icon ? s.icon.replace(/^(fa|fas|far|glyphicon|icon|imoon|bsi)-/, '') : s.tag)) + (s.row ? ' on ' + (s.rowLabel || s.row) : '');
     return s;
   }
   // Les filtres remplis au-dessus d une liste (Reference « *ml* », Status...) : leur libelle et leur valeur, pour les remettre au rejeu.
@@ -238,7 +239,8 @@
   }
   function searchButton() {
     const content = $('#content, section.content-main') || document.body;
-    return $$('button, a, [ng-click], [data-ng-click], i', content).filter(e => !ours(e) && visible(e) && !e.closest('table')).find(e => /^search$/i.test(txt(e) || e.getAttribute('title') || '') || /binocular|fa-search/.test(iconOf(e)) && !e.closest('tr'));
+    const c = $$('button, a, [ng-click], [data-ng-click], i', content).filter(e => !ours(e) && visible(e) && !e.closest('table, tr, .navbar, header'));
+    return c.find(e => /^search$/i.test(txt(e) || tipOf(e))) || c.find(e => /binocular|fa-search/.test(iconOf(e))) || c.find(e => /search/i.test(tipOf(e)) && !/clear|reset|filter selection/i.test(tipOf(e)));
   }
   // Une ligne de tableau : la cellule qui ressemble a une reference (ML-040014), sinon les deux premieres cellules de texte
   // sans chiffres (les compteurs changent d un jour a l autre).
@@ -267,7 +269,13 @@
     if (s.row) {
       let rows = $$('tr, [role="row"]').filter(r => !ours(r) && visible(r) && rowKey(r) === s.row);
       if (!rows.length && refLike(s.row)) rows = $$('td, [role="cell"], [role="gridcell"]').filter(c => !ours(c) && txt(c) === s.row).map(c => c.closest('tr, [role="row"]')).filter(r => r && visible(r));
-      if (!rows.length && (s.rowLabel || '').length > 2) rows = $$('td, [role="cell"], [role="gridcell"]').filter(c => !ours(c) && txt(c) === s.rowLabel).map(c => c.closest('tr, [role="row"]')).filter(r => r && visible(r));
+      const norm = t => (t || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+      const all = $$('tr, [role="row"]').filter(r => !ours(r) && visible(r) && r.querySelector('td, [role="cell"], [role="gridcell"]'));
+      if (!rows.length) rows = all.filter(r => norm(rowKey(r)) === norm(s.row));
+      if (!rows.length && norm(s.rowLabel).length > 2) rows = all.filter(r => $$('td, [role="cell"], [role="gridcell"]', r).some(c => norm(txt(c)) === norm(s.rowLabel)));
+      if (!rows.length && norm(s.rowLabel).length > 4) rows = all.filter(r => norm(txt(r)).includes(norm(s.rowLabel)));
+      // De quoi comprendre un arret, sans rien du contenu : des comptes et des oui / non.
+      find.report = 'rows ' + all.length + ' matched ' + rows.length + ' · recorded key ' + (s.row || '').length + ' label ' + (s.rowLabel || '').length + ' chars · ' + all.slice(0, 4).map(r => { const cs = $$('td, [role="cell"], [role="gridcell"]', r); return cs.length + ' cells/key ' + rowKey(r).length + (rowKey(r) === s.row ? ' =' : ' ≠') + '/label ' + (cs.some(c => txt(c) === s.rowLabel) ? 'yes' : 'no'); }).join(' ; ');
       find.rowSeen = rows.length;
       if (!rows.length) return null;
       scope = rows;
@@ -284,6 +292,8 @@
     let cands = scope.flatMap(sc => $$(ACTIONABLE, sc)).filter(e => !ours(e) && same(sigOf(e), s, true) && (s.row || visible(e) || s.tag === 'li' || s.tag === 'a' || s.menu));
     if (s.href) { const byHref = cands.filter(e => (e.getAttribute('href') || '').slice(0, 80) === s.href); if (byHref.length) cands = byHref; }
     if (s.act) { const byAct = cands.filter(e => actKey(actOf(e)) === actKey(s.act)); if (byAct.length) cands = byAct; }
+    // Plusieurs boutons pour la meme action d enos (executeAction(a,item)) : leur infobulle les departage.
+    if (s.title) { const byTip = cands.filter(e => tipOf(e).slice(0, 60) === s.title); if (byTip.length) cands = byTip; }
     if (!cands.length) return null;
     const exact = cands.filter(e => sigOf(e).icon === s.icon);
     const pool = exact.length ? exact : cands;
@@ -376,8 +386,9 @@
           if (changed || btn) { progress(item, i, steps.length, 'searching the list for ' + (s.rowLabel || s.row)); if (btn) press(btn.closest('button, a, [ng-click], [data-ng-click]') || btn); await settle(6000); el = await waitFor(s, 15000); }
         }
         if (halted()) return;
+        if (!el) lastStop = 'step ' + (i + 1) + '/' + steps.length + ' [' + (s.row ? 'row button ' + (s.title || s.icon || s.tag) + ' pos ' + s.pos + '/' + s.posN : s.label) + '] crumb [' + crumb() + '] panel [' + panelTitle() + '] filters noted ' + (s.filters || []).length + ' search button ' + !!searchButton() + ' net ' + netBusy() + (s.row ? ' · ' + (find.report || '') : '') + ' · steps ' + steps.map(x => (x.menu ? 'menu' : x.row ? 'row' : x.tag)).join('>');
         if (!el && s.row && find.rowSeen) { toast('Stopped at step ' + (i + 1) + ' of ' + steps.length + ': the row « ' + (s.rowLabel || s.row) + ' » is there, but its button (' + (s.title || s.text || s.icon || s.tag) + ') was not recognised. Click it by hand once more, pin the view again, and if it still stops send me a diagnostic taken on this list.', false, 16000); return; }
-        if (!el) { toast('Stopped at step ' + (i + 1) + ' of ' + steps.length + ' (' + s.label + '): not found on this page. The view stays as it is.' + (s.row ? ' The row « ' + (s.rowLabel || s.row) + ' » is not in the list: check the list filters, open it by hand once, then pin it again.' : ' Open the view by hand once, then pin it again (drop the steps that are not part of the way).'), false, 14000); return; }
+        if (!el) { toast('Stopped at step ' + (i + 1) + ' of ' + steps.length + ' (' + s.label + '): not found on this page. The view stays as it is.' + (s.row ? ' The row « ' + (s.rowLabel || s.row) + ' » was not found in the list. If you can see it on screen, click the extension icon and « Copy a diagnostic » now, and send it to me.' : ' Open the view by hand once, then pin it again (drop the steps that are not part of the way).'), false, 14000); return; }
         if (halted()) return;
         // Un Search juste avant une ligne dont on connait les filtres : les remettre AVANT de chercher, un aller-retour de moins.
         const nx = steps[i + 1];
@@ -985,6 +996,7 @@
   function diagnose() {
     const lines = ['enos Helper ' + VERSION, 'url ' + location.href, 'title ' + (document.title || '').slice(0, 60),
       'layout ' + opts.layout + ' home ' + opts.home + ' open ' + homeOpen + ' net ' + netBusy() + ' chips ' + opts.chips + ' calm ' + opts.calm + ' forms ' + opts.forms + ' resume ' + opts.resume + ' open ' + sideOpen + ' pins ' + store.pins.length + ' recent ' + store.recent.length + ' trail ' + trail.length + ' logged out ' + loggedOut() + ' · last error ' + (lastError || 'none'),
+      'last stop: ' + (lastStop || 'none'),
       'crumb [' + crumb() + '] panel [' + panelTitle() + '] reference found ' + !!reference() + ' navbar ' + !!navbar() + ' side menu ' + !!sideMenu()];
     const attrs = new Map();
     for (const el of $$('*')) for (const a of el.attributes) if (/^(bsi-|data-testid|ng-controller|ui-view|ng-view|ng-app|ng-repeat)/.test(a.name)) attrs.set(a.name, (attrs.get(a.name) || 0) + 1);
