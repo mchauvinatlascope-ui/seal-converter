@@ -33,6 +33,7 @@
   #sidebar_right li { list-style: none; padding: 10px; border-bottom: 1px solid #ddd; cursor: pointer; }
   #sidebar_right ul { margin: 0; padding: 0; }
   .hidden { display: none; }
+  .acts a { display: inline-block; width: 16px; height: 16px; background: #f26522; margin-right: 8px; cursor: pointer; }
   .form label { display: block; font-weight: 600; margin: 10px 10px 2px; }
   .form input { margin: 0 10px; width: 300px; }
   .widget { background: #fff; padding: 10px; margin: 8px; }
@@ -67,6 +68,12 @@
     <section id="content" class="content-main">
       <div class="panel" id="home-panel"><div class="dashboard-container"><div class="widget" bsi-widget bsi-entity="Activity">To do list</div><div class="widget" bsi-widget>My query</div></div></div>
       <div class="panel hidden" id="generic-panel"><h4 class="panel-heading" id="generic-title"></h4></div>
+      <div class="panel hidden" id="queries-panel">
+        <table>
+          <tr><th>Name</th><th>Code</th><th>Access</th><th>Staff</th><th>Actions</th></tr>
+          <tr><td>My group query</td><td>MC QUERY</td><td></td><td>MALAGHAN Workspace</td><td class="acts"><a ng-click="rowact()" data-k="open"><i></i></a><a ng-click="rowact()" data-k="edit"><i></i></a><a ng-click="rowact()" data-k="execute"><i></i></a><a ng-click="rowact()" data-k="print"><i></i></a><a ng-click="rowact()" data-k="trash"><i></i></a></td></tr>
+        </table>
+      </div>
       <div class="panel hidden" id="projects-panel">
         <h4 class="panel-heading">Projects</h4>
         <form class="filters" tabindex="0" ng-click="noop()" onsubmit="return false"><div bsi-attribute="Reference"><label for="f-ref">Reference</label> <input id="f-ref" type="text" placeholder="Reference"> <button type="button" ng-click="search()"><i class="fa fa-binoculars"></i> Search</button></div></form>
@@ -118,10 +125,13 @@
       // les compteurs changent d un jour a l autre
       document.getElementById('n1').textContent = Math.round(Math.random() * 2000) + ' 10.' + Math.round(Math.random() * 99) + '%';
     });
+    // comme dans enos : l infobulle d un bouton de ligne n existe qu apres le survol
+    document.querySelectorAll('.acts a').forEach(a => a.addEventListener('mouseenter', () => a.setAttribute('title', a.dataset.k[0].toUpperCase() + a.dataset.k.slice(1))));
     document.querySelectorAll('[ng-click]').forEach(el => el.addEventListener('click', e => {
       e.preventDefault();
       const act = el.getAttribute('ng-click');
       window.pressed.push(act);
+      if (act === 'rowact()') { window.pressed.push('rowact:' + el.dataset.k); document.getElementById('crumbtext').textContent = 'Query ' + el.dataset.k; return; }
       const m = act.match(/^(\w+)\((?:'(.*)')?\)$/);
       const [fn, arg] = [m[1], m[2]];
       if (fn === 'login') { document.getElementById('login').classList.add('hidden'); document.getElementById('main').classList.remove('hidden'); location.hash = '#/home'; show(['home-panel'], ''); return; }
@@ -132,7 +142,7 @@
         document.querySelectorAll('#sidebar-menu > li').forEach(li => li.classList.toggle('active', li.textContent.includes(arg.split(' ')[0])));
         if (arg === 'Projects') { location.hash = '#/Project/list/'; document.getElementById('f-ref').value = ''; document.querySelectorAll('#projects-panel tr').forEach((tr, i) => { tr.style.display = i <= 1 ? '' : 'none'; }); show(['projects-panel'], 'Projects'); return; }
         if (arg === 'Dashboard') { location.hash = '#/'; show(['home-panel'], ''); return; }
-        document.getElementById('generic-title').textContent = arg; show(['generic-panel'], arg); return;
+        document.getElementById('generic-title').textContent = arg; show(arg === 'Animals queries' ? ['generic-panel', 'queries-panel'] : ['generic-panel'], arg); return;
       }
       if (fn === 'open') { document.getElementById('proj-ref').value = arg; show(['project-panel'], 'Projects / Project', true); return; }
       if (fn === 'detail') { show(arg === 'Procedures' ? ['procedures-panel'] : ['project-panel'], 'Projects / ' + arg, arg !== 'Procedures'); return; }

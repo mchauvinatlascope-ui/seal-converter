@@ -4,7 +4,7 @@ A Chrome extension that gets you where you work in enos in one click. It gives e
 
 ## Install (2 minutes)
 
-1. Download `enos-helper-1.1.0.zip` and unzip it.
+1. Download `enos-helper-1.1.1.zip` and unzip it.
 2. Open `chrome://extensions` and switch on **Developer mode** (top right).
 3. Click **Load unpacked** and pick the unzipped `enos-helper` folder.
 4. Open enos and sign in. The first time, three steps explain the star. Then **Home** opens in place of the empty enos home page.
@@ -44,6 +44,13 @@ Type a few letters: your pinned views, your recent views, the entries of the eno
 ## What it never does
 
 It never clicks Save, Delete or any button for you unless that click is part of a path you pinned yourself; it never fills a record. The one thing it types is the list filters you had typed yourself when you pinned a view through a list row (then presses Search). To open your pinned views quickly it counts the calls enos makes to its server while a page loads (a number, never their content). To greet you on Home it reads your first name where enos shows it at the top right; it is kept nowhere. Nothing leaves your browser.
+
+## 1.1.1
+
+- **Buttons of a list row** (magnifier, pencil, Execute, Print…): in the query lists they carry no text and no lasting name, so a pinned query could stop (« Execute … not found ») or press the neighbour (Print). A row button is now recognised by its icon, its tooltip, or its place in the row. **Pin your query again once** so the new marks are noted.
+- A row is also found by the cell that names it (the Code of a query).
+- The buttons in the orange bar step aside while an enos window (Query Parameters…) is open.
+- The diagnostic now describes the buttons of the first row of a list and the fields of an open window (their kind, never their values).
 
 ## 1.1
 

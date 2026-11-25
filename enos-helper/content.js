@@ -1,4 +1,4 @@
-// enos Helper 1.1.0
+// enos Helper 1.1.1
 // Ne fait que changer l affichage dans ce navigateur : n ecrit jamais dans enos,
 // n envoie rien, ne touche a aucun formulaire.
 // Dans enos l adresse ne change pas quand on ouvre un projet, une procedure ou une fiche :
@@ -11,7 +11,7 @@
 // section#content, aside#sidebar_right (Details, 350 px), icones fa-* / bsi-* / glyphicon-*.
 (() => {
   if (window.top !== window) return; // jamais dans un cadre interne
-  const VERSION = '1.1.0';
+  const VERSION = '1.1.1';
   const KEY = 'enosHelper';
   const DEFAULTS = { on: true, layout: 'drawer', recentMax: 30, palette: true, autoOpen: false, chips: true, calm: true, forms: false, resume: true, home: true };
   const root = document.documentElement;
@@ -161,6 +161,8 @@
     const cls = e => (e && typeof e.className === 'string' ? e.className.trim().split(/\s+/).filter(c => /^(fa|fas|far|fab|glyphicon|icon|bsi|ion|mdi)-/.test(c)) : []);
     let c = cls(el);
     if (!c.length) for (const k of el.children) { c = cls(k); if (c.length) break; }
+    if (!c.length) { const d = el.querySelector('[class*="fa-"], [class*="glyphicon-"], [class*="bsi-"]'); if (d) c = cls(d); }
+    if (!c.length) { const b = el.getAttribute('bsi-icon') || (el.querySelector('[bsi-icon]') ? el.querySelector('[bsi-icon]').getAttribute('bsi-icon') : ''); if (b) c = ['bsi-icon:' + b.slice(0, 40)]; }
     return c.slice(0, 3).join(' ');
   }
   function sig(target) {
@@ -177,6 +179,7 @@
       s.row = rowKey(row);
       s.rowLabel = rowLabel(row);
       s.filters = listFilters(row.closest('table, [role="grid"]'));
+      if (!/^(td|tr|th)$/.test(s.tag)) { const bs = rowButtons(row, s.tag); s.pos = bs.indexOf(el); s.posN = bs.length; }
       const inRow = $$(ACTIONABLE, row).filter(e => same(sigOf(e), s, true));
       s.n = Math.max(0, inRow.indexOf(el));
     } else {
@@ -248,8 +251,12 @@
     return t.filter(x => !/^[\d.,% ]+$/.test(x)).slice(0, 2).join(' | ').slice(0, 100) || txt(row).slice(0, 60);
   }
   const rowLabel = row => { const t = rowCells(row).map(c => txt(c)); return (t.find(refLike) || t[1] || t[0] || '').slice(0, 40); };
+  // Le nom d un bouton sans texte : son infobulle, ou qu enos la range (title, data-original-title, bsi-tooltip...).
+  const tipOf = el => el.getAttribute('title') || el.getAttribute('aria-label') || el.getAttribute('data-original-title') || el.getAttribute('bsi-tooltip') || el.getAttribute('uib-tooltip') || el.getAttribute('tooltip') || el.getAttribute('placeholder') || '';
+  // Les boutons d une ligne, dans l ordre (loupe, crayon, executer, imprimer...) : la place d un bouton dans sa ligne ne change pas.
+  const rowButtons = (row, tag) => $$(tag, row).filter(e => !ours(e) && !e.querySelector(tag));
   const actOf = el => (el.getAttribute('ng-click') || el.getAttribute('data-ng-click') || el.getAttribute('ui-sref') || '').slice(0, 120);
-  const sigOf = el => ({ tag: el.tagName.toLowerCase(), text: txt(el).length > 60 ? '' : txt(el).slice(0, 60), title: (el.getAttribute('title') || el.getAttribute('aria-label') || el.getAttribute('placeholder') || '').slice(0, 60), icon: iconOf(el), href: (el.getAttribute('href') || '').slice(0, 80), act: actOf(el) });
+  const sigOf = el => ({ tag: el.tagName.toLowerCase(), text: txt(el).length > 60 ? '' : txt(el).slice(0, 60), title: tipOf(el).slice(0, 60), icon: iconOf(el), href: (el.getAttribute('href') || '').slice(0, 80), act: actOf(el) });
   // Meme element : meme balise et, soit la meme action AngularJS (hors $index / $event), soit le meme texte et le meme titre.
   const actKey = a => (a || '').replace(/\$(index|event|parent)\b/g, '').replace(/\s+/g, '');
   const same = (a, b, loose) => a.tag === b.tag
@@ -260,8 +267,19 @@
     if (s.row) {
       let rows = $$('tr, [role="row"]').filter(r => !ours(r) && visible(r) && rowKey(r) === s.row);
       if (!rows.length && refLike(s.row)) rows = $$('td, [role="cell"], [role="gridcell"]').filter(c => !ours(c) && txt(c) === s.row).map(c => c.closest('tr, [role="row"]')).filter(r => r && visible(r));
+      if (!rows.length && (s.rowLabel || '').length > 2) rows = $$('td, [role="cell"], [role="gridcell"]').filter(c => !ours(c) && txt(c) === s.rowLabel).map(c => c.closest('tr, [role="row"]')).filter(r => r && visible(r));
+      find.rowSeen = rows.length;
       if (!rows.length) return null;
       scope = rows;
+      // Bouton d une ligne : d abord son icone ou son infobulle si elles le designent seul, sinon sa place dans la ligne.
+      if (s.pos >= 0 && s.posN) {
+        const bs = rowButtons(rows[0], s.tag);
+        const byIcon = s.icon ? bs.filter(e => iconOf(e) === s.icon) : [];
+        if (byIcon.length === 1) return byIcon[0];
+        const byTip = s.title ? bs.filter(e => tipOf(e).slice(0, 60) === s.title) : [];
+        if (byTip.length === 1) return byTip[0];
+        if (bs.length === s.posN && bs[s.pos]) return bs[s.pos];
+      }
     }
     let cands = scope.flatMap(sc => $$(ACTIONABLE, sc)).filter(e => !ours(e) && same(sigOf(e), s, true) && (s.row || visible(e) || s.tag === 'li' || s.tag === 'a' || s.menu));
     if (s.href) { const byHref = cands.filter(e => (e.getAttribute('href') || '').slice(0, 80) === s.href); if (byHref.length) cands = byHref; }
@@ -358,6 +376,7 @@
           if (changed || btn) { progress(item, i, steps.length, 'searching the list for ' + (s.rowLabel || s.row)); if (btn) press(btn.closest('button, a, [ng-click], [data-ng-click]') || btn); await settle(6000); el = await waitFor(s, 15000); }
         }
         if (halted()) return;
+        if (!el && s.row && find.rowSeen) { toast('Stopped at step ' + (i + 1) + ' of ' + steps.length + ': the row « ' + (s.rowLabel || s.row) + ' » is there, but its button (' + (s.title || s.text || s.icon || s.tag) + ') was not recognised. Click it by hand once more, pin the view again, and if it still stops send me a diagnostic taken on this list.', false, 16000); return; }
         if (!el) { toast('Stopped at step ' + (i + 1) + ' of ' + steps.length + ' (' + s.label + '): not found on this page. The view stays as it is.' + (s.row ? ' The row « ' + (s.rowLabel || s.row) + ' » is not in the list: check the list filters, open it by hand once, then pin it again.' : ' Open the view by hand once, then pin it again (drop the steps that are not part of the way).'), false, 14000); return; }
         if (halted()) return;
         // Un Search juste avant une ligne dont on connait les filtres : les remettre AVANT de chercher, un aller-retour de moins.
@@ -955,6 +974,7 @@
     if (out !== wasOut) { wasOut = out; if (out) trail = []; renderChips(); }
     else if (!out && opts.chips && !chipsEl.isConnected) renderChips();
     if (!out && sideMenu()) { offerResume(); maybeWelcome(); }
+    root.classList.toggle('eh-modal', $$('.modal, [uib-modal-window], .modal-dialog').some(m => !ours(m) && visible(m)));
     const dash = out ? null : dashBox();
     if (!dash) homeDismissed = false; // quitter l accueil d enos : Home y reviendra a la prochaine visite
     if (homeOpen) { if (out || (docked() && !dash)) closeHome(); else if (!!dash !== docked()) renderHome(); else placeHome(); }
@@ -979,6 +999,14 @@
     const selOf = el => el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') + (el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\s+/).slice(0, 3).join('.') : '') + [...el.attributes].filter(a => /^bsi-/.test(a.name)).slice(0, 3).map(a => '[' + a.name + '=' + a.value.slice(0, 25) + ']').join('');
     const content = $('#content, section.content-main');
     if (content) { lines.push('content tree:'); const dump = (el, depth) => { if (!el || depth > 5 || ours(el)) return; lines.push('  '.repeat(depth) + selOf(el) + ' ' + rect(el) + (el.children.length === 0 && txt(el) && txt(el).length < 30 && !el.closest('table') ? ' "' + txt(el) + '"' : '')); for (const c of [...el.children].slice(0, 10)) dump(c, depth + 1); }; dump(content, 0); }
+    const attrsOf = e => e.tagName.toLowerCase() + [...e.attributes].filter(a => /^(class|title|data-original-title|ng-click|data-ng-click|ui-sref|type|role)$|^bsi-|tooltip/.test(a.name)).map(a => '[' + a.name + '=' + a.value.replace(/\s+/g, ' ').slice(0, 50) + ']').join('');
+    $$('table').filter(t => !ours(t) && visible(t)).slice(0, 3).forEach((t, k) => {
+      const row = $$('tr', t).find(r => r.querySelector('td') && visible(r)); if (!row) return;
+      const cells = $$('td', row);
+      lines.push('table ' + k + ' first row: ' + cells.length + ' cells, key cells ' + rowCells(row).length + '; buttons: ' + $$('a, button, i, span[ng-click], [bsi-icon], input', row).slice(0, 24).map(e => attrsOf(e) + (e.children.length ? '>' + [...e.children].slice(0, 2).map(attrsOf).join('+') : '')).join(' | '));
+    });
+    const modal = $$('.modal, [uib-modal-window], .modal-dialog').find(m => !ours(m) && visible(m));
+    if (modal) lines.push('modal open: labels ' + $$('label, th, h3, h4, .modal-title', modal).map(e => txt(e).slice(0, 30)).filter(Boolean).slice(0, 30).join(' | ') + ' ; fields ' + $$('input, select, textarea, button', modal).slice(0, 60).map(e => e.tagName.toLowerCase() + (e.type ? ':' + e.type : '') + [...e.attributes].filter(a => /^(ng-model|data-ng-model|name|ng-click|bsi-attribute|bsi-name|bsi-label)$/.test(a.name)).map(a => '[' + a.name + '=' + a.value.slice(0, 40) + ']').join('')).join(' | '));
     const right = $('#sidebar_right');
     if (right) lines.push('details entries ' + detailEntries().map(d => d.label).join(' | '));
     if (right) { lines.push('right panel ' + rect(right) + ' texts ' + $$('*', right).filter(e => e.children.length === 0 && txt(e)).map(e => txt(e).slice(0, 30)).slice(0, 20).join(' | ')); }

@@ -44,6 +44,7 @@
 #eh-chips.eh-tight .eh-chip-pin { padding: 0 8px; }
 #eh-chips.eh-tight .eh-chip-pin span:not(.eh-i) { display: none; }
 html.eh-busy .eh-chip { opacity: .6; pointer-events: none; }
+html.eh-modal #eh-chips { visibility: hidden; }
 
 /* ----- Home : le tableau de bord, a la place de la zone de travail d enos */
 #eh-home { position: fixed; top: 40px; left: 60px; right: 0; bottom: 0; z-index: 2147482990; overflow: auto; overscroll-behavior: contain; background: var(--eh-ground); padding: 30px 40px 28px; }
