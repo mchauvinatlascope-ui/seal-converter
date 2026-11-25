@@ -1,4 +1,4 @@
-// enos Helper 1.1.5
+// enos Helper 1.2.0
 // Ne fait que changer l affichage dans ce navigateur : n ecrit jamais dans enos,
 // n envoie rien, ne touche a aucun formulaire.
 // Dans enos l adresse ne change pas quand on ouvre un projet, une procedure ou une fiche :
@@ -11,9 +11,9 @@
 // section#content, aside#sidebar_right (Details, 350 px), icones fa-* / bsi-* / glyphicon-*.
 (() => {
   if (window.top !== window) return; // jamais dans un cadre interne
-  const VERSION = '1.1.5';
+  const VERSION = '1.2.0';
   const KEY = 'enosHelper';
-  const DEFAULTS = { on: true, layout: 'drawer', recentMax: 30, palette: true, autoOpen: false, chips: true, calm: true, forms: false, resume: true, home: true };
+  const DEFAULTS = { on: true, layout: 'drawer', recentMax: 30, palette: true, autoOpen: false, chips: true, calm: true, forms: false, resume: true, home: true, updates: true };
   const root = document.documentElement;
   const isMac = /Mac/.test(navigator.platform);
   const SITE = 'eh:' + location.origin;
@@ -28,7 +28,7 @@
   const $ = (sel, scope = document) => scope.querySelector(sel);
   const $$ = (sel, scope = document) => [...scope.querySelectorAll(sel)];
   const txt = el => (el ? (el.textContent || '').replace(/\s+/g, ' ').trim() : '');
-  const ours = el => !!(el && el.closest && el.closest('#eh-side, #eh-pal, #eh-tab, #eh-toast, #eh-chips, #eh-pop, #eh-home, #eh-welcome, #eh-prog, [data-eh]'));
+  const ours = el => !!(el && el.closest && el.closest('#eh-side, #eh-pal, #eh-tab, #eh-toast, #eh-chips, #eh-pop, #eh-home, #eh-welcome, #eh-prog, #eh-update, [data-eh]'));
   function h(tag, attrs, ...kids) {
     const el = document.createElement(tag);
     for (const [k, v] of Object.entries(attrs || {})) {
@@ -813,6 +813,43 @@
         h('span', { class: 'eh-sp' }), h('span', {}, 'v' + VERSION + ' · Stays on this computer. Sends nothing, changes nothing in enos.'))));
   }
 
+  // ------------------------------------------------------------ nouvelle version
+  // Le travail est fait par background.js ; ici on affiche. Rien ne se relance tout seul : un bouton le propose.
+  const UPL = 'eh:updateLater';
+  let updLater = null, updLast = 0;
+  function applyUpdate(v) {
+    toast('enos Helper ' + v + ' is in place: restarting the extension and reloading this page…', false, 6000);
+    try { chrome.runtime.sendMessage({ eh: 'update', apply: true }, () => { void chrome.runtime.lastError; }); } catch (e) {}
+    setTimeout(() => location.reload(), 1600);
+  }
+  function updateCard(u) {
+    const old = $('#eh-update'); if (old) old.remove();
+    if (!u || !opts.on || !opts.updates) return;
+    const v = u.onDisk || u.latest;
+    const later = updLater && updLater.v === v && Date.now() - updLater.at < 20 * 3600 * 1000;
+    let body = null;
+    if (u.ready || u.settling) body = [h('b', {}, 'enos Helper ' + u.onDisk + ' is in place'), h('p', {}, u.settling ? 'Its files were just copied. Restart the extension once the copy is complete; this page reloads.' : 'Restart the extension to use it. This page reloads.'),
+      h('div', { class: 'eh-uact' }, h('button', { type: 'button', class: 'eh-btn eh-main', onclick: () => applyUpdate(u.onDisk) }, 'Restart now'))];
+    else if (u.available && !later) {
+      const steps = h('ol', { hidden: true }, h('li', {}, 'Unzip the download.'), h('li', {}, 'Put its files over your enos-helper folder (replace all).'), h('li', {}, 'Reload this page and press « Restart now » on the card that appears.'));
+      body = [h('b', {}, 'enos Helper ' + u.latest + ' is available'), u.notes ? h('p', {}, u.notes) : null, steps,
+        h('div', { class: 'eh-uact' }, h('a', { class: 'eh-btn eh-main', href: u.url, target: '_blank', rel: 'noopener', onclick: () => { steps.hidden = false; } }, 'Download'),
+          h('button', { type: 'button', class: 'eh-btn', onclick: () => { steps.hidden = !steps.hidden; } }, 'How'),
+          h('button', { type: 'button', class: 'eh-btn', onclick: () => { updLater = { v, at: Date.now() }; try { chrome.storage.local.set({ [UPL]: updLater }); } catch (e) {} updateCard(null); } }, 'Later'))];
+    }
+    if (body) document.body.append(h('div', { id: 'eh-update', role: 'status' }, h('small', {}, 'You have ' + u.running), body));
+  }
+  function checkUpdate() {
+    if (!opts.on || !opts.updates || loggedOut() || Date.now() - updLast < 30 * 60 * 1000) return;
+    updLast = Date.now();
+    try {
+      chrome.storage.local.get(UPL, r => {
+        updLater = (r && r[UPL]) || null;
+        chrome.runtime.sendMessage({ eh: 'update' }, u => { void chrome.runtime.lastError; if (u) updateCard(u); });
+      });
+    } catch (e) {}
+  }
+
   // ------------------------------------------------------------ premiere installation
   const welEl = h('div', { id: 'eh-welcome', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Welcome to enos Helper', hidden: true });
   function closeWelcome() { welEl.hidden = true; welEl.remove(); }
@@ -1007,7 +1044,7 @@
     root.classList.toggle('eh-drawer', opts.on && opts.layout === 'drawer');
     root.classList.toggle('eh-calm', opts.on && !!opts.calm);
     root.classList.toggle('eh-forms', opts.on && !!opts.forms);
-    if (!opts.on) { sideOpen = false; root.classList.remove('eh-open', 'eh-calm', 'eh-forms', 'eh-chips'); palEl.hidden = true; popEl.hidden = true; chipsEl.remove(); closeHome(); closeWelcome(); return; }
+    if (!opts.on) { sideOpen = false; root.classList.remove('eh-open', 'eh-calm', 'eh-forms', 'eh-chips'); palEl.hidden = true; popEl.hidden = true; chipsEl.remove(); closeHome(); closeWelcome(); updateCard(null); return; }
     mount();
     if (opts.layout === 'push') toggleSide(true);
     else if (opts.layout === 'none') toggleSide(false);
@@ -1037,7 +1074,7 @@
     const out = loggedOut();
     if (out !== wasOut) { wasOut = out; if (out) trail = []; renderChips(); }
     else if (!out && opts.chips && !chipsEl.isConnected) renderChips();
-    if (!out && sideMenu()) { offerResume(); maybeWelcome(); }
+    if (!out && sideMenu()) { offerResume(); maybeWelcome(); checkUpdate(); }
     root.classList.toggle('eh-modal', $$('.modal, [uib-modal-window], .modal-dialog').some(m => !ours(m) && visible(m)) || !!topLayer());
     const dash = out ? null : dashBox();
     if (!dash) homeDismissed = false; // quitter l accueil d enos : Home y reviendra a la prochaine visite

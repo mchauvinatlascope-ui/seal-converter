@@ -1,6 +1,6 @@
 const KEY = 'enosHelper';
-const DEFAULTS = { on: true, layout: 'drawer', recentMax: 30, palette: true, autoOpen: false, chips: true, calm: true, forms: false, resume: true, home: true };
-const BOOLS = { on: 'on', calm: 'calm', forms: 'forms', homeOn: 'home' }; // case a cocher -> reglage
+const DEFAULTS = { on: true, layout: 'drawer', recentMax: 30, palette: true, autoOpen: false, chips: true, calm: true, forms: false, resume: true, home: true, updates: true };
+const BOOLS = { on: 'on', calm: 'calm', forms: 'forms', homeOn: 'home', updates: 'updates' }; // case a cocher -> reglage
 const $ = id => document.getElementById(id);
 $('ver').textContent = chrome.runtime.getManifest().version;
 if (/Mac/.test(navigator.platform)) $('find').querySelector('kbd').textContent = '⌘ K';

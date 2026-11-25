@@ -179,6 +179,20 @@ html.eh-modal #eh-chips { visibility: hidden; }
 .eh-prog-bar { height: 4px; border-radius: 2px; background: #45504A; overflow: hidden; }
 .eh-prog-bar i { display: block; height: 4px; border-radius: 2px; background: #fff; transition: width .25s ease; }
 
+/* ----- nouvelle version */
+#eh-update { position: fixed; right: 18px; bottom: 18px; z-index: 2147482997; width: 320px; max-width: calc(100vw - 36px); display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; border-radius: 10px; background: #FDFDFB; color: #1F2823; border: 1px solid #E2E0D6; box-shadow: 0 14px 40px rgba(31, 40, 35, .22); font: 13.5px/1.45 "EH Atkinson", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; text-align: left; }
+#eh-update * { box-sizing: border-box; }
+#eh-update small { font: 700 11px/1.3 "EH Schibsted", system-ui, sans-serif; letter-spacing: .07em; text-transform: uppercase; color: #5C6860; }
+#eh-update b { font: 700 15px/1.3 "EH Schibsted", system-ui, sans-serif; }
+#eh-update p { margin: 0; color: #5C6860; }
+#eh-update ol { margin: 2px 0 0; padding-left: 18px; color: #5C6860; display: flex; flex-direction: column; gap: 2px; }
+#eh-update ol[hidden] { display: none; }
+#eh-update .eh-uact { display: flex; gap: 6px; margin-top: 6px; }
+#eh-update .eh-btn { height: 32px; padding: 0 12px; display: inline-flex; align-items: center; font-size: 13px; text-decoration: none; }
+#eh-update a.eh-btn.eh-main, #eh-update a.eh-btn.eh-main:hover { color: #fff; }
+@media print { #eh-update { display: none !important; } }
+html.eh-modal #eh-update { visibility: hidden; }
+
 /* ----- premiere installation */
 #eh-welcome { position: fixed; inset: 0; z-index: 2147483003; background: rgba(31, 40, 35, .42); display: flex; align-items: center; justify-content: center; padding: 16px; }
 #eh-welcome[hidden] { display: none; }

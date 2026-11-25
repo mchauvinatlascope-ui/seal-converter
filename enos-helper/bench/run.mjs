@@ -27,6 +27,8 @@ const base = 'http://127.0.0.1:' + srv.address().port + '/#/login';
 const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', `--disable-extensions-except=${ext}`, `--load-extension=${ext}`] });
 const sw = await browser.waitForTarget(t => t.type() === 'service_worker', { timeout: 10000 }).then(t => t.worker());
 const setOpts = o => sw.evaluate(async o => { await chrome.storage.sync.set({ enosHelper: o }); }, o);
+// 1.2 : une version plus recente est publiee (lue il y a un instant : pas d appel a GitHub pendant le banc).
+await sw.evaluate(async () => { await chrome.storage.local.set({ enosHelperUpdate: { latest: '9.9.9', zip: 'enos-helper-9.9.9.zip', notes: 'Bench notes.', at: Date.now() } }); });
 const page = await browser.newPage();
 await page.setViewport({ width: 1600, height: 900 });
 page.on('pageerror', e => console.log('page error', e.message));
@@ -50,6 +52,9 @@ ok(await page.$eval('#eh-welcome', e => !e.hidden && /Get to any enos view in on
 await page.screenshot({ path: path.join(here, 'shot-welcome.png') });
 await page.$$eval('#eh-welcome .eh-btn', bs => bs.find(b => b.textContent === 'Skip').click()); await sleep(150);
 ok(!(await page.$('#eh-welcome')), 'Skip closes the first run');
+ok(await page.$eval('#eh-update', e => /enos Helper 9\.9\.9 is available/.test(e.textContent) && /Bench notes/.test(e.textContent) && e.querySelector('a').href === 'https://github.com/mchauvinatlascope-ui/seal-converter/raw/main/enos-helper/enos-helper-9.9.9.zip').catch(() => false), '1.2: a card says a new version is available, with its download link');
+await page.$$eval('#eh-update button', bs => bs.find(b => b.textContent === 'Later').click()); await sleep(150);
+ok(!(await page.$('#eh-update')), 'Later puts the card away');
 ok(await page.$eval('#eh-home', e => !e.hidden && /Good (morning|afternoon|evening), Manon/.test(e.querySelector('h1').textContent)), 'Home opens on arrival and greets by first name: ' + await page.$eval('#eh-home h1', e => e.textContent).catch(() => '-'));
 ok(await page.$eval('#eh-home', e => e.parentElement.classList.contains('dashboard-container') && e.getBoundingClientRect().bottom <= document.querySelector('.widget').getBoundingClientRect().top + 1), 'on the enos home page, Home sits above the enos widgets, which stay visible below');
 ok(!(await page.$('#eh-home .eh-map')) && await page.$eval('#eh-home', e => /Show the menu/.test(e.textContent)), 'above the widgets the enos menu is folded');

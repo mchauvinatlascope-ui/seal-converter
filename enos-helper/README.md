@@ -4,12 +4,12 @@ A Chrome extension that gets you where you work in enos in one click. It gives e
 
 ## Install (2 minutes)
 
-1. Download `enos-helper-1.1.5.zip` and unzip it.
+1. Download `enos-helper-1.2.0.zip` and unzip it.
 2. Open `chrome://extensions` and switch on **Developer mode** (top right).
 3. Click **Load unpacked** and pick the unzipped `enos-helper` folder.
 4. Open enos and sign in. The first time, three steps explain the star. Then **Home** opens in place of the empty enos home page.
 
-To update: replace the folder with the new one, click the reload arrow on the enos Helper card in `chrome://extensions`, then reload the enos tab. Your pinned views are kept.
+To update: a card in enos tells you when a new version is ready. Download it, unzip, put its files over your `enos-helper` folder, reload the enos tab and press **Restart now**. Your pinned views are kept.
 
 ## Home
 
@@ -44,6 +44,10 @@ Type a few letters: your pinned views, your recent views, the entries of the eno
 ## What it never does
 
 It never clicks Save, Delete or any button for you unless that click is part of a path you pinned yourself; it never fills a record. The one thing it types is the list filters you had typed yourself when you pinned a view through a list row (then presses Search). To open your pinned views quickly it counts the calls enos makes to its server while a page loads (a number, never their content). To greet you on Home it reads your first name where enos shows it at the top right; it is kept nowhere. Nothing leaves your browser.
+
+## 1.2
+
+- **New versions announce themselves.** When a newer version is published, a small card at the bottom right of enos says so, with a **Download** button and the three steps (unzip, put the files over your `enos-helper` folder, reload the page). Once the files are replaced, the card offers **Restart now**: no more trip to `chrome://extensions`. To know, the extension reads one small public file on GitHub (a version number and one line of notes), at most every six hours; nothing about you or enos is sent. Switch it off under **New versions** in the extension window.
 
 ## 1.1.5
 
