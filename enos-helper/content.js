@@ -1,4 +1,4 @@
-// enos Helper 1.1.3
+// enos Helper 1.1.4
 // Ne fait que changer l affichage dans ce navigateur : n ecrit jamais dans enos,
 // n envoie rien, ne touche a aucun formulaire.
 // Dans enos l adresse ne change pas quand on ouvre un projet, une procedure ou une fiche :
@@ -11,7 +11,7 @@
 // section#content, aside#sidebar_right (Details, 350 px), icones fa-* / bsi-* / glyphicon-*.
 (() => {
   if (window.top !== window) return; // jamais dans un cadre interne
-  const VERSION = '1.1.3';
+  const VERSION = '1.1.4';
   const KEY = 'enosHelper';
   const DEFAULTS = { on: true, layout: 'drawer', recentMax: 30, palette: true, autoOpen: false, chips: true, calm: true, forms: false, resume: true, home: true };
   const root = document.documentElement;
@@ -207,7 +207,9 @@
     if (/^(i|svg|img)$/i.test(el.tagName) && el.parentElement && el.parentElement.closest('a, button, [role="button"], [ng-click], [data-ng-click]')) el = el.parentElement.closest('a, button, [role="button"], [ng-click], [data-ng-click]');
     const s = sigOf(el);
     if (el.tagName === 'INPUT') { s.want = el.type === 'radio' ? true : el.checked; s.say = (el.type === 'radio' ? 'option' : (s.want ? 'tick' : 'untick')) + (fieldOfBox(el) ? ' « ' + fieldOfBox(el) + ' »' : (s.title ? ' ' + s.title : '')); } // l etat voulu : au moment du clic, la case a deja pris son nouvel etat
-    const row = el.closest('tr, [role="row"]');
+    // Une ligne de formulaire (listes, champs : les clauses d une requete) n est pas une ligne de donnees : rien ne la nomme, son rang suffit.
+    const row0 = el.closest('tr, [role="row"]');
+    const row = row0 && !row0.querySelector('select, textarea, input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"])') ? row0 : null;
     if (row && !/^(th|tr)$/.test(s.tag)) {
       s.row = rowKey(row);
       s.rowLabel = rowLabel(row);
