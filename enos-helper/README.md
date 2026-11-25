@@ -4,7 +4,7 @@ A Chrome extension that gets you where you work in enos in one click. It gives e
 
 ## Install (2 minutes)
 
-1. Download `enos-helper-1.0.0.zip` and unzip it.
+1. Download `enos-helper-1.0.1.zip` and unzip it.
 2. Open `chrome://extensions` and switch on **Developer mode** (top right).
 3. Click **Load unpacked** and pick the unzipped `enos-helper` folder.
 4. Open enos and sign in. The first time, three steps explain the star. Then **Home** opens in place of the empty enos home page.
@@ -44,6 +44,14 @@ Type a few letters: your pinned views, your recent views, the entries of the eno
 ## What it never does
 
 It never clicks Save, Delete or any button for you unless that click is part of a path you pinned yourself; it never fills a record. The one thing it types is the list filters you had typed yourself when you pinned a view through a list row (then presses Search). To greet you on Home it reads your first name where enos shows it at the top right; it is kept nowhere. Nothing leaves your browser.
+
+## 1.0.1
+
+- **Home and your enos dashboard on one page**: on the enos home page, Home now sits above your enos widgets (your query results) instead of covering them. The enos menu is folded there (**Show the menu**). From any other view, the Home button still opens Home over the page, with a link to the enos dashboard.
+- Home shows every time you come back to the enos home page, sign-in included (the address is `#/home`).
+- **Pin a menu entry from Home**: a star next to each entry of All of enos (Locations › Records, Animals › Selection, Cages…) pins it without going there. Entries that enos names the same in several menus (Selection, Queries) are all listed now, and named after their menu.
+- « Stopped at step 2 (form) »: a click in a filter box or in the filter area was noted as a step. It no longer is, and such steps are removed from the views you already pinned.
+- Ticking a box is a step that remembers the state you wanted: a box already ticked is left as it is.
 
 ## 1.0
 

@@ -1,4 +1,4 @@
-// enos Helper 1.0.0
+// enos Helper 1.0.1
 // Ne fait que changer l affichage dans ce navigateur : n ecrit jamais dans enos,
 // n envoie rien, ne touche a aucun formulaire.
 // Dans enos l adresse ne change pas quand on ouvre un projet, une procedure ou une fiche :
@@ -11,7 +11,7 @@
 // section#content, aside#sidebar_right (Details, 350 px), icones fa-* / bsi-* / glyphicon-*.
 (() => {
   if (window.top !== window) return; // jamais dans un cadre interne
-  const VERSION = '1.0.0';
+  const VERSION = '1.0.1';
   const KEY = 'enosHelper';
   const DEFAULTS = { on: true, layout: 'drawer', recentMax: 30, palette: true, autoOpen: false, chips: true, calm: true, forms: false, resume: true, home: true };
   const root = document.documentElement;
@@ -107,7 +107,7 @@
   // Clics qui ne menent nulle part (menu replie/deplie, plein ecran, verrou, notifications, compte, connexion).
   const NOISE = /^(toggle menu|fullscreen|lock session|get search results|sign in|log ?in|connexion|se connecter|logout|notifications?|received notifications|sent notifications|collapse|select all|\d+)$/i;
   // Un chemin enregistre par une version d avant peut porter des pas parasites (Sign In, ≡, compte) : on les retire.
-  const noisyStep = st => NOISE.test(st.text || st.title || '') || (st.icon || '').split(/\s+/).some(c => /^(fa|glyphicon|bsi)-(navicon|bars|power-off|user|login-changer2|login-reset)$/.test(c));
+  const noisyStep = st => /^(form|fieldset|table|tbody|thead|section|main|aside|header|body|html)$/.test(st.tag || '') || NOISE.test(st.text || st.title || '') || (st.icon || '').split(/\s+/).some(c => /^(fa|glyphicon|bsi)-(navicon|bars|power-off|user|login-changer2|login-reset)$/.test(c));
   function cleanItems(items) {
     return items.filter(it => it && Array.isArray(it.trail)).map(it => ({ ...it, trail: it.trail.filter(st => st && !noisyStep(st)) })).filter(it => it.trail.length);
   }
@@ -155,7 +155,8 @@
 
   // ------------------------------------------------------------ le chemin de clics
   // Signature d un element clique : de quoi le retrouver (texte, titre, icone, ligne de tableau).
-  const ACTIONABLE = 'a, button, [role="button"], [role="menuitem"], [role="tab"], [ng-click], [data-ng-click], [ui-sref], li, i, svg, img, th, td, tr, label, [tabindex]';
+  const ACTIONABLE = 'input[type="checkbox"], input[type="radio"], a, button, [role="button"], [role="menuitem"], [role="tab"], [ng-click], [data-ng-click], [ui-sref], li, i, svg, img, th, td, tr, label, [tabindex]';
+  const CONTAINER = /^(FORM|FIELDSET|TABLE|TBODY|THEAD|SECTION|MAIN|ASIDE|HEADER|BODY|HTML)$/;
   function iconOf(el) {
     const cls = e => (e && typeof e.className === 'string' ? e.className.trim().split(/\s+/).filter(c => /^(fa|fas|far|fab|glyphicon|icon|bsi|ion|mdi)-/.test(c)) : []);
     let c = cls(el);
@@ -163,11 +164,14 @@
     return c.slice(0, 3).join(' ');
   }
   function sig(target) {
-    let el = target.closest ? target.closest(ACTIONABLE) : null;
+    if (!target.closest || target.closest('input:not([type="checkbox"]):not([type="radio"]), select, textarea, option, [contenteditable="true"]')) return null; // taper dans un champ n est pas un pas
+    let el = target.closest(ACTIONABLE);
     if (!el || ours(el)) return null;
+    if (CONTAINER.test(el.tagName) || (!el.matches('a, button, [role="button"]') && el.querySelector('input, select, textarea'))) return null; // un formulaire, un bloc de filtres
     // Une icone dans un bouton : on vise le bouton.
     if (/^(i|svg|img)$/i.test(el.tagName) && el.parentElement && el.parentElement.closest('a, button, [role="button"], [ng-click], [data-ng-click]')) el = el.parentElement.closest('a, button, [role="button"], [ng-click], [data-ng-click]');
     const s = sigOf(el);
+    if (el.tagName === 'INPUT') { s.want = el.type === 'radio' ? true : !el.checked; if (!s.text && !s.title) s.title = (el.type === 'radio' ? 'option' : (s.want ? 'tick' : 'untick')); } // l etat voulu apres ton clic (note avant qu il change)
     const row = el.closest('tr, [role="row"]');
     if (row && !/^(th|tr)$/.test(s.tag)) {
       s.row = rowKey(row);
@@ -274,7 +278,7 @@
   document.addEventListener('click', e => {
     if (!opts.on || !recording || ours(e.target)) return;
     const s = sig(e.target);
-    if (homeOpen && (s || (e.target.closest && railOf(e.target)))) closeHome();
+    if (homeOpen && !docked() && (s || (e.target.closest && railOf(e.target)))) closeHome(); // pose sur l accueil d enos, Home ne recouvre rien : il reste
     if (!s) return;
     if (s.root) trail = [s]; else { trail.push(s); if (trail.length > 14) trail = trail.slice(-14); }
     scheduleVisit();
@@ -350,7 +354,7 @@
         if (halted()) return;
         if (!el) { toast('Stopped at step ' + (i + 1) + ' of ' + steps.length + ' (' + s.label + '): not found on this page. The view stays as it is.' + (s.row ? ' The row « ' + (s.rowLabel || s.row) + ' » is not in the list: check the list filters, open it by hand once, then pin it again.' : ' Open the view by hand once, then pin it again (drop the steps that are not part of the way).'), false, 14000); return; }
         if (halted()) return;
-        press(el);
+        if (!(typeof s.want === 'boolean' && el.tagName === 'INPUT' && el.checked === s.want)) press(el); // une case deja dans le bon etat reste comme elle est
         await settle();
         if (halted()) return;
       }
@@ -448,7 +452,7 @@
 
   // ------------------------------------------------------------ les menus d enos
   const ACT = 'a[href], button, [role="menuitem"], [role="button"], [role="tab"], [ng-click], [data-ng-click], [ui-sref], [bsi-action]';
-  const SKIP = /^(ok|cancel|close|yes|no|×|x)$/i;
+  const SKIP = /^(ok|cancel|close|yes|no|×|x|\d+(\.\d+)+)$/i;
   function menuPath(el) {
     const parts = [];
     let p = el.parentElement;
@@ -473,7 +477,8 @@
       if (el.querySelector(ACT)) continue;
       const label = txt(el) || el.getAttribute('aria-label') || el.getAttribute('title') || '';
       if (!label || label.length > 60 || SKIP.test(label) || NOISE.test(label)) continue;
-      const key = label.toLowerCase() + '|' + (el.getAttribute('href') || el.getAttribute('ng-click') || el.getAttribute('data-ng-click') || el.getAttribute('ui-sref') || '');
+      const inMenu = !!el.closest('#sidebar-menu, .sidebar-menu');
+      const key = (inMenu ? menuPath(el).join('>') + '>' : '') + label.toLowerCase() + '|' + (el.getAttribute('href') || el.getAttribute('ng-click') || el.getAttribute('data-ng-click') || el.getAttribute('ui-sref') || '');
       if (seen.has(key)) continue;
       seen.add(key);
       out.push({ el, label, path: menuPath(el), hidden: !visible(el), menu: !!el.closest('#sidebar-menu, .sidebar-menu') });
@@ -481,10 +486,11 @@
     return out;
   }
   // Le menu de gauche d enos, a plat : Projects › Management, Animals › Reports › Queries...
+  const leaves = list => list.filter(a => !a.menu || !list.some(b => b !== a && b.menu && b.path.length > a.path.length && b.path[a.path.length] === a.label && a.path.every((x, i) => b.path[i] === x)));
   function menuTree() {
     const m = sideMenu();
     if (!m) return [];
-    return scanActions().filter(a => a.menu).map(a => ({ ...a, full: a.path.concat(a.label).join(' › '), top: a.path[0] || a.label }));
+    return leaves(scanActions()).filter(a => a.menu).map(a => ({ ...a, full: a.path.concat(a.label).join(' › '), top: a.path[0] || a.label }));
   }
   // Le volet Details de la fiche ouverte (aside#sidebar_right) : ses entrees, meme quand le volet est hors ecran.
   function detailEntries() {
@@ -566,7 +572,10 @@
 
   // ------------------------------------------------------------ Home : le tableau de bord
   const homeEl = h('div', { id: 'eh-home', role: 'region', 'aria-label': 'enos Helper home', hidden: true });
-  let homeOpen = false, homeLoad = false, dragPin = null;
+  let homeOpen = false, homeLoad = false, dragPin = null, homeDismissed = false, mapShown = null;
+  // Le vrai tableau de bord d enos (tes widgets, tes requetes) : sur cette page, Home se pose AU-DESSUS, dans la page, sans rien recouvrir.
+  const dashBox = () => { if (loggedOut()) return null; const d = $('#content .dashboard-container, section.content-main .dashboard-container'); return d && visible(d) ? d : null; };
+  const docked = () => homeEl.classList.contains('eh-docked');
   // Ton prenom tel qu enos l affiche en haut a droite (« Manon CHAUVIN ») : lu dans la page, garde nulle part.
   function firstName() {
     const nb = navbar(); if (!nb) return '';
@@ -578,6 +587,10 @@
     return '';
   }
   function placeHome() {
+    const d = dashBox();
+    if (d) { if (homeEl.parentElement !== d) d.prepend(homeEl); homeEl.classList.add('eh-docked'); homeEl.style.top = ''; homeEl.style.left = ''; return; }
+    if (homeEl.parentElement !== document.body) document.body.append(homeEl);
+    homeEl.classList.remove('eh-docked');
     const nb = navbar(), rail = $('#sidebar_left, aside.sidebar-left');
     const top = nb && visible(nb) ? Math.round(nb.getBoundingClientRect().bottom) : 40;
     const left = rail && visible(rail) ? Math.round(rail.getBoundingClientRect().right) : 0;
@@ -586,15 +599,15 @@
   }
   function openHome(load) {
     if (!opts.on || loggedOut()) return;
-    homeOpen = true; homeLoad = !!load;
+    homeOpen = true; homeLoad = !!load; homeDismissed = false;
     closePalette(); if (opts.layout !== 'push') toggleSide(false);
-    if (!homeEl.isConnected) document.body.append(homeEl);
     homeEl.hidden = false;
     renderHome(); renderChips();
     homeEl.scrollTop = 0;
+    if (docked() && homeEl.scrollIntoView) homeEl.scrollIntoView({ block: 'start' });
   }
-  function closeHome() { if (!homeOpen) return; homeOpen = false; homeLoad = false; homeEl.hidden = true; renderChips(); }
-  function toggleHome() { if (homeOpen) closeHome(); else openHome(); }
+  function closeHome(byYou) { if (!homeOpen) return; homeOpen = false; homeLoad = false; homeEl.hidden = true; if (byYou) homeDismissed = true; renderChips(); }
+  function toggleHome() { if (homeOpen) closeHome(true); else openHome(); }
   function howToPin() { closeHome(); toast('Open the view in enos as usual (left menu, then the row or the Details entry), then press ★ Pin this view in the orange bar.', false, 12000); }
   function exportPins() {
     if (!store.pins.length) { toast('No pinned view to save yet.', false, 4000); return; }
@@ -649,12 +662,24 @@
         h('button', { type: 'button', class: 'eh-star' + (on ? ' eh-on' : ''), title: on ? 'Unpin' : 'Pin', 'aria-label': (on ? 'Unpin ' : 'Pin ') + r.name, onclick: () => { if (on) store.pins = store.pins.filter(p => p.name !== r.name); else store.pins.push({ name: r.name, trail: r.trail, at: Date.now() }); save(); render(); } }, icon(on ? 'starFull' : 'star')));
     });
     // Le menu d enos a plat : les entrees qui ne font qu ouvrir un sous-menu ne sont pas des destinations.
-    const all = menuTree();
-    const tree = all.filter(a => !all.some(b => b !== a && b.path.length > a.path.length && b.path[a.path.length] === a.label && a.path.every((x, i) => b.path[i] === x)));
-    const openEntry = a => h('button', { type: 'button', class: 'eh-link', title: a.full, onclick: () => openMenuEntry(a) }, a.path.slice(1).concat(a.label).join(' › '));
+    const tree = menuTree();
+    // Epingler une entree du menu sans y aller : « Animals selection », « Cages selection », « Records »...
+    const pinName = a => (tree.filter(b => b.label === a.label).length > 1 && a.top !== a.label ? a.top + ' ' + a.label.toLowerCase() : a.label);
+    const menuStar = a => {
+      const name = pinName(a), on = store.pins.some(p => p.name === name);
+      return h('button', { type: 'button', class: 'eh-star' + (on ? ' eh-on' : ''), title: on ? 'Unpin ' + name : 'Pin ' + name, 'aria-label': (on ? 'Unpin ' : 'Pin ') + name, onclick: () => {
+        if (on) store.pins = store.pins.filter(p => p.name !== name);
+        else { const s = sig(a.el) || { ...sigOf(a.el), n: 0 }; s.root = true; s.menu = a.full; s.label = a.full; store.pins.push({ name, trail: [s], at: Date.now() }); toast('Pinned « ' + name + ' »', false, 2500); }
+        save(); render(); } }, icon(on ? 'starFull' : 'star'));
+    };
+    const entry = (a, text) => h('div', { class: 'eh-map-r' }, h('button', { type: 'button', class: 'eh-link', title: a.full, onclick: () => openMenuEntry(a) }, text), menuStar(a));
+    const openEntry = a => entry(a, a.path.slice(1).concat(a.label).join(' › '));
     const tops = [...new Set(tree.map(a => a.top))];
     const groups = tops.map(t => ({ t, kids: tree.filter(a => a.top === t && a.path.length) })).filter(g => g.kids.length);
     const singles = tree.filter(a => !a.path.length);
+    const isDocked = docked();
+    const showMap = mapShown == null ? !isDocked : mapShown;
+    const dash = tree.find(a => !a.path.length && /^dashboard$/i.test(a.label)) || tree.find(a => /^#\/?(home)?$/.test(a.el.getAttribute('href') || ''));
     const isQ = it => /quer|filter selection/i.test(stepsHint(it));
     const myQ = store.pins.filter(isQ);
     const qLists = tree.filter(a => /^quer/i.test(a.label));
@@ -662,7 +687,7 @@
       h('div', { class: 'eh-home-top' },
         h('div', {}, h('div', { class: 'eh-eyebrow' }, 'enos Helper'), h('h1', {}, hello)),
         h('button', { type: 'button', class: 'eh-find', onclick: () => openPalette() }, icon('search'), h('span', { class: 'eh-t' }, 'Go to a view, a menu entry, a query'), h('kbd', {}, mod() + ' K')),
-        h('button', { type: 'button', class: 'eh-close', title: 'Close Home and show enos (Esc)', 'aria-label': 'Close Home', onclick: closeHome }, icon('x'))),
+        h('button', { type: 'button', class: 'eh-close', title: 'Close Home and show enos (Esc)', 'aria-label': 'Close Home', onclick: () => closeHome(true) }, icon('x'))),
       homeLoad ? h('div', { class: 'eh-banner' }, h('b', {}, 'Load pinned views from a file saved by enos Helper'), filePick('Choose the file'), h('button', { type: 'button', class: 'eh-link', onclick: () => { homeLoad = false; renderHome(); } }, 'Cancel')) : null,
       h('section', { class: 'eh-sec' },
         h('div', { class: 'eh-sec-h' }, h('h2', {}, 'Pinned views'), h('span', {}, store.pins.length ? 'One click instead of the whole path. Drag to reorder.' : 'A pinned view opens in one click instead of the whole path.')),
@@ -675,12 +700,13 @@
           h('div', { class: 'eh-sec-h' }, h('h2', {}, 'My queries'), h('span', {}, 'All in one place')),
           myQ.map(p => h('div', { class: 'eh-hrow' }, h('button', { type: 'button', class: 'eh-hrow-main', title: stepsHint(p), onclick: () => go(p) }, h('b', {}, p.name), h('span', { class: 'eh-hrow-path' }, ''), h('span', { class: 'eh-hrow-when' }, domainOf(p))))),
           !myQ.length ? h('p', { class: 'eh-note' }, 'Open a query or a saved filter once, pin it with the star, and it is listed here by its name.') : null,
+          isDocked ? h('p', { class: 'eh-note' }, 'The query widgets of your enos dashboard are just below this page.') : (dash ? h('p', { class: 'eh-note' }, 'Your query widgets are on the enos dashboard:', h('button', { type: 'button', class: 'eh-link', onclick: () => openMenuEntry(dash) }, 'Open it')) : null),
           qLists.length ? h('p', { class: 'eh-note' }, 'Open the query lists:', qLists.map(a => h('button', { type: 'button', class: 'eh-link', title: a.full, onclick: () => openMenuEntry(a) }, a.top))) : null)),
       tree.length ? h('section', { class: 'eh-sec' },
-        h('div', { class: 'eh-sec-h' }, h('h2', {}, 'All of enos'), h('span', {}, 'The whole left menu, with its names, one click each')),
-        h('div', { class: 'eh-map' },
+        h('div', { class: 'eh-sec-h' }, h('h2', {}, 'All of enos'), h('span', {}, 'The whole left menu, with its names, one click each. The star pins an entry.'), h('button', { type: 'button', class: 'eh-link', 'aria-expanded': showMap ? 'true' : 'false', onclick: () => { mapShown = !showMap; renderHome(); } }, showMap ? 'Hide' : 'Show the menu')),
+        showMap && h('div', { class: 'eh-map' },
           groups.map(g => h('div', {}, h('div', { class: 'eh-map-h' }, g.t), g.kids.map(openEntry))),
-          singles.length ? h('div', {}, h('div', { class: 'eh-map-h' }, groups.length ? 'Also' : 'Menu'), singles.map(a => h('button', { type: 'button', class: 'eh-link', title: a.full, onclick: () => openMenuEntry(a) }, a.label))) : null)) : null,
+          singles.length ? h('div', {}, h('div', { class: 'eh-map-h' }, groups.length ? 'Also' : 'Menu'), singles.map(a => entry(a, a.label))) : null)) : null,
       h('div', { class: 'eh-home-foot' },
         h('button', { type: 'button', class: 'eh-link', onclick: exportPins }, 'Save my pinned views to a file'), filePick('Load from a file'),
         h('span', { class: 'eh-sp' }), h('span', {}, 'v' + VERSION + ' · Stays on this computer. Sends nothing, changes nothing in enos.'))));
@@ -746,7 +772,7 @@
     const pins = store.pins.filter(inQ);
     const pinned = new Set(store.pins.map(p => p.name));
     const recent = store.recent.filter(r => !pinned.has(r.name) && inQ(r)).slice(0, q ? 30 : 8);
-    const acts = scanActions();
+    const acts = leaves(scanActions());
     const found = q ? acts.map(a => [matches(q, a), a]).filter(x => x[0]).sort((a, b) => b[0] - a[0]).slice(0, 14).map(x => x[1]) : [];
     const tree = !q ? acts.filter(a => a.menu).map(a => ({ ...a, top: a.path[0] || a.label })) : [];
     const details = !q ? detailEntries() : [];
@@ -818,7 +844,7 @@
       ['Recent', store.recent.filter(r => !pinned.has(r.name) && inQ(r)).slice(0, q ? 8 : 6).map(r => ({ label: r.name, sub: whenLong(r.at), run: () => replay(r), pin: () => { pinFromRecent(r); toast('Pinned « ' + r.name + ' »', false, 3000); } }))],
     ];
     if (q) {
-      const found = scanActions().map(a => [matches(q, a), a]).filter(x => x[0]).sort((a, b) => b[0] - a[0]).map(x => x[1]);
+      const found = leaves(scanActions()).map(a => [matches(q, a), a]).filter(x => x[0]).sort((a, b) => b[0] - a[0]).map(x => x[1]);
       groups.push(['enos menu', found.filter(a => a.menu).slice(0, 8).map(a => ({ label: a.label, sub: a.path.join(' › '), run: () => openMenuEntry(a) }))]);
       groups.push(['On this page', found.filter(a => !a.menu).slice(0, 6).map(a => ({ label: a.label, sub: a.path.join(' › ') + (a.hidden ? (a.path.length ? ' · ' : '') + 'in a closed menu' : ''), run: () => openMenuEntry(a) }))]);
     }
@@ -864,7 +890,7 @@
     else if (e.key === 'Escape' && !palEl.hidden) { closePalette(); }
     else if (e.key === 'Escape' && !popEl.hidden) { closePop(); }
     else if (e.key === 'Escape' && !welEl.hidden) { closeWelcome(); }
-    else if (e.key === 'Escape' && homeOpen && !/^(INPUT|TEXTAREA|SELECT)$/.test((e.target && e.target.tagName) || '')) { closeHome(); }
+    else if (e.key === 'Escape' && homeOpen && !/^(INPUT|TEXTAREA|SELECT)$/.test((e.target && e.target.tagName) || '')) { closeHome(true); }
   }, true);
 
   // ------------------------------------------------------------ pose et retrait
@@ -891,8 +917,8 @@
   let resumed = false;
   function offerResume() {
     if (resumed || !opts.on || loggedOut() || replaying) return;
-    if (!/^#\/?$/.test(location.hash) || trail.length) return;
-    if (opts.home) { resumed = true; openHome(); return; } // Home dit deja ou tu en etais
+    if (!/^#\/?(home\/?)?$/i.test(location.hash) || trail.length) return; // l accueil d enos est #/home
+    if (opts.home) { resumed = true; return; } // Home (pose sur l accueil par tick) dit deja ou tu en etais
     if (!opts.resume) return;
     const last = store.recent[0];
     if (!last || !last.trail || !last.trail.length) { resumed = true; return; }
@@ -911,7 +937,10 @@
     if (out !== wasOut) { wasOut = out; if (out) trail = []; renderChips(); }
     else if (!out && opts.chips && !chipsEl.isConnected) renderChips();
     if (!out && sideMenu()) { offerResume(); maybeWelcome(); }
-    if (homeOpen) { if (out) closeHome(); else placeHome(); }
+    const dash = out ? null : dashBox();
+    if (!dash) homeDismissed = false; // quitter l accueil d enos : Home y reviendra a la prochaine visite
+    if (homeOpen) { if (out || (docked() && !dash)) closeHome(); else if (!!dash !== docked()) renderHome(); else placeHome(); }
+    else if (dash && opts.home && !homeDismissed && !replaying && sideMenu()) openHome();
   }
 
   // Etat de la page pour la fenetre de l extension : structure et libelles de menus, jamais le contenu des tableaux ni tes raccourcis.

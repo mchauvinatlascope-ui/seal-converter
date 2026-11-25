@@ -69,7 +69,7 @@
       <div class="panel hidden" id="generic-panel"><h4 class="panel-heading" id="generic-title"></h4></div>
       <div class="panel hidden" id="projects-panel">
         <h4 class="panel-heading">Projects</h4>
-        <div class="filters" bsi-attribute="Reference"><label for="f-ref">Reference</label> <input id="f-ref" type="text" placeholder="Reference"> <button type="button" ng-click="search()"><i class="fa fa-binoculars"></i> Search</button></div>
+        <form class="filters" tabindex="0" ng-click="noop()" onsubmit="return false"><div bsi-attribute="Reference"><label for="f-ref">Reference</label> <input id="f-ref" type="text" placeholder="Reference"> <button type="button" ng-click="search()"><i class="fa fa-binoculars"></i> Search</button></div></form>
         <div class="dropdown" id="filters"><a class="dropdown-toggle" ng-click="toggle()">Filter Selection</a>
           <ul class="dropdown-menu" role="menu"><li><a ng-click="filter('mine')">My projects 2026</a></li><li><a ng-click="filter('all')">All</a></li></ul>
         </div>
@@ -122,7 +122,7 @@
       window.pressed.push(act);
       const m = act.match(/^(\w+)\((?:'(.*)')?\)$/);
       const [fn, arg] = [m[1], m[2]];
-      if (fn === 'login') { document.getElementById('login').classList.add('hidden'); document.getElementById('main').classList.remove('hidden'); location.hash = '#/'; show(['home-panel'], ''); return; }
+      if (fn === 'login') { document.getElementById('login').classList.add('hidden'); document.getElementById('main').classList.remove('hidden'); location.hash = '#/home'; show(['home-panel'], ''); return; }
       if (fn === 'toggle') { el.parentElement.classList.toggle('open'); return; }
       if (fn === 'toggleMenu') { document.getElementById('sidebar_left').style.width = document.getElementById('sidebar_left').style.width === '240px' ? '60px' : '240px'; return; }
       if (fn === 'home') { show(['home-panel'], ''); return; }
