@@ -12,15 +12,15 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const src = path.resolve(here, '..');
 // Copie de l extension dont le manifeste vise le serveur du banc au lieu d enos.
 const ext = fs.mkdtempSync(path.join(process.env.EH_BENCH_DIR || '/tmp', 'enos-helper-bench-'));
-for (const f of ['manifest.json', 'background.js', 'content.js', 'content.css', 'popup.html', 'popup.js']) fs.copyFileSync(path.join(src, f), path.join(ext, f));
+for (const f of ['manifest.json', 'background.js', 'net.js', 'content.js', 'content.css', 'popup.html', 'popup.js']) fs.copyFileSync(path.join(src, f), path.join(ext, f));
 for (const d of ['icons', 'fonts']) { fs.mkdirSync(path.join(ext, d)); for (const f of fs.readdirSync(path.join(src, d))) fs.copyFileSync(path.join(src, d, f), path.join(ext, d, f)); }
-const man = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8')); man.content_scripts[0].matches = ['http://127.0.0.1/*']; man.web_accessible_resources[0].matches = ['http://127.0.0.1/*']; fs.writeFileSync(path.join(ext, 'manifest.json'), JSON.stringify(man));
+const man = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8')); for (const c of man.content_scripts) c.matches = ['http://127.0.0.1/*']; man.web_accessible_resources[0].matches = ['http://127.0.0.1/*']; fs.writeFileSync(path.join(ext, 'manifest.json'), JSON.stringify(man));
 
 let fails = 0;
 const ok = (cond, msg) => { console.log((cond ? 'ok   ' : 'FAIL ') + msg); if (!cond) fails++; };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-const srv = http.createServer((req, res) => { res.setHeader('content-type', 'text/html'); res.end(fs.readFileSync(path.join(here, 'mock.html'))); });
+const srv = http.createServer((req, res) => { if (req.url.startsWith('/wait')) { setTimeout(() => res.end('ok'), 250); return; } res.setHeader('content-type', 'text/html'); res.end(fs.readFileSync(path.join(here, 'mock.html'))); });
 await new Promise(r => srv.listen(0, '127.0.0.1', r));
 const base = 'http://127.0.0.1:' + srv.address().port + '/#/login';
 
@@ -178,12 +178,15 @@ await page.keyboard.press('Enter'); await sleep(200);
 await page.$$eval('#sidebar-menu a', as => as.find(a => a.textContent === 'Dashboard').click()); await sleep(500);
 await page.evaluate(() => { window.pressed = []; });
 await page.keyboard.down('Alt'); await page.keyboard.press('1'); await page.keyboard.up('Alt');
-let opened = false, prog = '';
+let opened = false, prog = ''; const t1 = Date.now();
 for (let i = 0; i < 60 && !opened; i++) { await sleep(200); prog = prog || await page.$eval('#eh-prog', e => (e.hidden ? '' : e.textContent)).catch(() => ''); opened = await page.$eval('#eh-toast', e => !e.hidden && /Opened Procedure two/.test(e.textContent)).catch(() => false); }
 await sleep(800);
 ok((await crumbs()) === 'Projects / Procedures / Procedure' && (await page.$eval('#proc-ref', e => e.value)) === 'ML-2025-0026' && (await page.evaluate(() => window.pressed.includes("open('ML-040014')"))), 'Alt 1 replayed to the right procedure: ' + await page.evaluate(() => window.pressed.join(',')));
 ok(await page.evaluate(() => window.pressed.includes('search()')) && (await page.$eval('#f-ref', e => e.value)) === '*040*', 'typed filter put back and Search pressed before the row click');
 ok(opened, 'toast says opened');
+const took = await page.$eval('#eh-toast', e => +(e.textContent.match(/in ([\d.]+) s/) || [0, 99])[1]);
+ok(took < 3.2, '1.1: five steps (four server calls of 250 ms) replayed in ' + took + ' s, filters set before the first Search');
+ok(await page.evaluate(() => window.pressed.filter(p => p === 'search()').length === 1), 'Search pressed once, not twice: ' + await page.evaluate(() => window.pressed.join(',')));
 ok(/Opening Procedure two.*Step \d of 5/.test(prog) && await page.$eval('#eh-prog', e => e.hidden), 'progress banner during the replay, gone after: ' + prog);
 
 // Un clic de puce depuis une autre vue.
@@ -215,7 +218,7 @@ ok((await crumbs()) === 'Projects · mine', 'saved filter applied from the finde
 // Un pas introuvable : message, pas de boucle.
 await page.evaluate(() => { document.querySelectorAll('#sidebar_right li').forEach(l => { if (l.textContent.includes('Procedures')) l.remove(); }); });
 await ctrl('.');
-await page.click('#eh-side .eh-row'); await sleep(24000);
+await page.click('#eh-side .eh-row'); await sleep(11000);
 ok(await page.$eval('#eh-toast', e => !e.hidden && /Stopped at step 4 of 5/.test(e.textContent)), 'missing step reported: ' + await page.$eval('#eh-toast', e => e.textContent));
 ok((await crumbs()) === 'Projects / Project', 'the view stays where the replay stopped, no jump home: ' + await crumbs());
 

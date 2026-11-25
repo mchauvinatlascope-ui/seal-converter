@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "enos Helper",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "A home dashboard, one-click shortcuts and a Ctrl K finder for enos. Stays in your browser: it sends nothing anywhere.",
   "permissions": [
     "storage",
@@ -22,6 +22,16 @@
         "content.js"
       ],
       "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://malaghan.poweredbyenos.com/*"
+      ],
+      "js": [
+        "net.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
     }
   ],
   "action": {

@@ -1,4 +1,4 @@
-// enos Helper 1.0.2
+// enos Helper 1.1.0
 // Ne fait que changer l affichage dans ce navigateur : n ecrit jamais dans enos,
 // n envoie rien, ne touche a aucun formulaire.
 // Dans enos l adresse ne change pas quand on ouvre un projet, une procedure ou une fiche :
@@ -11,7 +11,7 @@
 // section#content, aside#sidebar_right (Details, 350 px), icones fa-* / bsi-* / glyphicon-*.
 (() => {
   if (window.top !== window) return; // jamais dans un cadre interne
-  const VERSION = '1.0.2';
+  const VERSION = '1.1.0';
   const KEY = 'enosHelper';
   const DEFAULTS = { on: true, layout: 'drawer', recentMax: 30, palette: true, autoOpen: false, chips: true, calm: true, forms: false, resume: true, home: true };
   const root = document.documentElement;
@@ -309,19 +309,24 @@
 
   // Rejouer un chemin : chaque pas attend que son element existe, clique, puis attend le calme.
   let replaying = null;
+  // Apres un clic : la page est prete quand enos n attend plus son serveur (compteur pose par net.js) et que l ecran ne bouge plus.
+  // Sans compteur (net.js absent), on garde l ancienne regle : 350 ms de calme.
+  const netBusy = () => { const n = root.getAttribute('data-eh-net'); return n == null ? null : +n; };
   function settle(max = 5000) {
     return new Promise(res => {
-      let t = 0, done = false;
-      const end = () => { if (done) return; done = true; mo.disconnect(); clearTimeout(t); res(); };
-      const mo = new MutationObserver(() => { clearTimeout(t); t = setTimeout(end, 350); });
+      const t0 = Date.now();
+      let last = t0;
+      const mo = new MutationObserver(() => { last = Date.now(); });
       mo.observe(document.body, { childList: true, subtree: true, attributes: true });
-      t = setTimeout(end, 450);
-      setTimeout(end, max);
+      const iv = setInterval(() => {
+        const now = Date.now(), quiet = now - last, net = netBusy();
+        if (now - t0 >= max || (net === null && quiet >= 350 && now - t0 >= 450) || (net === 0 && quiet >= 160 && now - t0 >= 160)) { clearInterval(iv); mo.disconnect(); res(); }
+      }, 40);
     });
   }
   async function waitFor(s, max = 8000) {
     const t0 = Date.now();
-    while (Date.now() - t0 < max && !stopAsked) { const el = find(s); if (el) return el; await sleep(120); }
+    while (Date.now() - t0 < max && !stopAsked) { const el = find(s); if (el) return el; await sleep(50); }
     return null;
   }
   // Un pas qui est une entree du menu de gauche se retrouve par son chemin de libelles (Projects › Management), meme replie.
@@ -335,6 +340,7 @@
     const steps = item.trail || [];
     if (!steps.length) { toast('This shortcut has no steps.'); return; }
     if (loggedOut()) { toast('Sign in to enos first, then open the shortcut.'); return; }
+    const began = Date.now();
     replaying = item; recording = false; stopAsked = false;
     closeHome();
     root.classList.add('eh-busy');
@@ -343,7 +349,7 @@
       for (let i = 0; i < steps.length; i++) {
         const s = steps[i];
         progress(item, i, steps.length, stepText(s));
-        let el = findMenuStep(s) || await waitFor(s, i === 0 ? 2500 : (s.row ? ((s.filters || []).length ? 2500 : 6000) : 8000)); // filtres notes : inutile d attendre longtemps une ligne que la liste ne montrera pas sans eux
+        let el = findMenuStep(s) || await waitFor(s, i === 0 ? 2500 : (s.row ? ((s.filters || []).length ? 1200 : 6000) : 8000)); // filtres notes : inutile d attendre longtemps une ligne que la liste ne montrera pas sans eux
         if (!el && s.row) {
           // La liste n a pas la ligne : les filtres tapes a l epingle sont remis, Search relance, puis on attend la liste.
           let changed = 0;
@@ -354,11 +360,14 @@
         if (halted()) return;
         if (!el) { toast('Stopped at step ' + (i + 1) + ' of ' + steps.length + ' (' + s.label + '): not found on this page. The view stays as it is.' + (s.row ? ' The row « ' + (s.rowLabel || s.row) + ' » is not in the list: check the list filters, open it by hand once, then pin it again.' : ' Open the view by hand once, then pin it again (drop the steps that are not part of the way).'), false, 14000); return; }
         if (halted()) return;
+        // Un Search juste avant une ligne dont on connait les filtres : les remettre AVANT de chercher, un aller-retour de moins.
+        const nx = steps[i + 1];
+        if (!s.row && nx && nx.row && (nx.filters || []).length && (/^search$/i.test(s.text || s.title || '') || /binocular/.test(s.icon || ''))) for (const f of nx.filters) { const inp = findFilterInput(f); if (inp && (inp.tagName === 'SELECT' || inp.value !== f.value)) setField(inp, f); }
         if (!(typeof s.want === 'boolean' && el.tagName === 'INPUT' && el.checked === s.want)) press(el); // une case deja dans le bon etat reste comme elle est
         await settle();
         if (halted()) return;
       }
-      toast('Opened ' + item.name, false, 1800);
+      toast('Opened ' + item.name + ' in ' + ((Date.now() - began) / 1000).toFixed(1) + ' s', false, 2200);
       trail = steps.map(s => ({ ...s }));
       lastView = '';
       noteVisit();
@@ -955,7 +964,7 @@
   // Etat de la page pour la fenetre de l extension : structure et libelles de menus, jamais le contenu des tableaux ni tes raccourcis.
   function diagnose() {
     const lines = ['enos Helper ' + VERSION, 'url ' + location.href, 'title ' + (document.title || '').slice(0, 60),
-      'layout ' + opts.layout + ' home ' + opts.home + ' open ' + homeOpen + ' chips ' + opts.chips + ' calm ' + opts.calm + ' forms ' + opts.forms + ' resume ' + opts.resume + ' open ' + sideOpen + ' pins ' + store.pins.length + ' recent ' + store.recent.length + ' trail ' + trail.length + ' logged out ' + loggedOut() + ' · last error ' + (lastError || 'none'),
+      'layout ' + opts.layout + ' home ' + opts.home + ' open ' + homeOpen + ' net ' + netBusy() + ' chips ' + opts.chips + ' calm ' + opts.calm + ' forms ' + opts.forms + ' resume ' + opts.resume + ' open ' + sideOpen + ' pins ' + store.pins.length + ' recent ' + store.recent.length + ' trail ' + trail.length + ' logged out ' + loggedOut() + ' · last error ' + (lastError || 'none'),
       'crumb [' + crumb() + '] panel [' + panelTitle() + '] reference found ' + !!reference() + ' navbar ' + !!navbar() + ' side menu ' + !!sideMenu()];
     const attrs = new Map();
     for (const el of $$('*')) for (const a of el.attributes) if (/^(bsi-|data-testid|ng-controller|ui-view|ng-view|ng-app|ng-repeat)/.test(a.name)) attrs.set(a.name, (attrs.get(a.name) || 0) + 1);

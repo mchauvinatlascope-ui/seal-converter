@@ -109,13 +109,15 @@
   <script>
     // Simule enos : connexion d abord ; puis l adresse ne change (presque) jamais ; les volets s affichent selon les clics ; un delai imite le serveur.
     window.pressed = [];
-    const show = (ids, crumb, right) => setTimeout(() => {
+    // chaque vue arrive apres un vrai appel au serveur du banc (250 ms), comme dans enos
+    const later = fn => { const x = new XMLHttpRequest(); x.open('GET', '/wait?' + Math.random()); x.onloadend = fn; x.send(); };
+    const show = (ids, crumb, right) => later(() => {
       document.querySelectorAll('.panel').forEach(p => p.classList.toggle('hidden', !ids.includes(p.id)));
       document.getElementById('crumbtext').textContent = crumb;
       document.getElementById('sidebar_right').classList.toggle('in', !!right);
       // les compteurs changent d un jour a l autre
       document.getElementById('n1').textContent = Math.round(Math.random() * 2000) + ' 10.' + Math.round(Math.random() * 99) + '%';
-    }, 250);
+    });
     document.querySelectorAll('[ng-click]').forEach(el => el.addEventListener('click', e => {
       e.preventDefault();
       const act = el.getAttribute('ng-click');
